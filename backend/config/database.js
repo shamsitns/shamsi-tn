@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
@@ -6,39 +6,32 @@ const fs = require('fs');
 // إنشاء مجلد البيانات
 const dataDir = path.join(__dirname, '../data');
 if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir);
+    fs.mkdirSync(dataDir, { recursive: true });
     console.log('📁 Created data directory');
 }
 
 const dbPath = path.join(dataDir, 'shamsi.db');
 console.log('📁 Database path:', dbPath);
 
-// إنشاء اتصال SQLite
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('❌ Error opening database:', err.message);
-    } else {
-        console.log('✅ SQLite database connected successfully');
-    }
-});
+// إنشاء اتصال SQLite باستخدام better-sqlite3
+const db = new Database(dbPath);
+
+// تمكين المفاتيح الخارجية
+db.pragma('foreign_keys = ON');
+
+console.log('✅ SQLite database connected successfully');
 
 // تهيئة قاعدة البيانات - إنشاء الجداول
-db.serialize(() => {
-    // =============================================
-    // جدول الأدمن
-    // =============================================
-    db.run(`CREATE TABLE IF NOT EXISTS admins (
+db.exec(`
+    CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    
-    // =============================================
-    // جدول المديرين
-    // =============================================
-    db.run(`CREATE TABLE IF NOT EXISTS managers (
+    );
+
+    CREATE TABLE IF NOT EXISTS managers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
@@ -47,12 +40,9 @@ db.serialize(() => {
         company_name TEXT,
         city TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    
-    // =============================================
-    // جدول العملاء (محدث)
-    // =============================================
-    db.run(`CREATE TABLE IF NOT EXISTS leads (
+    );
+
+    CREATE TABLE IF NOT EXISTS leads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_name TEXT NOT NULL,
         phone TEXT NOT NULL,
@@ -85,12 +75,9 @@ db.serialize(() => {
         manager_id INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    
-    // =============================================
-    // جدول الشركات (جديد)
-    // =============================================
-    db.run(`CREATE TABLE IF NOT EXISTS companies (
+    );
+
+    CREATE TABLE IF NOT EXISTS companies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
@@ -104,12 +91,9 @@ db.serialize(() => {
         logo TEXT,
         is_active INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    
-    // =============================================
-    // جدول ربط الشركات بالطلبات (جديد)
-    // =============================================
-    db.run(`CREATE TABLE IF NOT EXISTS lead_companies (
+    );
+
+    CREATE TABLE IF NOT EXISTS lead_companies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         lead_id INTEGER NOT NULL,
         company_id INTEGER NOT NULL,
@@ -117,16 +101,10 @@ db.serialize(() => {
         price REAL,
         notes TEXT,
         status TEXT DEFAULT 'pending',
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (lead_id) REFERENCES leads(id),
-        FOREIGN KEY (company_id) REFERENCES companies(id),
-        FOREIGN KEY (assigned_by) REFERENCES managers(id)
-    )`);
-    
-    // =============================================
-    // جدول تعيينات المديرين
-    // =============================================
-    db.run(`CREATE TABLE IF NOT EXISTS manager_assignments (
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS manager_assignments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         lead_id INTEGER NOT NULL,
         manager_id INTEGER NOT NULL,
@@ -134,138 +112,50 @@ db.serialize(() => {
         assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         status TEXT DEFAULT 'pending',
         notes TEXT
-    )`);
-    
-    console.log('\n✅ Database tables created successfully');
-    
-    // =============================================
-    // إنشاء حساب الأدمن الخاص بك تلقائياً
-    // =============================================
-    const yourAdmin = {
-        name: 'Shamsi TN',
-        email: 'shamsi.tns@gmail.com',
-        password: 'Levis1992*&'
-    };
-    
-    const hashedPassword = bcrypt.hashSync(yourAdmin.password, 10);
-    
-    db.get('SELECT * FROM admins WHERE email = ?', [yourAdmin.email], (err, row) => {
-        if (err) {
-            console.error('❌ Error checking admin:', err.message);
-        } else if (!row) {
-            db.run('INSERT INTO admins (name, email, password) VALUES (?, ?, ?)',
-                [yourAdmin.name, yourAdmin.email, hashedPassword],
-                function(err) {
-                    if (err) {
-                        console.error('❌ Error creating admin:', err.message);
-                    } else {
-                        console.log('\n╔════════════════════════════════════════════╗');
-                        console.log('║     ✅ تم إنشاء حساب الأدمن بنجاح         ║');
-                        console.log('╚════════════════════════════════════════════╝');
-                        console.log(`   📧 Email: ${yourAdmin.email}`);
-                        console.log(`   🔑 Password: ${yourAdmin.password}`);
-                        console.log('   👤 Name: Shamsi TN\n');
-                    }
-                }
-            );
-        } else {
-            console.log('\nℹ️  حساب الأدمن موجود مسبقاً');
-            console.log(`   📧 Email: ${yourAdmin.email}`);
-            console.log('   🔑 Password: Levis1992*&');
-            console.log('   💡 يمكنك تسجيل الدخول مباشرة\n');
-        }
-    });
-    
-    // =============================================
-    // إنشاء مدير تجريبي
-    // =============================================
-    const defaultManager = {
-        name: 'مدير تجريبي',
-        email: 'manager@shamsi.tn',
-        password: 'manager123',
-        phone: '12345678',
-        company_name: 'شركة الطاقة الشمسية',
-        city: 'تونس'
-    };
-    
-    const hashedManagerPassword = bcrypt.hashSync(defaultManager.password, 10);
-    
-    db.get('SELECT * FROM managers WHERE email = ?', [defaultManager.email], (err, row) => {
-        if (err) {
-            console.error('❌ Error checking manager:', err.message);
-        } else if (!row) {
-            db.run(`INSERT INTO managers (name, email, password, phone, company_name, city) 
-                    VALUES (?, ?, ?, ?, ?, ?)`,
-                [defaultManager.name, defaultManager.email, hashedManagerPassword, 
-                 defaultManager.phone, defaultManager.company_name, defaultManager.city],
-                function(err) {
-                    if (!err && this.changes > 0) {
-                        console.log('✅ تم إنشاء حساب مدير تجريبي:');
-                        console.log('   📧 Email: manager@shamsi.tn');
-                        console.log('   🔑 Password: manager123\n');
-                    }
-                }
-            );
-        } else {
-            console.log('ℹ️  حساب المدير التجريبي موجود مسبقاً\n');
-        }
-    });
-    
-    // =============================================
-    // إنشاء شركات تجريبية
-    // =============================================
-    const companies = [
-        {
-            name: 'شركة الطاقة الشمسية تونس',
-            email: 'contact@solar-tunisie.com',
-            password: 'solar123',
-            phone: '71234567',
-            city: 'تونس',
-            description: 'متخصصون في تركيب الأنظمة الشمسية للمنازل والشركات',
-            rating: 4.8,
-            projects_count: 120
-        },
-        {
-            name: 'Solar Tunisie',
-            email: 'info@solartunisie.tn',
-            password: 'solar123',
-            phone: '74234567',
-            city: 'صفاقس',
-            description: 'خدمة ممتازة وأسعار منافسة في الجنوب التونسي',
-            rating: 4.7,
-            projects_count: 95
-        },
-        {
-            name: 'Green Energy Tunisia',
-            email: 'contact@greenenergy.tn',
-            password: 'solar123',
-            phone: '73234567',
-            city: 'سوسة',
-            description: 'أفضل جودة وأطول ضمان في السوق التونسية',
-            rating: 4.9,
-            projects_count: 150
-        }
-    ];
-    
-    for (const company of companies) {
-        const hashedCompanyPassword = bcrypt.hashSync(company.password, 10);
-        db.get('SELECT * FROM companies WHERE email = ?', [company.email], (err, row) => {
-            if (err) {
-                console.error('❌ Error checking company:', err.message);
-            } else if (!row) {
-                db.run(`INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [company.name, company.email, hashedCompanyPassword, company.phone, company.city, company.description, company.rating, company.projects_count],
-                    function(err) {
-                        if (!err && this.changes > 0) {
-                            console.log(`✅ Company added: ${company.name}`);
-                        }
-                    }
-                );
-            }
-        });
+    );
+`);
+
+console.log('✅ Database tables created successfully');
+
+// إنشاء حساب الأدمن
+const adminEmail = 'shamsi.tns@gmail.com';
+const adminPassword = 'Levis1992*&';
+const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
+
+const existingAdmin = db.prepare('SELECT * FROM admins WHERE email = ?').get(adminEmail);
+if (!existingAdmin) {
+    db.prepare('INSERT INTO admins (name, email, password) VALUES (?, ?, ?)').run('Shamsi TN', adminEmail, hashedAdminPassword);
+    console.log('✅ Admin account created');
+}
+
+// إنشاء مدير تجريبي
+const managerEmail = 'manager@shamsi.tn';
+const managerPassword = 'manager123';
+const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
+
+const existingManager = db.prepare('SELECT * FROM managers WHERE email = ?').get(managerEmail);
+if (!existingManager) {
+    db.prepare('INSERT INTO managers (name, email, password, phone, company_name, city) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس');
+    console.log('✅ Manager account created');
+}
+
+// إنشاء شركات تجريبية
+const companies = [
+    { name: 'شركة الطاقة الشمسية تونس', email: 'contact@solar-tunisie.com', password: 'solar123', phone: '71234567', city: 'تونس', description: 'متخصصون في تركيب الأنظمة الشمسية', rating: 4.8, projects_count: 120 },
+    { name: 'Solar Tunisie', email: 'info@solartunisie.tn', password: 'solar123', phone: '74234567', city: 'صفاقس', description: 'خدمة ممتازة وأسعار منافسة', rating: 4.7, projects_count: 95 },
+    { name: 'Green Energy Tunisia', email: 'contact@greenenergy.tn', password: 'solar123', phone: '73234567', city: 'سوسة', description: 'أفضل جودة وأطول ضمان', rating: 4.9, projects_count: 150 }
+];
+
+for (const company of companies) {
+    const existing = db.prepare('SELECT * FROM companies WHERE email = ?').get(company.email);
+    if (!existing) {
+        const hashed = bcrypt.hashSync(company.password, 10);
+        db.prepare('INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(company.name, company.email, hashed, company.phone, company.city, company.description, company.rating, company.projects_count);
+        console.log(`✅ Company added: ${company.name}`);
     }
-});
+}
 
 // =============================================
 // تصدير الدوال للاستخدام في المشروع
@@ -273,37 +163,42 @@ db.serialize(() => {
 
 const dbAPI = {
     query: (sql, params = []) => {
-        return new Promise((resolve, reject) => {
-            db.all(sql, params, (err, rows) => {
-                if (err) {
-                    console.error('❌ Query error:', err);
-                    reject(err);
-                } else {
-                    resolve([rows]);
-                }
-            });
-        });
+        try {
+            const stmt = db.prepare(sql);
+            const rows = stmt.all(...params);
+            return [rows];
+        } catch (error) {
+            console.error('❌ Query error:', error);
+            throw error;
+        }
     },
-    
     execute: (sql, params = []) => {
-        return new Promise((resolve, reject) => {
-            db.run(sql, params, function(err) {
-                if (err) {
-                    console.error('❌ Execute error:', err);
-                    reject(err);
-                } else {
-                    resolve([{ insertId: this.lastID, affectedRows: this.changes }]);
-                }
-            });
-        });
+        try {
+            const stmt = db.prepare(sql);
+            const info = stmt.run(...params);
+            return [{ insertId: info.lastInsertRowid, affectedRows: info.changes }];
+        } catch (error) {
+            console.error('❌ Execute error:', error);
+            throw error;
+        }
     },
-    
-    getConnection: () => {
-        return {
-            query: dbAPI.query,
-            execute: dbAPI.execute,
-            release: () => {}
-        };
+    get: (sql, params = []) => {
+        try {
+            const stmt = db.prepare(sql);
+            return stmt.get(...params);
+        } catch (error) {
+            console.error('❌ Get error:', error);
+            throw error;
+        }
+    },
+    all: (sql, params = []) => {
+        try {
+            const stmt = db.prepare(sql);
+            return stmt.all(...params);
+        } catch (error) {
+            console.error('❌ All error:', error);
+            throw error;
+        }
     }
 };
 
