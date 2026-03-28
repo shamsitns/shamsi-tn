@@ -2,6 +2,7 @@ const db = require('../config/database');
 const { calculateSolarSystem, validateLeadEligibility } = require('../utils/solarCalculator');
 
 // إنشاء طلب جديد
+// إنشاء طلب جديد
 exports.createLead = async (req, res) => {
     try {
         console.log('📝 Received lead data:', req.body);
@@ -40,7 +41,7 @@ exports.createLead = async (req, res) => {
         
         console.log('📊 Solar calculation result:', solarData);
         
-        // إدخال البيانات في قاعدة البيانات (صيغة PostgreSQL)
+        // إدخال البيانات في قاعدة البيانات (بدون RETURNING)
         const query = `
             INSERT INTO leads (
                 user_name, phone, city, property_type, payment_method,
@@ -50,7 +51,6 @@ exports.createLead = async (req, res) => {
                 inverter_power, annual_production, annual_savings, 
                 payback_years, commission, status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-            RETURNING id
         `;
         
         const values = [
@@ -77,12 +77,10 @@ exports.createLead = async (req, res) => {
             'new'
         ];
         
-        const result = await db.query(query, values);
-        const insertId = result.rows[0]?.id;
+        await db.query(query, values);
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
-            leadId: insertId,
             solarData
         });
         
