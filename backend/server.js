@@ -165,6 +165,83 @@ app.get('/api/add-sample-data', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// =============================================
+// مسارات مؤقتة لتنظيف البيانات وإعادة تعيين التسلسل
+// =============================================
+
+// حذف البيانات المكررة وإعادة تعيين التسلسل
+app.get('/api/clean-duplicates', async (req, res) => {
+    try {
+        // حذف جميع البيانات من جدول leads
+        await db.query('DELETE FROM leads');
+        // إعادة تعيين التسلسل
+        await db.query('SELECT setval(\'leads_id_seq\', 1, false)');
+        console.log('✅ Cleaned leads table and reset sequence');
+        res.json({ message: 'Cleanup completed. All leads deleted, sequence reset to 1' });
+    } catch (error) {
+        console.error('❌ Error cleaning duplicates:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// عرض عدد السجلات في جداول قاعدة البيانات
+app.get('/api/db-stats', async (req, res) => {
+    try {
+        const admins = await db.query('SELECT COUNT(*) as count FROM admins');
+        const managers = await db.query('SELECT COUNT(*) as count FROM managers');
+        const companies = await db.query('SELECT COUNT(*) as count FROM companies');
+        const leads = await db.query('SELECT COUNT(*) as count FROM leads');
+        
+        res.json({
+            admins: admins.rows[0]?.count || 0,
+            managers: managers.rows[0]?.count || 0,
+            companies: companies.rows[0]?.count || 0,
+            leads: leads.rows[0]?.count || 0
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// إضافة بيانات تجريبية
+app.get('/api/add-sample-lead', async (req, res) => {
+    try {
+        const solarData = {
+            requiredKw: 5,
+            estimatedPrice: 16000,
+            panels: 10,
+            panelPower: 0.5,
+            inverterPower: 5.5,
+            annualProduction: 7500,
+            annualSavings: 1650,
+            paybackYears: 9.7,
+            commission: 500
+        };
+        
+        await db.query(`
+            INSERT INTO leads (
+                user_name, phone, city, property_type, payment_method,
+                monthly_bill, monthly_consumption, meter_owner,
+                roof_area, roof_direction, shading,
+                required_kw, estimated_price, panels, panel_power,
+                inverter_power, annual_production, annual_savings, 
+                payback_years, commission, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        `, [
+            'أحمد بن علي', '12345678', 'تونس', 'house', 'cash',
+            250, null, 1,
+            80, 'جنوب', 'لا يوجد',
+            solarData.requiredKw, solarData.estimatedPrice, solarData.panels, solarData.panelPower,
+            solarData.inverterPower, solarData.annualProduction, solarData.annualSavings,
+            solarData.paybackYears, solarData.commission, 'new'
+        ]);
+        
+        res.json({ message: 'Sample lead added successfully' });
+    } catch (error) {
+        console.error('Error adding sample lead:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 app.listen(PORT, async () => {
     console.log(`
     ════════════════════════════════════════════
