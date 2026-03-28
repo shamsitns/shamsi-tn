@@ -290,14 +290,18 @@ const ManagerDashboard = () => {
                                             <span className="text-gray-500">السعر التقريبي:</span>
                                             <span className="font-medium">{formatCurrency(lead.estimated_price)} دينار</span>
                                         </div>
-                                        
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaMoneyBillWave className="text-green-600" />
-                                                عمولتك:
-                                            </span>
-                                            <span className="font-bold text-green-600">{formatCurrency(lead.commission)} دينار</span>
-                                        </div>
+    <span className="text-gray-500 flex items-center gap-1">
+        <FaMoneyBillWave className="text-green-600" />
+        عمولتك:
+    </span>
+    <span className="font-bold text-green-600">
+        {formatCurrency(lead.commission)} دينار
+        <span className="text-xs text-gray-400 mr-1">
+            ({lead.required_kw} kW × 150)
+        </span>
+    </span>
+</div>
                                         
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">

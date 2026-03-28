@@ -420,6 +420,22 @@ const CalculatorPage = () => {
                     )}
                 </div>
                 
+                {/* قسم العمولة */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-700 font-semibold flex items-center gap-1">
+                            <FaMoneyBillWave className="text-blue-600" />
+                            عمولة المنصة:
+                        </span>
+                        <span className="text-xl font-bold text-blue-700">
+                            {result.commission?.toLocaleString() || '0'} دينار
+                        </span>
+                    </div>
+                    <p className="text-xs text-gray-500 text-center mt-2">
+                        (150 دينار لكل كيلوواط - {result.requiredKw} kW × 150 = {result.commission?.toLocaleString()} دينار)
+                    </p>
+                </div>
+                
                 <div className="flex gap-3">
                     <a
                         href={`https://wa.me/21624661499?text=${encodeURIComponent('مرحباً، أريد استشارة حول الطاقة الشمسية')}`}

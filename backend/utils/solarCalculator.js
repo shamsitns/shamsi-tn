@@ -314,19 +314,11 @@ function estimatePrice(kw, propertyType, panelType) {
 // حساب العمولة للمنصة (نظام جديد)
 // =============================================
 
+// حساب العمولة للمنصة (150 دينار لكل كيلوواط)
 function calculateCommission(kw) {
-    // نظام عمولة متدرج
-    if (kw <= 3) {
-        return 300;
-    } else if (kw <= 5) {
-        return 500;
-    } else if (kw <= 6) {
-        return 600;
-    } else if (kw <= 10) {
-        return 1000;
-    } else {
-        return Math.round(kw * 100);
-    }
+    // العمولة: 150 دينار لكل 1 كيلوواط
+    // 3kW = 450 دينار، 5kW = 750 دينار، 10kW = 1500 دينار
+    return Math.round(kw * 150);
 }
 
 // =============================================
