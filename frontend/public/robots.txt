@@ -1,0 +1,4 @@
+# robots.txt for Shamsi.tn
+User-agent: *
+Allow: /
+Sitemap: https://shamsi-tns.onrender.com/sitemap.xml

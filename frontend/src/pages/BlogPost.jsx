@@ -1,17 +1,14 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FaCalendarAlt, FaUser, FaArrowRight } from 'react-icons/fa';
 
 const BlogPost = () => {
     const { slug } = useParams();
     
     const posts = {
-        'cout-energie-solaire-tunisie': {
-            title: 'تكلفة الطاقة الشمسية في تونس 2024',
-            date: '15 مارس 2024',
-            author: 'فريق Shamsi.tn',
+        'cout-energie-solaire-tunisie-2026': {
+            title: 'تكلفة الطاقة الشمسية في تونس 2026',
             content: `
-                <p>تتراوح تكلفة تركيب الطاقة الشمسية في تونس بين 2000 و 3000 دينار لكل كيلوواط حسب جودة المعدات والشركة المنفذة.</p>
+                <p>تتراوح تكلفة تركيب الطاقة الشمسية في تونس بين <strong>2000 و 3000 دينار لكل كيلوواط</strong> حسب جودة المعدات والشركة المنفذة.</p>
                 
                 <h2>عوامل تؤثر على التكلفة:</h2>
                 <ul>
@@ -23,41 +20,27 @@ const BlogPost = () => {
                 
                 <h2>مثال على التكلفة:</h2>
                 <ul>
-                    <li>نظام 3kW: 8,000 - 10,000 دينار</li>
-                    <li>نظام 5kW: 14,000 - 17,000 دينار</li>
-                    <li>نظام 10kW: 26,000 - 32,000 دينار</li>
+                    <li><strong>نظام 3kW:</strong> 8,000 - 10,000 دينار</li>
+                    <li><strong>نظام 5kW:</strong> 14,000 - 17,000 دينار</li>
+                    <li><strong>نظام 10kW:</strong> 26,000 - 32,000 دينار</li>
                 </ul>
                 
-                <p>يمكنك الحصول على دراسة مجانية لمنزلك من خلال <a href="/calculator">حاسبة الطاقة الشمسية</a>.</p>
+                <p>يمكنك الحصول على <strong>دراسة مجانية</strong> لمنزلك من خلال <a href="/calculator">حاسبة الطاقة الشمسية</a>.</p>
             `
-        }
+        },
+        // أضف مقالات أخرى هنا
     };
     
-    const post = posts[slug] || posts['cout-energie-solaire-tunisie'];
+    const post = posts[slug] || posts['cout-energie-solaire-tunisie-2026'];
     
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4">
-            <div className="max-w-4xl mx-auto">
-                <Link to="/blog" className="inline-flex items-center gap-2 text-yellow-600 hover:text-yellow-700 mb-6">
-                    <FaArrowRight /> العودة إلى المدونة
+            <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-6 md:p-8">
+                <Link to="/blog" className="text-green-600 hover:text-green-700 mb-4 inline-block">
+                    ← العودة إلى المدونة
                 </Link>
-                
-                <div className="bg-white rounded-2xl shadow-xl p-8">
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">{post.title}</h1>
-                    
-                    <div className="flex items-center gap-4 text-gray-500 mb-8 pb-4 border-b">
-                        <span className="flex items-center gap-1"><FaCalendarAlt /> {post.date}</span>
-                        <span className="flex items-center gap-1"><FaUser /> {post.author}</span>
-                    </div>
-                    
-                    <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
-                    
-                    <div className="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <p className="text-center text-yellow-800">
-                            هل تريد دراسة مجانية لمنزلك؟ <Link to="/calculator" className="font-bold underline">احسب تكلفة الطاقة الشمسية الآن</Link>
-                        </p>
-                    </div>
-                </div>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">{post.title}</h1>
+                <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
             </div>
         </div>
     );
