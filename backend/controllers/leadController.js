@@ -40,7 +40,7 @@ exports.createLead = async (req, res) => {
         
         console.log('📊 Solar calculation result:', solarData);
         
-        // إدخال البيانات في قاعدة البيانات
+        // إدخال البيانات في قاعدة البيانات (صيغة PostgreSQL)
         const query = `
             INSERT INTO leads (
                 user_name, phone, city, property_type, payment_method,
@@ -49,7 +49,8 @@ exports.createLead = async (req, res) => {
                 required_kw, estimated_price, panels, panel_power,
                 inverter_power, annual_production, annual_savings, 
                 payback_years, commission, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+            RETURNING id
         `;
         
         const values = [
@@ -76,12 +77,12 @@ exports.createLead = async (req, res) => {
             'new'
         ];
         
-        const result = await db.execute(query, values);
-        const insertResult = result.rows || result;
+        const result = await db.query(query, values);
+        const insertId = result.rows[0]?.id;
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
-            leadId: insertResult?.insertId,
+            leadId: insertId,
             solarData
         });
         
@@ -93,7 +94,6 @@ exports.createLead = async (req, res) => {
         });
     }
 };
-
 // الحصول على طلب محدد
 exports.getLead = async (req, res) => {
     try {
