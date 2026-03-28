@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
-import { FaCheck, FaTimes, FaPaperPlane, FaUsers, FaChartBar, FaEye, FaTrash, FaSync } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaPaperPlane, FaUsers, FaChartBar, FaEye, FaTrash, FaSync, FaUser, FaMapMarkerAlt, FaMoneyBillWave, FaBolt, FaCalendarAlt } from 'react-icons/fa';
 
 const AdminDashboard = () => {
     const [leads, setLeads] = useState([]);
@@ -78,6 +78,52 @@ const AdminDashboard = () => {
         }
     };
     
+    // =============================================
+    // دوال الحذف
+    // =============================================
+    
+    const handleDeleteLead = async (leadId) => {
+        if (window.confirm('⚠️ هل أنت متأكد من حذف هذا الطلب؟')) {
+            try {
+                await adminAPI.deleteLead(leadId);
+                toast.success('✅ تم حذف الطلب بنجاح');
+                fetchData();
+                fetchStats();
+            } catch (error) {
+                console.error('Error deleting lead:', error);
+                toast.error('❌ حدث خطأ في حذف الطلب');
+            }
+        }
+    };
+    
+    const handleDeleteAllLeads = async () => {
+        if (window.confirm('⚠️ تحذير: هل أنت متأكد من حذف جميع الطلبات؟ لا يمكن التراجع عن هذا الإجراء.')) {
+            try {
+                await adminAPI.deleteAllLeads();
+                toast.success('✅ تم حذف جميع الطلبات بنجاح');
+                fetchData();
+                fetchStats();
+            } catch (error) {
+                console.error('Error deleting all leads:', error);
+                toast.error('❌ حدث خطأ في حذف الطلبات');
+            }
+        }
+    };
+    
+    const handleDeleteRejectedLeads = async () => {
+        if (window.confirm('⚠️ هل أنت متأكد من حذف جميع الطلبات المرفوضة؟')) {
+            try {
+                await adminAPI.deleteRejectedLeads();
+                toast.success('✅ تم حذف الطلبات المرفوضة بنجاح');
+                fetchData();
+                fetchStats();
+            } catch (error) {
+                console.error('Error deleting rejected leads:', error);
+                toast.error('❌ حدث خطأ في حذف الطلبات المرفوضة');
+            }
+        }
+    };
+    
     const handleSendToManager = async () => {
         if (!selectedLead || !selectedLead.managerId) {
             toast.error('يرجى اختيار مدير');
@@ -107,6 +153,7 @@ const AdminDashboard = () => {
             new: 'bg-yellow-100 text-yellow-800',
             approved_by_admin: 'bg-blue-100 text-blue-800',
             sent_to_manager: 'bg-purple-100 text-purple-800',
+            assigned_to_company: 'bg-indigo-100 text-indigo-800',
             completed: 'bg-green-100 text-green-800',
             rejected: 'bg-red-100 text-red-800'
         };
@@ -115,6 +162,7 @@ const AdminDashboard = () => {
             new: 'جديد',
             approved_by_admin: 'تمت الموافقة',
             sent_to_manager: 'مرسل لمدير',
+            assigned_to_company: 'مرسل لشركة',
             completed: 'مكتمل',
             rejected: 'مرفوض'
         };
@@ -124,6 +172,11 @@ const AdminDashboard = () => {
                 {texts[status] || status}
             </span>
         );
+    };
+    
+    const formatCurrency = (amount) => {
+        if (!amount && amount !== 0) return '0';
+        return amount.toLocaleString();
     };
     
     if (loading) {
@@ -139,11 +192,29 @@ const AdminDashboard = () => {
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-green-700 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-6">
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-                        <FaUsers className="text-yellow-300" />
-                        لوحة تحكم الأدمن
-                    </h1>
-                    <p className="text-green-100 mt-1">إدارة الطلبات والموافقة عليها وإرسالها للمديرين</p>
+                    <div className="flex flex-wrap justify-between items-center">
+                        <div>
+                            <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+                                <FaUsers className="text-yellow-300" />
+                                لوحة تحكم الأدمن
+                            </h1>
+                            <p className="text-green-100 mt-1">إدارة الطلبات والموافقة عليها وإرسالها للمديرين</p>
+                        </div>
+                        <div className="flex gap-2 mt-3 sm:mt-0">
+                            <button
+                                onClick={handleDeleteRejectedLeads}
+                                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                            >
+                                <FaTimes /> حذف المرفوضة
+                            </button>
+                            <button
+                                onClick={handleDeleteAllLeads}
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                            >
+                                <FaTrash /> حذف الكل
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -164,7 +235,7 @@ const AdminDashboard = () => {
                             <div className="text-sm text-gray-500">مكتملة</div>
                         </div>
                         <div className="bg-white rounded-lg shadow p-4">
-                            <div className="text-2xl font-bold text-purple-600">{stats.total_commission || 0} دينار</div>
+                            <div className="text-2xl font-bold text-purple-600">{stats.total_commission?.toLocaleString() || 0} دينار</div>
                             <div className="text-sm text-gray-500">الأرباح المتوقعة</div>
                         </div>
                     </div>
@@ -206,6 +277,22 @@ const AdminDashboard = () => {
                     >
                         مرسلة لمدير
                     </button>
+                    <button
+                        onClick={() => setFilter('rejected')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            filter === 'rejected' ? 'bg-red-600 text-white' : 'bg-white text-gray-700 border'
+                        }`}
+                    >
+                        مرفوضة
+                    </button>
+                    <button
+                        onClick={() => setFilter('completed')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            filter === 'completed' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 border'
+                        }`}
+                    >
+                        مكتملة
+                    </button>
                 </div>
                 
                 {/* Leads Table */}
@@ -219,6 +306,7 @@ const AdminDashboard = () => {
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الفاتورة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">القدرة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">السعر</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">العمولة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
                                 </tr>
@@ -226,7 +314,7 @@ const AdminDashboard = () => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {leads.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
                                             لا توجد طلبات
                                         </td>
                                     </tr>
@@ -241,6 +329,14 @@ const AdminDashboard = () => {
                                             <td className="px-4 py-3 whitespace-nowrap">{lead.monthly_bill || lead.bill} دينار</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{lead.estimated_price?.toLocaleString()} دينار</td>
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <span className="text-green-600 font-semibold">
+                                                    {lead.commission?.toLocaleString()} دينار
+                                                </span>
+                                                <span className="text-xs text-gray-400 block">
+                                                    ({lead.required_kw} kW × 150)
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">
                                                 <div className="flex gap-2">
@@ -274,6 +370,14 @@ const AdminDashboard = () => {
                                                             <FaPaperPlane size={18} />
                                                         </button>
                                                     )}
+                                                    {/* زر حذف لجميع الطلبات */}
+                                                    <button
+                                                        onClick={() => handleDeleteLead(lead.id)}
+                                                        className="text-gray-500 hover:text-red-600 p-1"
+                                                        title="حذف"
+                                                    >
+                                                        <FaTrash size={18} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
