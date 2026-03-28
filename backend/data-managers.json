@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "name": "مدير تجريبي",
+    "email": "manager@shamsi.tn",
+    "password": "$2a$10$McgtZBtdJwaUDakMjJS1VuigycOv93fOj.on2QPiPmNNiDKnLq2KS",
+    "phone": "12345678",
+    "company_name": "شركة الطاقة الشمسية",
+    "city": "تونس",
+    "created_at": "2026-03-27 21:16:08"
+  }
+]
