@@ -143,6 +143,28 @@ async function seedDatabase() {
 // =============================================
 // بدء الخادم
 // =============================================
+// مسار مؤقت لإضافة بيانات تجريبية
+app.get('/api/add-sample-data', async (req, res) => {
+    try {
+        // إضافة طلب تجريبي
+        await db.execute(`
+            INSERT INTO leads (user_name, phone, city, property_type, monthly_bill, required_kw, estimated_price, panels, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, ['أحمد بن علي', '12345678', 'تونس', 'house', 250, 5, 16000, 10, 'new']);
+        
+        // عرض عدد الطلبات
+        const result = await db.query('SELECT COUNT(*) as count FROM leads');
+        const leadsCount = result.rows ? result.rows[0]?.count : result[0]?.count;
+        
+        res.json({ 
+            message: 'Test data added successfully',
+            totalLeads: leadsCount
+        });
+    } catch (error) {
+        console.error('Error adding data:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 app.listen(PORT, async () => {
     console.log(`
     ════════════════════════════════════════════
