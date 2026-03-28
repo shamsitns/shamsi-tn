@@ -24,28 +24,33 @@ exports.getAllLeads = async (req, res) => {
             WHERE 1=1
         `;
         const queryParams = [];
+        let paramIndex = 1;
         
         if (status && status !== 'all') {
-            query += ' AND l.status = ?';
+            query += ` AND l.status = $${paramIndex}`;
             queryParams.push(status);
+            paramIndex++;
         }
         
         if (city) {
-            query += ' AND l.city = ?';
+            query += ` AND l.city = $${paramIndex}`;
             queryParams.push(city);
+            paramIndex++;
         }
         
         if (fromDate) {
-            query += ' AND DATE(l.created_at) >= ?';
+            query += ` AND DATE(l.created_at) >= $${paramIndex}`;
             queryParams.push(fromDate);
+            paramIndex++;
         }
         
         if (toDate) {
-            query += ' AND DATE(l.created_at) <= ?';
+            query += ` AND DATE(l.created_at) <= $${paramIndex}`;
             queryParams.push(toDate);
+            paramIndex++;
         }
         
-        query += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
+        query += ` ORDER BY l.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
         queryParams.push(parseInt(limit), parseInt(offset));
         
         const result = await db.query(query, queryParams);
@@ -54,15 +59,18 @@ exports.getAllLeads = async (req, res) => {
         // الحصول على العدد الإجمالي
         let countQuery = 'SELECT COUNT(*) as total FROM leads WHERE 1=1';
         const countParams = [];
+        let countIndex = 1;
         
         if (status && status !== 'all') {
-            countQuery += ' AND status = ?';
+            countQuery += ` AND status = $${countIndex}`;
             countParams.push(status);
+            countIndex++;
         }
         
         if (city) {
-            countQuery += ' AND city = ?';
+            countQuery += ` AND city = $${countIndex}`;
             countParams.push(city);
+            countIndex++;
         }
         
         const countResultRaw = await db.query(countQuery, countParams);
@@ -92,18 +100,18 @@ exports.approveLead = async (req, res) => {
         console.log(`✅ Admin ${adminId} approving lead ${leadId}`);
         
         // التحقق من وجود الطلب
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // تحديث حالة الطلب
-        await db.execute(
+        await db.query(
             `UPDATE leads 
              SET status = 'approved_by_admin', 
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
+             WHERE id = $1`,
             [leadId]
         );
         
@@ -130,25 +138,25 @@ exports.rejectLead = async (req, res) => {
         console.log(`❌ Admin ${adminId} rejecting lead ${leadId}, reason: ${reason}`);
         
         // التحقق من وجود الطلب
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // تحديث حالة الطلب
-        await db.execute(
+        await db.query(
             `UPDATE leads 
              SET status = 'rejected', 
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
+             WHERE id = $1`,
             [leadId]
         );
         
         // تسجيل سبب الرفض في جدول منفصل (اختياري)
-        await db.execute(
+        await db.query(
             `INSERT INTO lead_rejections (lead_id, rejected_by, reason, rejected_at) 
-             VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [leadId, adminId, reason || 'لا يوجد سبب']
         );
         
@@ -175,7 +183,7 @@ exports.sendToManager = async (req, res) => {
         console.log(`📨 Admin ${adminId} sending lead ${leadId} to manager ${managerId}`);
         
         // التحقق من وجود الطلب
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
@@ -183,7 +191,7 @@ exports.sendToManager = async (req, res) => {
         
         // التحقق من وجود المدير
         const resultManager = await db.query(
-            'SELECT id, name FROM managers WHERE id = ?',
+            'SELECT id, name FROM managers WHERE id = $1',
             [managerId]
         );
         const managers = resultManager.rows || resultManager;
@@ -194,34 +202,34 @@ exports.sendToManager = async (req, res) => {
         const manager = managers[0];
         
         // تحديث lead
-        await db.execute(
+        await db.query(
             `UPDATE leads 
              SET status = 'sent_to_manager', 
-                 manager_id = ?, 
+                 manager_id = $1, 
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
+             WHERE id = $2`,
             [managerId, leadId]
         );
         
         // إضافة تعيين في manager_assignments
         const resultExisting = await db.query(
             `SELECT id FROM manager_assignments 
-             WHERE lead_id = ? AND manager_id = ?`,
+             WHERE lead_id = $1 AND manager_id = $2`,
             [leadId, managerId]
         );
         const existing = resultExisting.rows || resultExisting;
         
         if (existing && existing.length > 0) {
-            await db.execute(
+            await db.query(
                 `UPDATE manager_assignments 
-                 SET assigned_by = ?, notes = ?, status = 'pending', assigned_at = CURRENT_TIMESTAMP
-                 WHERE lead_id = ? AND manager_id = ?`,
+                 SET assigned_by = $1, notes = $2, status = 'pending', assigned_at = CURRENT_TIMESTAMP
+                 WHERE lead_id = $3 AND manager_id = $4`,
                 [adminId, notes || `تم إرسال الطلب من قبل الأدمن`, leadId, managerId]
             );
         } else {
-            await db.execute(
+            await db.query(
                 `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, status) 
-                 VALUES (?, ?, ?, ?, ?)`,
+                 VALUES ($1, $2, $3, $4, $5)`,
                 [leadId, managerId, adminId, notes || `تم إرسال الطلب من قبل الأدمن`, 'pending']
             );
         }
@@ -274,7 +282,7 @@ exports.addManager = async (req, res) => {
         console.log(`👥 Adding new manager: ${name}, ${email}`);
         
         // التحقق من وجود البريد
-        const resultExisting = await db.query('SELECT id FROM managers WHERE email = ?', [email]);
+        const resultExisting = await db.query('SELECT id FROM managers WHERE email = $1', [email]);
         const existing = resultExisting.rows || resultExisting;
         if (existing && existing.length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
@@ -282,9 +290,9 @@ exports.addManager = async (req, res) => {
         
         const hashedPassword = bcrypt.hashSync(password, 10);
         
-        await db.execute(
+        await db.query(
             `INSERT INTO managers (name, email, password, phone, company_name, city) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             VALUES ($1, $2, $3, $4, $5, $6)`,
             [name, email, hashedPassword, phone || null, company_name || null, city || null]
         );
         
@@ -300,63 +308,11 @@ exports.addManager = async (req, res) => {
     }
 };
 
-// تحديث مدير
-exports.updateManager = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, phone, company_name, city, is_active } = req.body;
-        
-        console.log(`👥 Updating manager ${id}`);
-        
-        await db.execute(
-            `UPDATE managers 
-             SET name = ?, phone = ?, company_name = ?, city = ?, updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
-            [name, phone || null, company_name || null, city || null, id]
-        );
-        
-        console.log(`✅ Manager ${id} updated`);
-        res.json({ message: 'تم تحديث المدير بنجاح' });
-        
-    } catch (error) {
-        console.error('❌ Error updating manager:', error);
-        res.status(500).json({ message: 'حدث خطأ في تحديث المدير', error: error.message });
-    }
-};
-
-// حذف مدير
-exports.deleteManager = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        console.log(`👥 Deleting manager ${id}`);
-        
-        // التحقق من وجود طلبات مرتبطة
-        const resultLeads = await db.query('SELECT COUNT(*) as count FROM leads WHERE manager_id = ?', [id]);
-        const leads = resultLeads.rows || resultLeads;
-        if (leads[0]?.count > 0) {
-            return res.status(400).json({ 
-                message: `لا يمكن حذف المدير لأن لديه ${leads[0].count} طلبات مرتبطة`,
-                hasLeads: true
-            });
-        }
-        
-        await db.execute('DELETE FROM managers WHERE id = ?', [id]);
-        
-        console.log(`✅ Manager ${id} deleted`);
-        res.json({ message: 'تم حذف المدير بنجاح' });
-        
-    } catch (error) {
-        console.error('❌ Error deleting manager:', error);
-        res.status(500).json({ message: 'حدث خطأ في حذف المدير', error: error.message });
-    }
-};
-
 // =============================================
 // إحصائيات وإدارة عامة
 // =============================================
 
-// الحصول على إحصائيات الطلبات
+// الحصول على إحصائيات الطلبات (بدون strftime)
 exports.getLeadStats = async (req, res) => {
     try {
         console.log(`📈 Getting lead statistics`);
@@ -379,26 +335,13 @@ exports.getLeadStats = async (req, res) => {
         
         // إحصائيات حسب المدينة
         const resultCityStats = await db.query(`
-            SELECT city, COUNT(*) as count, SUM(commission) as commission
+            SELECT city, COUNT(*) as count, COALESCE(SUM(commission), 0) as commission
             FROM leads
             GROUP BY city
             ORDER BY count DESC
             LIMIT 10
         `);
         const cityStats = resultCityStats.rows || resultCityStats;
-        
-        // إحصائيات حسب الشهر
-        const resultMonthlyStats = await db.query(`
-            SELECT 
-                strftime('%Y-%m', created_at) as month,
-                COUNT(*) as count,
-                SUM(commission) as commission
-            FROM leads
-            GROUP BY strftime('%Y-%m', created_at)
-            ORDER BY month DESC
-            LIMIT 12
-        `);
-        const monthlyStats = resultMonthlyStats.rows || resultMonthlyStats;
         
         const result = stats[0] || { 
             total: 0, new: 0, approved: 0, sent_to_manager: 0, assigned_to_company: 0,
@@ -409,131 +352,11 @@ exports.getLeadStats = async (req, res) => {
         
         res.json({
             ...result,
-            byCity: cityStats || [],
-            byMonth: monthlyStats || []
+            byCity: cityStats || []
         });
         
     } catch (error) {
         console.error('❌ Error getting lead stats:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب الإحصائيات', error: error.message });
-    }
-};
-
-// الحصول على تقرير مفصل
-exports.getDetailedReport = async (req, res) => {
-    try {
-        const { startDate, endDate, format = 'json' } = req.query;
-        
-        let dateFilter = '';
-        const params = [];
-        
-        if (startDate) {
-            dateFilter += ' AND DATE(created_at) >= ?';
-            params.push(startDate);
-        }
-        
-        if (endDate) {
-            dateFilter += ' AND DATE(created_at) <= ?';
-            params.push(endDate);
-        }
-        
-        const resultLeads = await db.query(`
-            SELECT id, user_name, phone, city, monthly_bill, required_kw, 
-                   estimated_price, commission, status, created_at, updated_at
-            FROM leads
-            WHERE 1=1 ${dateFilter}
-            ORDER BY created_at DESC
-        `, params);
-        const leads = resultLeads.rows || resultLeads;
-        
-        const resultSummary = await db.query(`
-            SELECT 
-                COUNT(*) as total,
-                SUM(commission) as total_commission,
-                AVG(monthly_bill) as avg_bill,
-                AVG(required_kw) as avg_kw
-            FROM leads
-            WHERE 1=1 ${dateFilter}
-        `, params);
-        const summary = resultSummary.rows || resultSummary;
-        
-        res.json({
-            summary: summary[0] || {},
-            leads: leads || []
-        });
-        
-    } catch (error) {
-        console.error('❌ Error getting detailed report:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب التقرير', error: error.message });
-    }
-};
-
-// =============================================
-// إدارة الشركات (لأدمن)
-// =============================================
-
-// الحصول على جميع الشركات
-exports.getAllCompanies = async (req, res) => {
-    try {
-        const result = await db.query(`
-            SELECT id, name, email, phone, city, description, rating, projects_count, is_active, created_at
-            FROM companies
-            ORDER BY rating DESC, projects_count DESC
-        `);
-        const companies = result.rows || result;
-        
-        res.json(companies || []);
-        
-    } catch (error) {
-        console.error('❌ Error getting companies:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب الشركات' });
-    }
-};
-
-// إضافة شركة جديدة
-exports.addCompany = async (req, res) => {
-    try {
-        const { name, email, password, phone, city, description } = req.body;
-        
-        const resultExisting = await db.query('SELECT id FROM companies WHERE email = ?', [email]);
-        const existing = resultExisting.rows || resultExisting;
-        if (existing && existing.length > 0) {
-            return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
-        }
-        
-        const hashedPassword = bcrypt.hashSync(password, 10);
-        
-        await db.execute(
-            `INSERT INTO companies (name, email, password, phone, city, description) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [name, email, hashedPassword, phone || null, city || null, description || null]
-        );
-        
-        res.status(201).json({ message: 'تم إضافة الشركة بنجاح' });
-        
-    } catch (error) {
-        console.error('❌ Error adding company:', error);
-        res.status(500).json({ message: 'حدث خطأ في إضافة الشركة' });
-    }
-};
-
-// تحديث شركة
-exports.updateCompany = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, phone, city, description, rating, is_active } = req.body;
-        
-        await db.execute(
-            `UPDATE companies 
-             SET name = ?, phone = ?, city = ?, description = ?, rating = ?, is_active = ?
-             WHERE id = ?`,
-            [name, phone || null, city || null, description || null, rating || 0, is_active !== undefined ? is_active : 1, id]
-        );
-        
-        res.json({ message: 'تم تحديث الشركة بنجاح' });
-        
-    } catch (error) {
-        console.error('❌ Error updating company:', error);
-        res.status(500).json({ message: 'حدث خطأ في تحديث الشركة' });
     }
 };
