@@ -13,13 +13,16 @@ exports.login = async (req, res) => {
         let userRole = null;
         
         if (role === 'admin') {
-            const [rows] = await db.query('SELECT * FROM admins WHERE email = ?', [email]);
+            const result = await db.query('SELECT * FROM admins WHERE email = $1', [email]);
+            // التحقق من النتيجة حسب نوع قاعدة البيانات
+            const rows = result.rows || result;
             if (rows && rows.length > 0) {
                 user = rows[0];
                 userRole = 'admin';
             }
         } else if (role === 'manager') {
-            const [rows] = await db.query('SELECT * FROM managers WHERE email = ?', [email]);
+            const result = await db.query('SELECT * FROM managers WHERE email = $1', [email]);
+            const rows = result.rows || result;
             if (rows && rows.length > 0) {
                 user = rows[0];
                 userRole = 'manager';

@@ -76,11 +76,12 @@ exports.createLead = async (req, res) => {
             'new'
         ];
         
-        const [result] = await db.execute(query, values);
+        const result = await db.execute(query, values);
+        const insertResult = result.rows || result;
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
-            leadId: result.insertId,
+            leadId: insertResult?.insertId,
             solarData
         });
         
@@ -98,10 +99,11 @@ exports.getLead = async (req, res) => {
     try {
         const { id } = req.params;
         
-        const [leads] = await db.query(
+        const result = await db.query(
             'SELECT * FROM leads WHERE id = ?',
             [id]
         );
+        const leads = result.rows || result;
         
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
@@ -132,16 +134,18 @@ exports.getAllLeads = async (req, res) => {
         query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
         queryParams.push(parseInt(limit), parseInt(offset));
         
-        const [leads] = await db.query(query, queryParams);
+        const result = await db.query(query, queryParams);
+        const leads = result.rows || result;
         
         let countQuery = 'SELECT COUNT(*) as total FROM leads';
         if (status && status !== 'all') {
             countQuery += ' WHERE status = ?';
         }
-        const [countResult] = await db.query(
+        const countResultRaw = await db.query(
             countQuery,
             (status && status !== 'all') ? [status] : []
         );
+        const countResult = countResultRaw.rows || countResultRaw;
         
         res.json({
             leads: leads || [],

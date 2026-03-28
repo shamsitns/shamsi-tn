@@ -31,7 +31,8 @@ exports.getMyLeads = async (req, res) => {
         query += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
         queryParams.push(parseInt(limit), parseInt(offset));
         
-        const [leads] = await db.query(query, queryParams);
+        const result = await db.query(query, queryParams);
+        const leads = result.rows || result;
         
         console.log(`✅ Found ${leads?.length || 0} leads`);
         res.json(leads || []);
@@ -52,11 +53,12 @@ exports.updateLeadStatus = async (req, res) => {
         console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
         
         // التحقق من أن الطلب للمدير
-        const [assignments] = await db.query(
+        const resultAssign = await db.query(
             `SELECT id FROM manager_assignments 
              WHERE lead_id = ? AND manager_id = ?`,
             [leadId, managerId]
         );
+        const assignments = resultAssign.rows || resultAssign;
         
         if (!assignments || assignments.length === 0) {
             // إذا لم يكن هناك تعيين، أنشئ واحداً
@@ -103,7 +105,7 @@ exports.getManagerStats = async (req, res) => {
         
         console.log(`📈 Getting stats for manager ${managerId}`);
         
-        const [stats] = await db.query(`
+        const result = await db.query(`
             SELECT 
                 COUNT(CASE WHEN l.status = 'sent_to_manager' THEN 1 END) as pending,
                 COUNT(CASE WHEN l.status = 'assigned_to_company' THEN 1 END) as assigned,
@@ -116,7 +118,8 @@ exports.getManagerStats = async (req, res) => {
             WHERE ma.manager_id = ? OR l.manager_id = ?
         `, [managerId, managerId]);
         
-        const result = stats[0] || { 
+        const statsArray = result.rows || result;
+        const stats = statsArray[0] || { 
             pending: 0, 
             assigned: 0,
             completed: 0, 
@@ -125,8 +128,8 @@ exports.getManagerStats = async (req, res) => {
             total_completed_count: 0
         };
         
-        console.log(`📊 Stats: pending=${result.pending}, completed=${result.completed}, commission=${result.total_commission}`);
-        res.json(result);
+        console.log(`📊 Stats: pending=${stats.pending}, completed=${stats.completed}, commission=${stats.total_commission}`);
+        res.json(stats);
         
     } catch (error) {
         console.error('❌ Error getting manager stats:', error);
@@ -144,13 +147,15 @@ exports.assignToCompany = async (req, res) => {
         console.log(`🏢 Assigning lead ${leadId} to company ${companyId} with price ${price}`);
         
         // التحقق من وجود الطلب
-        const [leads] = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // التحقق من وجود الشركة
-        const [companies] = await db.query('SELECT id, name FROM companies WHERE id = ?', [companyId]);
+        const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = ?', [companyId]);
+        const companies = resultCompany.rows || resultCompany;
         if (!companies || companies.length === 0) {
             return res.status(404).json({ message: 'الشركة غير موجودة' });
         }
@@ -168,11 +173,12 @@ exports.assignToCompany = async (req, res) => {
         );
         
         // إضافة أو تحديث في lead_companies
-        const [existing] = await db.query(
+        const resultExisting = await db.query(
             `SELECT id FROM lead_companies 
              WHERE lead_id = ? AND company_id = ?`,
             [leadId, companyId]
         );
+        const existing = resultExisting.rows || resultExisting;
         
         if (existing && existing.length > 0) {
             await db.execute(
@@ -190,10 +196,11 @@ exports.assignToCompany = async (req, res) => {
         }
         
         // تحديث أو إنشاء manager_assignments
-        const [assignment] = await db.query(
+        const resultAssignment = await db.query(
             `SELECT id FROM manager_assignments WHERE lead_id = ? AND manager_id = ?`,
             [leadId, managerId]
         );
+        const assignment = resultAssignment.rows || resultAssignment;
         
         if (assignment && assignment.length > 0) {
             await db.execute(
@@ -230,7 +237,7 @@ exports.getLeadDetails = async (req, res) => {
         const { leadId } = req.params;
         const managerId = req.user.id;
         
-        const [leads] = await db.query(`
+        const result = await db.query(`
             SELECT l.*, 
                    c.name as company_name,
                    c.phone as company_phone,
@@ -242,6 +249,8 @@ exports.getLeadDetails = async (req, res) => {
             LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = ?
             WHERE l.id = ?
         `, [managerId, leadId]);
+        
+        const leads = result.rows || result;
         
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
@@ -270,7 +279,8 @@ exports.getAvailableCompanies = async (req, res) => {
         
         query += ' ORDER BY rating DESC';
         
-        const [companies] = await db.query(query, params);
+        const result = await db.query(query, params);
+        const companies = result.rows || result;
         
         res.json(companies || []);
         

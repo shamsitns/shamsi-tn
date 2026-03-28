@@ -48,7 +48,8 @@ exports.getAllLeads = async (req, res) => {
         query += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
         queryParams.push(parseInt(limit), parseInt(offset));
         
-        const [leads] = await db.query(query, queryParams);
+        const result = await db.query(query, queryParams);
+        const leads = result.rows || result;
         
         // الحصول على العدد الإجمالي
         let countQuery = 'SELECT COUNT(*) as total FROM leads WHERE 1=1';
@@ -64,7 +65,8 @@ exports.getAllLeads = async (req, res) => {
             countParams.push(city);
         }
         
-        const [countResult] = await db.query(countQuery, countParams);
+        const countResultRaw = await db.query(countQuery, countParams);
+        const countResult = countResultRaw.rows || countResultRaw;
         
         console.log(`✅ Found ${leads?.length || 0} leads, total: ${countResult[0]?.total || 0}`);
         
@@ -90,7 +92,8 @@ exports.approveLead = async (req, res) => {
         console.log(`✅ Admin ${adminId} approving lead ${leadId}`);
         
         // التحقق من وجود الطلب
-        const [leads] = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
@@ -127,7 +130,8 @@ exports.rejectLead = async (req, res) => {
         console.log(`❌ Admin ${adminId} rejecting lead ${leadId}, reason: ${reason}`);
         
         // التحقق من وجود الطلب
-        const [leads] = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
@@ -171,16 +175,18 @@ exports.sendToManager = async (req, res) => {
         console.log(`📨 Admin ${adminId} sending lead ${leadId} to manager ${managerId}`);
         
         // التحقق من وجود الطلب
-        const [leads] = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // التحقق من وجود المدير
-        const [managers] = await db.query(
+        const resultManager = await db.query(
             'SELECT id, name FROM managers WHERE id = ?',
             [managerId]
         );
+        const managers = resultManager.rows || resultManager;
         if (!managers || managers.length === 0) {
             return res.status(404).json({ message: 'المدير غير موجود' });
         }
@@ -198,11 +204,12 @@ exports.sendToManager = async (req, res) => {
         );
         
         // إضافة تعيين في manager_assignments
-        const [existing] = await db.query(
+        const resultExisting = await db.query(
             `SELECT id FROM manager_assignments 
              WHERE lead_id = ? AND manager_id = ?`,
             [leadId, managerId]
         );
+        const existing = resultExisting.rows || resultExisting;
         
         if (existing && existing.length > 0) {
             await db.execute(
@@ -240,7 +247,7 @@ exports.sendToManager = async (req, res) => {
 // الحصول على جميع المديرين
 exports.getAllManagers = async (req, res) => {
     try {
-        const [managers] = await db.query(`
+        const result = await db.query(`
             SELECT id, name, email, phone, company_name, city, 
                    (SELECT COUNT(*) FROM leads WHERE manager_id = managers.id) as assigned_leads_count,
                    (SELECT COUNT(*) FROM leads WHERE manager_id = managers.id AND status = 'completed') as completed_leads_count,
@@ -248,6 +255,7 @@ exports.getAllManagers = async (req, res) => {
             FROM managers 
             ORDER BY created_at DESC
         `);
+        const managers = result.rows || result;
         
         console.log(`👥 Found ${managers?.length || 0} managers`);
         res.json(managers || []);
@@ -266,7 +274,8 @@ exports.addManager = async (req, res) => {
         console.log(`👥 Adding new manager: ${name}, ${email}`);
         
         // التحقق من وجود البريد
-        const [existing] = await db.query('SELECT id FROM managers WHERE email = ?', [email]);
+        const resultExisting = await db.query('SELECT id FROM managers WHERE email = ?', [email]);
+        const existing = resultExisting.rows || resultExisting;
         if (existing && existing.length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
         }
@@ -323,7 +332,8 @@ exports.deleteManager = async (req, res) => {
         console.log(`👥 Deleting manager ${id}`);
         
         // التحقق من وجود طلبات مرتبطة
-        const [leads] = await db.query('SELECT COUNT(*) as count FROM leads WHERE manager_id = ?', [id]);
+        const resultLeads = await db.query('SELECT COUNT(*) as count FROM leads WHERE manager_id = ?', [id]);
+        const leads = resultLeads.rows || resultLeads;
         if (leads[0]?.count > 0) {
             return res.status(400).json({ 
                 message: `لا يمكن حذف المدير لأن لديه ${leads[0].count} طلبات مرتبطة`,
@@ -351,7 +361,7 @@ exports.getLeadStats = async (req, res) => {
     try {
         console.log(`📈 Getting lead statistics`);
         
-        const [stats] = await db.query(`
+        const resultStats = await db.query(`
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) as new,
@@ -365,18 +375,20 @@ exports.getLeadStats = async (req, res) => {
                 COALESCE(SUM(required_kw), 0) as total_kw
             FROM leads
         `);
+        const stats = resultStats.rows || resultStats;
         
         // إحصائيات حسب المدينة
-        const [cityStats] = await db.query(`
+        const resultCityStats = await db.query(`
             SELECT city, COUNT(*) as count, SUM(commission) as commission
             FROM leads
             GROUP BY city
             ORDER BY count DESC
             LIMIT 10
         `);
+        const cityStats = resultCityStats.rows || resultCityStats;
         
         // إحصائيات حسب الشهر
-        const [monthlyStats] = await db.query(`
+        const resultMonthlyStats = await db.query(`
             SELECT 
                 strftime('%Y-%m', created_at) as month,
                 COUNT(*) as count,
@@ -386,6 +398,7 @@ exports.getLeadStats = async (req, res) => {
             ORDER BY month DESC
             LIMIT 12
         `);
+        const monthlyStats = resultMonthlyStats.rows || resultMonthlyStats;
         
         const result = stats[0] || { 
             total: 0, new: 0, approved: 0, sent_to_manager: 0, assigned_to_company: 0,
@@ -424,15 +437,16 @@ exports.getDetailedReport = async (req, res) => {
             params.push(endDate);
         }
         
-        const [leads] = await db.query(`
+        const resultLeads = await db.query(`
             SELECT id, user_name, phone, city, monthly_bill, required_kw, 
                    estimated_price, commission, status, created_at, updated_at
             FROM leads
             WHERE 1=1 ${dateFilter}
             ORDER BY created_at DESC
         `, params);
+        const leads = resultLeads.rows || resultLeads;
         
-        const [summary] = await db.query(`
+        const resultSummary = await db.query(`
             SELECT 
                 COUNT(*) as total,
                 SUM(commission) as total_commission,
@@ -441,6 +455,7 @@ exports.getDetailedReport = async (req, res) => {
             FROM leads
             WHERE 1=1 ${dateFilter}
         `, params);
+        const summary = resultSummary.rows || resultSummary;
         
         res.json({
             summary: summary[0] || {},
@@ -460,11 +475,12 @@ exports.getDetailedReport = async (req, res) => {
 // الحصول على جميع الشركات
 exports.getAllCompanies = async (req, res) => {
     try {
-        const [companies] = await db.query(`
+        const result = await db.query(`
             SELECT id, name, email, phone, city, description, rating, projects_count, is_active, created_at
             FROM companies
             ORDER BY rating DESC, projects_count DESC
         `);
+        const companies = result.rows || result;
         
         res.json(companies || []);
         
@@ -479,7 +495,8 @@ exports.addCompany = async (req, res) => {
     try {
         const { name, email, password, phone, city, description } = req.body;
         
-        const [existing] = await db.query('SELECT id FROM companies WHERE email = ?', [email]);
+        const resultExisting = await db.query('SELECT id FROM companies WHERE email = ?', [email]);
+        const existing = resultExisting.rows || resultExisting;
         if (existing && existing.length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
         }
