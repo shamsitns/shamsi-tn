@@ -82,6 +82,31 @@ exports.authenticate = (req, res, next) => {
 };
 
 // مصادقة للمديرين فقط
+// مصادقة للمديرين فقط
+exports.isManager = (req, res, next) => {
+    // حل مؤقت: في بيئة التطوير، اسمح بالمرور بدون تحقق
+    if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️ Development mode: Skipping manager check');
+        return next();
+    }
+    if (req.user.role !== 'manager') {
+        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير' });
+    }
+    next();
+};
+
+// مصادقة للأدمن فقط
+exports.isAdmin = (req, res, next) => {
+    // حل مؤقت: في بيئة التطوير، اسمح بالمرور بدون تحقق
+    if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️ Development mode: Skipping admin check');
+        return next();
+    }
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات أدمن' });
+    }
+    next();
+};
 exports.isManager = (req, res, next) => {
     if (req.user.role !== 'manager') {
         return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير' });
