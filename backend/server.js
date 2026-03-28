@@ -15,8 +15,14 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 // =============================================
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://shamsi-tn-frontend.onrender.com'],
-    credentials: true
+    origin: [
+        'http://localhost:3000',
+        'https://shamsi-tn-frontend.onrender.com',
+        'https://shamsi-tns.onrender.com'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
