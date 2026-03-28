@@ -2,7 +2,6 @@ const db = require('../config/database');
 const { calculateSolarSystem, validateLeadEligibility } = require('../utils/solarCalculator');
 
 // إنشاء طلب جديد
-// إنشاء طلب جديد
 exports.createLead = async (req, res) => {
     try {
         console.log('📝 Received lead data:', req.body);
@@ -41,7 +40,7 @@ exports.createLead = async (req, res) => {
         
         console.log('📊 Solar calculation result:', solarData);
         
-        // إدخال البيانات في قاعدة البيانات (بدون RETURNING)
+        // إدخال البيانات في قاعدة البيانات (صيغة PostgreSQL)
         const query = `
             INSERT INTO leads (
                 user_name, phone, city, property_type, payment_method,
@@ -92,13 +91,14 @@ exports.createLead = async (req, res) => {
         });
     }
 };
+
 // الحصول على طلب محدد
 exports.getLead = async (req, res) => {
     try {
         const { id } = req.params;
         
         const result = await db.query(
-            'SELECT * FROM leads WHERE id = ?',
+            'SELECT * FROM leads WHERE id = $1',
             [id]
         );
         const leads = result.rows || result;
@@ -125,24 +125,27 @@ exports.getAllLeads = async (req, res) => {
         const queryParams = [];
         
         if (status && status !== 'all') {
-            query += ' WHERE status = ?';
+            query += ' WHERE status = $1';
             queryParams.push(status);
+            query += ' ORDER BY created_at DESC LIMIT $2 OFFSET $3';
+            queryParams.push(parseInt(limit), parseInt(offset));
+        } else {
+            query += ' ORDER BY created_at DESC LIMIT $1 OFFSET $2';
+            queryParams.push(parseInt(limit), parseInt(offset));
         }
-        
-        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-        queryParams.push(parseInt(limit), parseInt(offset));
         
         const result = await db.query(query, queryParams);
         const leads = result.rows || result;
         
         let countQuery = 'SELECT COUNT(*) as total FROM leads';
+        const countParams = [];
+        
         if (status && status !== 'all') {
-            countQuery += ' WHERE status = ?';
+            countQuery += ' WHERE status = $1';
+            countParams.push(status);
         }
-        const countResultRaw = await db.query(
-            countQuery,
-            (status && status !== 'all') ? [status] : []
-        );
+        
+        const countResultRaw = await db.query(countQuery, countParams);
         const countResult = countResultRaw.rows || countResultRaw;
         
         res.json({
@@ -164,8 +167,8 @@ exports.updateLeadStatus = async (req, res) => {
         const { leadId } = req.params;
         const { status } = req.body;
         
-        await db.execute(
-            'UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        await db.query(
+            'UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [status, leadId]
         );
         
