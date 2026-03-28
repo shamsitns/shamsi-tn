@@ -6,7 +6,8 @@ const {
     getManagerStats,
     assignToCompany,
     getLeadDetails,
-    getAvailableCompanies
+    getAvailableCompanies,
+    sendToOperationsManager  // إضافة الدالة الجديدة
 } = require('../controllers/managerController');
 
 const router = express.Router();
@@ -21,6 +22,9 @@ router.get('/stats', getManagerStats);
 router.put('/leads/:leadId/status', updateLeadStatus);
 router.post('/leads/:leadId/assign-company', assignToCompany);
 router.get('/leads/:leadId/details', getLeadDetails);
+
+// مسار إرسال الطلب لمدير العمليات (بعد اتصال المدير التنفيذي)
+router.post('/leads/:leadId/send-to-operations', sendToOperationsManager);
 
 // مسارات الشركات
 router.get('/companies/available', getAvailableCompanies);

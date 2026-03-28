@@ -291,3 +291,67 @@ exports.getAvailableCompanies = async (req, res) => {
         res.status(500).json({ message: 'حدث خطأ في جلب الشركات' });
     }
 };
+
+// =============================================
+// إرسال الطلب لمدير العمليات (بعد اتصال المدير التنفيذي)
+// =============================================
+exports.sendToOperationsManager = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        const { notes } = req.body;
+        const executiveId = req.user.id;
+        
+        console.log(`📤 Executive ${executiveId} sending lead ${leadId} to operations manager`);
+        
+        // التحقق من وجود الطلب
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const leads = resultLead.rows || resultLead;
+        if (!leads || leads.length === 0) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        // الحصول على أول Operations Manager
+        const resultOps = await db.query(`
+            SELECT id, name FROM managers 
+            WHERE role = 'operations' 
+            ORDER BY id ASC LIMIT 1
+        `);
+        const operationsManagers = resultOps.rows || resultOps;
+        
+        if (!operationsManagers || operationsManagers.length === 0) {
+            return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
+        }
+        
+        const operationsManager = operationsManagers[0];
+        
+        // تحديث الطلب: تغيير الحالة وتعيين لمدير العمليات
+        await db.query(
+            `UPDATE leads 
+             SET status = 'sent_to_operations', 
+                 manager_id = $1, 
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [operationsManager.id, leadId]
+        );
+        
+        // تسجيل التعيين
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, status) 
+             VALUES ($1, $2, $3, $4, $5)`,
+            [leadId, operationsManager.id, executiveId, notes || `تم إرسال الطلب من قبل المدير التنفيذي`, 'pending']
+        );
+        
+        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.id}`);
+        
+        res.json({ 
+            message: `تم إرسال الطلب لمدير العمليات: ${operationsManager.name}`,
+            leadId,
+            operationsManagerId: operationsManager.id,
+            operationsManagerName: operationsManager.name
+        });
+        
+    } catch (error) {
+        console.error('❌ Error sending to operations:', error);
+        res.status(500).json({ message: 'حدث خطأ في إرسال الطلب لمدير العمليات', error: error.message });
+    }
+};

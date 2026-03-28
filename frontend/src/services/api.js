@@ -111,6 +111,24 @@ export const adminAPI = {
         console.log('📨 Sending lead to manager:', leadId, managerId);
         return api.post(`/admin/leads/${leadId}/send-to-manager`, { managerId, notes });
     },
+    
+    // حذف طلب فردي
+    deleteLead: (leadId) => {
+        console.log('🗑️ Deleting lead:', leadId);
+        return api.delete(`/admin/leads/${leadId}`);
+    },
+    
+    // حذف جميع الطلبات
+    deleteAllLeads: () => {
+        console.log('🗑️ Deleting all leads');
+        return api.delete('/admin/leads/all');
+    },
+    
+    // حذف الطلبات المرفوضة فقط
+    deleteRejectedLeads: () => {
+        console.log('🗑️ Deleting rejected leads');
+        return api.delete('/admin/leads/rejected');
+    },
 };
 
 // ==================== Manager API ====================
@@ -137,6 +155,12 @@ export const managerAPI = {
     assignToCompany: (leadId, companyId, price, notes) => {
         console.log('🏢 Assigning lead to company:', leadId, companyId, price);
         return api.post(`/manager/leads/${leadId}/assign-company`, { companyId, price, notes });
+    },
+    
+    // إرسال الطلب لمدير العمليات (جديد)
+    sendToOperationsManager: (leadId, notes) => {
+        console.log('📤 Sending lead to operations manager:', leadId);
+        return api.post(`/manager/leads/${leadId}/send-to-operations`, { notes });
     },
 };
 
