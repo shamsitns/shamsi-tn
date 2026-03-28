@@ -1,205 +1,222 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-const fs = require('fs');
+const dotenv = require('dotenv');
 
-// إنشاء مجلد البيانات
-const dataDir = path.join(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-    console.log('📁 Created data directory');
-}
+dotenv.config();
 
-const dbPath = path.join(dataDir, 'shamsi.db');
-console.log('📁 Database path:', dbPath);
+// استخدام PostgreSQL على Render
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || 'postgresql://shamsi_user:p8pB9bEcXWzgdfg05DIi6sLRRsRClYRa@dpg-d741qaadbo4c738losm0-a/shamsi_tn',
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
 
-// إنشاء اتصال SQLite باستخدام better-sqlite3
-const db = new Database(dbPath);
+// اختبار الاتصال
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error('❌ Error connecting to PostgreSQL:', err.message);
+    } else {
+        console.log('✅ PostgreSQL database connected successfully');
+        release();
+        
+        // إنشاء الجداول
+        createTables();
+    }
+});
 
-// تمكين المفاتيح الخارجية
-db.pragma('foreign_keys = ON');
-
-console.log('✅ SQLite database connected successfully');
-
-// تهيئة قاعدة البيانات - إنشاء الجداول
-db.exec(`
-    CREATE TABLE IF NOT EXISTS admins (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS managers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        phone TEXT,
-        company_name TEXT,
-        city TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS leads (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        city TEXT NOT NULL,
-        property_type TEXT DEFAULT 'house',
-        payment_method TEXT DEFAULT 'cash',
-        monthly_bill REAL NOT NULL,
-        monthly_consumption REAL,
-        meter_owner INTEGER DEFAULT 1,
-        meter_number TEXT,
-        roof_area REAL,
-        roof_direction TEXT DEFAULT 'جنوب',
-        roof_type TEXT DEFAULT 'مسطح',
-        shading TEXT DEFAULT 'لا يوجد',
-        required_kw REAL,
-        estimated_price REAL,
-        panels INTEGER,
-        panel_power REAL,
-        panel_recommendation TEXT,
-        panel_brand TEXT,
-        inverter_power REAL,
-        annual_production REAL,
-        annual_savings REAL,
-        payback_years REAL,
-        commission REAL,
-        co2_saved REAL,
-        required_roof_area REAL,
-        company_id INTEGER,
-        status TEXT DEFAULT 'new',
-        manager_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS companies (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        phone TEXT,
-        city TEXT,
-        address TEXT,
-        description TEXT,
-        rating REAL DEFAULT 0,
-        projects_count INTEGER DEFAULT 0,
-        logo TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS lead_companies (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        lead_id INTEGER NOT NULL,
-        company_id INTEGER NOT NULL,
-        assigned_by INTEGER NOT NULL,
-        price REAL,
-        notes TEXT,
-        status TEXT DEFAULT 'pending',
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS manager_assignments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        lead_id INTEGER NOT NULL,
-        manager_id INTEGER NOT NULL,
-        assigned_by INTEGER NOT NULL,
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        status TEXT DEFAULT 'pending',
-        notes TEXT
-    );
-`);
-
-console.log('✅ Database tables created successfully');
-
-// إنشاء حساب الأدمن
-const adminEmail = 'shamsi.tns@gmail.com';
-const adminPassword = 'Levis1992*&';
-const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
-
-const existingAdmin = db.prepare('SELECT * FROM admins WHERE email = ?').get(adminEmail);
-if (!existingAdmin) {
-    db.prepare('INSERT INTO admins (name, email, password) VALUES (?, ?, ?)').run('Shamsi TN', adminEmail, hashedAdminPassword);
-    console.log('✅ Admin account created');
-}
-
-// إنشاء مدير تجريبي
-const managerEmail = 'manager@shamsi.tn';
-const managerPassword = 'manager123';
-const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
-
-const existingManager = db.prepare('SELECT * FROM managers WHERE email = ?').get(managerEmail);
-if (!existingManager) {
-    db.prepare('INSERT INTO managers (name, email, password, phone, company_name, city) VALUES (?, ?, ?, ?, ?, ?)')
-        .run('مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس');
-    console.log('✅ Manager account created');
-}
-
-// إنشاء شركات تجريبية
-const companies = [
-    { name: 'شركة الطاقة الشمسية تونس', email: 'contact@solar-tunisie.com', password: 'solar123', phone: '71234567', city: 'تونس', description: 'متخصصون في تركيب الأنظمة الشمسية', rating: 4.8, projects_count: 120 },
-    { name: 'Solar Tunisie', email: 'info@solartunisie.tn', password: 'solar123', phone: '74234567', city: 'صفاقس', description: 'خدمة ممتازة وأسعار منافسة', rating: 4.7, projects_count: 95 },
-    { name: 'Green Energy Tunisia', email: 'contact@greenenergy.tn', password: 'solar123', phone: '73234567', city: 'سوسة', description: 'أفضل جودة وأطول ضمان', rating: 4.9, projects_count: 150 }
-];
-
-for (const company of companies) {
-    const existing = db.prepare('SELECT * FROM companies WHERE email = ?').get(company.email);
-    if (!existing) {
-        const hashed = bcrypt.hashSync(company.password, 10);
-        db.prepare('INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(company.name, company.email, hashed, company.phone, company.city, company.description, company.rating, company.projects_count);
-        console.log(`✅ Company added: ${company.name}`);
+// إنشاء الجداول
+async function createTables() {
+    try {
+        // جدول الأدمن
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS admins (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // جدول المديرين
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS managers (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                phone VARCHAR(20),
+                company_name VARCHAR(100),
+                city VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // جدول العملاء
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS leads (
+                id SERIAL PRIMARY KEY,
+                user_name VARCHAR(100) NOT NULL,
+                phone VARCHAR(20) NOT NULL,
+                city VARCHAR(50) NOT NULL,
+                property_type VARCHAR(50) DEFAULT 'house',
+                payment_method VARCHAR(50) DEFAULT 'cash',
+                monthly_bill DECIMAL NOT NULL,
+                monthly_consumption DECIMAL,
+                meter_owner INTEGER DEFAULT 1,
+                meter_number VARCHAR(50),
+                roof_area DECIMAL,
+                roof_direction VARCHAR(50) DEFAULT 'جنوب',
+                roof_type VARCHAR(50) DEFAULT 'مسطح',
+                shading VARCHAR(50) DEFAULT 'لا يوجد',
+                required_kw DECIMAL,
+                estimated_price DECIMAL,
+                panels INTEGER,
+                panel_power DECIMAL,
+                panel_recommendation VARCHAR(100),
+                panel_brand VARCHAR(100),
+                inverter_power DECIMAL,
+                annual_production DECIMAL,
+                annual_savings DECIMAL,
+                payback_years DECIMAL,
+                commission DECIMAL,
+                co2_saved DECIMAL,
+                required_roof_area DECIMAL,
+                company_id INTEGER,
+                status VARCHAR(50) DEFAULT 'new',
+                manager_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // جدول الشركات
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS companies (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                phone VARCHAR(20),
+                city VARCHAR(50),
+                address TEXT,
+                description TEXT,
+                rating DECIMAL DEFAULT 0,
+                projects_count INTEGER DEFAULT 0,
+                logo TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // جدول ربط الشركات بالطلبات
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS lead_companies (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+                company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                assigned_by INTEGER NOT NULL REFERENCES managers(id),
+                price DECIMAL,
+                notes TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // جدول تعيينات المديرين
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS manager_assignments (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+                manager_id INTEGER NOT NULL REFERENCES managers(id),
+                assigned_by INTEGER NOT NULL,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(50) DEFAULT 'pending',
+                notes TEXT
+            )
+        `);
+        
+        // جدول أسباب الرفض
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS lead_rejections (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER NOT NULL REFERENCES leads(id),
+                rejected_by INTEGER NOT NULL,
+                reason TEXT,
+                rejected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        console.log('✅ Database tables created successfully');
+        
+        // إضافة البيانات الافتراضية
+        await seedDatabase();
+        
+    } catch (error) {
+        console.error('❌ Error creating tables:', error);
     }
 }
 
-// =============================================
-// تصدير الدوال للاستخدام في المشروع
-// =============================================
-
-const dbAPI = {
-    query: (sql, params = []) => {
-        try {
-            const stmt = db.prepare(sql);
-            const rows = stmt.all(...params);
-            return [rows];
-        } catch (error) {
-            console.error('❌ Query error:', error);
-            throw error;
+// إضافة البيانات الافتراضية
+async function seedDatabase() {
+    try {
+        // إنشاء حساب الأدمن
+        const adminEmail = 'shamsi.tns@gmail.com';
+        const adminPassword = 'Levis1992*&';
+        const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
+        
+        const adminResult = await pool.query('SELECT * FROM admins WHERE email = $1', [adminEmail]);
+        if (adminResult.rows.length === 0) {
+            await pool.query(
+                'INSERT INTO admins (name, email, password) VALUES ($1, $2, $3)',
+                ['Shamsi TN', adminEmail, hashedAdminPassword]
+            );
+            console.log('✅ Admin account created');
         }
-    },
-    execute: (sql, params = []) => {
-        try {
-            const stmt = db.prepare(sql);
-            const info = stmt.run(...params);
-            return [{ insertId: info.lastInsertRowid, affectedRows: info.changes }];
-        } catch (error) {
-            console.error('❌ Execute error:', error);
-            throw error;
+        
+        // إنشاء مدير تجريبي
+        const managerEmail = 'manager@shamsi.tn';
+        const managerPassword = 'manager123';
+        const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
+        
+        const managerResult = await pool.query('SELECT * FROM managers WHERE email = $1', [managerEmail]);
+        if (managerResult.rows.length === 0) {
+            await pool.query(
+                'INSERT INTO managers (name, email, password, phone, company_name, city) VALUES ($1, $2, $3, $4, $5, $6)',
+                ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس']
+            );
+            console.log('✅ Manager account created');
         }
-    },
-    get: (sql, params = []) => {
-        try {
-            const stmt = db.prepare(sql);
-            return stmt.get(...params);
-        } catch (error) {
-            console.error('❌ Get error:', error);
-            throw error;
+        
+        // إنشاء شركات تجريبية
+        const companies = [
+            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية', 4.8, 120],
+            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة', 4.7, 95],
+            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان', 4.9, 150]
+        ];
+        
+        for (const company of companies) {
+            const result = await pool.query('SELECT * FROM companies WHERE email = $1', [company[1]]);
+            if (result.rows.length === 0) {
+                await pool.query(
+                    'INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    company
+                );
+                console.log(`✅ Company added: ${company[0]}`);
+            }
         }
-    },
-    all: (sql, params = []) => {
-        try {
-            const stmt = db.prepare(sql);
-            return stmt.all(...params);
-        } catch (error) {
-            console.error('❌ All error:', error);
-            throw error;
-        }
+        
+        console.log('✅ Database seeding completed');
+        
+    } catch (error) {
+        console.error('❌ Error seeding database:', error);
     }
+}
+
+// تصدير pool للاستخدام في المشروع
+module.exports = {
+    query: (text, params) => pool.query(text, params),
+    execute: (text, params) => pool.query(text, params),
+    pool: pool
 };
-
-module.exports = dbAPI;
