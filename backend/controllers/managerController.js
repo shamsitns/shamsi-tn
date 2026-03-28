@@ -17,19 +17,21 @@ exports.getMyLeads = async (req, res) => {
                    c.name as company_name,
                    c.rating as company_rating
             FROM leads l
-            LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = ?
+            LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = $1
             LEFT JOIN companies c ON l.company_id = c.id
-            WHERE ma.manager_id = ? OR l.manager_id = ?
+            WHERE ma.manager_id = $1 OR l.manager_id = $1
         `;
-        const queryParams = [managerId, managerId, managerId];
+        const queryParams = [managerId];
         
         if (status && status !== 'all') {
-            query += ' AND l.status = ?';
+            query += ' AND l.status = $2';
             queryParams.push(status);
+            query += ' ORDER BY l.created_at DESC LIMIT $3 OFFSET $4';
+            queryParams.push(parseInt(limit), parseInt(offset));
+        } else {
+            query += ' ORDER BY l.created_at DESC LIMIT $2 OFFSET $3';
+            queryParams.push(parseInt(limit), parseInt(offset));
         }
-        
-        query += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
-        queryParams.push(parseInt(limit), parseInt(offset));
         
         const result = await db.query(query, queryParams);
         const leads = result.rows || result;
@@ -55,33 +57,33 @@ exports.updateLeadStatus = async (req, res) => {
         // التحقق من أن الطلب للمدير
         const resultAssign = await db.query(
             `SELECT id FROM manager_assignments 
-             WHERE lead_id = ? AND manager_id = ?`,
+             WHERE lead_id = $1 AND manager_id = $2`,
             [leadId, managerId]
         );
         const assignments = resultAssign.rows || resultAssign;
         
         if (!assignments || assignments.length === 0) {
             // إذا لم يكن هناك تعيين، أنشئ واحداً
-            await db.execute(
+            await db.query(
                 `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, status, notes) 
-                 VALUES (?, ?, ?, ?, ?)`,
+                 VALUES ($1, $2, $3, $4, $5)`,
                 [leadId, managerId, managerId, status, notes || null]
             );
         } else {
             // تحديث التعيين الموجود
-            await db.execute(
+            await db.query(
                 `UPDATE manager_assignments 
-                 SET status = ?, notes = ?, assigned_at = CURRENT_TIMESTAMP 
-                 WHERE lead_id = ? AND manager_id = ?`,
+                 SET status = $1, notes = $2, assigned_at = CURRENT_TIMESTAMP 
+                 WHERE lead_id = $3 AND manager_id = $4`,
                 [status, notes || null, leadId, managerId]
             );
         }
         
         // تحديث lead
-        await db.execute(
+        await db.query(
             `UPDATE leads 
-             SET status = ?, updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
+             SET status = $1, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
             [status, leadId]
         );
         
@@ -115,8 +117,8 @@ exports.getManagerStats = async (req, res) => {
                 COALESCE(SUM(CASE WHEN l.status = 'completed' THEN 1 ELSE 0 END), 0) as total_completed_count
             FROM leads l
             LEFT JOIN manager_assignments ma ON l.id = ma.lead_id
-            WHERE ma.manager_id = ? OR l.manager_id = ?
-        `, [managerId, managerId]);
+            WHERE ma.manager_id = $1 OR l.manager_id = $1
+        `, [managerId]);
         
         const statsArray = result.rows || result;
         const stats = statsArray[0] || { 
@@ -147,14 +149,14 @@ exports.assignToCompany = async (req, res) => {
         console.log(`🏢 Assigning lead ${leadId} to company ${companyId} with price ${price}`);
         
         // التحقق من وجود الطلب
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const leads = resultLead.rows || resultLead;
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // التحقق من وجود الشركة
-        const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = ?', [companyId]);
+        const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
         const companies = resultCompany.rows || resultCompany;
         if (!companies || companies.length === 0) {
             return res.status(404).json({ message: 'الشركة غير موجودة' });
@@ -163,56 +165,56 @@ exports.assignToCompany = async (req, res) => {
         const company = companies[0];
         
         // تحديث lead مع company_id
-        await db.execute(
+        await db.query(
             `UPDATE leads 
              SET status = 'assigned_to_company', 
-                 company_id = ?, 
+                 company_id = $1, 
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
+             WHERE id = $2`,
             [companyId, leadId]
         );
         
         // إضافة أو تحديث في lead_companies
         const resultExisting = await db.query(
             `SELECT id FROM lead_companies 
-             WHERE lead_id = ? AND company_id = ?`,
+             WHERE lead_id = $1 AND company_id = $2`,
             [leadId, companyId]
         );
         const existing = resultExisting.rows || resultExisting;
         
         if (existing && existing.length > 0) {
-            await db.execute(
+            await db.query(
                 `UPDATE lead_companies 
-                 SET assigned_by = ?, price = ?, notes = ?, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
-                 WHERE lead_id = ? AND company_id = ?`,
+                 SET assigned_by = $1, price = $2, notes = $3, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
+                 WHERE lead_id = $4 AND company_id = $5`,
                 [managerId, price || null, notes || null, leadId, companyId]
             );
         } else {
-            await db.execute(
+            await db.query(
                 `INSERT INTO lead_companies (lead_id, company_id, assigned_by, price, notes, status) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
                 [leadId, companyId, managerId, price || null, notes || null, 'assigned']
             );
         }
         
         // تحديث أو إنشاء manager_assignments
         const resultAssignment = await db.query(
-            `SELECT id FROM manager_assignments WHERE lead_id = ? AND manager_id = ?`,
+            `SELECT id FROM manager_assignments WHERE lead_id = $1 AND manager_id = $2`,
             [leadId, managerId]
         );
         const assignment = resultAssignment.rows || resultAssignment;
         
         if (assignment && assignment.length > 0) {
-            await db.execute(
+            await db.query(
                 `UPDATE manager_assignments 
-                 SET status = 'assigned_to_company', notes = ?, assigned_at = CURRENT_TIMESTAMP
-                 WHERE lead_id = ? AND manager_id = ?`,
+                 SET status = 'assigned_to_company', notes = $1, assigned_at = CURRENT_TIMESTAMP
+                 WHERE lead_id = $2 AND manager_id = $3`,
                 [notes || `تم إرسال الطلب للشركة: ${company.name}`, leadId, managerId]
             );
         } else {
-            await db.execute(
+            await db.query(
                 `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, status, notes) 
-                 VALUES (?, ?, ?, ?, ?)`,
+                 VALUES ($1, $2, $3, $4, $5)`,
                 [leadId, managerId, managerId, 'assigned_to_company', `تم إرسال الطلب للشركة: ${company.name}`]
             );
         }
@@ -246,8 +248,8 @@ exports.getLeadDetails = async (req, res) => {
                    ma.assigned_at
             FROM leads l
             LEFT JOIN companies c ON l.company_id = c.id
-            LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = ?
-            WHERE l.id = ?
+            LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = $1
+            WHERE l.id = $2
         `, [managerId, leadId]);
         
         const leads = result.rows || result;
@@ -273,7 +275,7 @@ exports.getAvailableCompanies = async (req, res) => {
         const params = [];
         
         if (city) {
-            query += ' AND city = ?';
+            query += ' AND city = $1';
             params.push(city);
         }
         
