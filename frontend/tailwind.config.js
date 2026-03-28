@@ -1,13 +1,10 @@
 module.exports = {
-    content: [
-        "./src/**/*.{js,jsx,ts,tsx}",
-    ],
-    theme: {
-        extend: {
-            fontFamily: {
-                'sans': ['Tajawal', 'sans-serif'],
-            },
-        },
-    },
-    plugins: [],
+  content: [
+    "./src/**/*.{js,jsx,ts,tsx}",
+    "./public/index.html"
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
 }

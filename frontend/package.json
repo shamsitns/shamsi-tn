@@ -27,15 +27,3 @@
   },
   "proxy": "http://localhost:5000"
 }
-{
-  "name": "shamsi-tns",
-  "version": "1.0.0",
-  "homepage": ".",
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  ...
-}
