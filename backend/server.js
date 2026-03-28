@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const { login } = require('./middleware/auth');
@@ -23,8 +24,13 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // =============================================
-// Middleware
+// Middleware (مع تحسينات الأداء)
 // =============================================
+
+// ضغط الاستجابات
+app.use(compression());
+
+// CORS
 app.use(cors({
     origin: [
         'http://localhost:3000',
@@ -35,8 +41,22 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+
+// Cache-Control للاستجابات
+app.use((req, res, next) => {
+    // عدم تطبيق cache على مسارات API
+    if (req.path.startsWith('/api/')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    } else {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+    next();
+});
+
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // =============================================
 // Routes
@@ -58,123 +78,13 @@ app.get('/api/health', (req, res) => {
 });
 
 // =============================================
-// Seed Database - إضافة البيانات الافتراضية عند التشغيل
-// =============================================
-async function seedDatabase() {
-    try {
-        console.log('🌱 Checking database seed...');
-        
-        // إنشاء حساب الأدمن إذا لم يكن موجود
-        const adminEmail = 'shamsi.tns@gmail.com';
-        const adminPassword = 'Levis1992*&';
-        const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
-        
-        const existingAdmin = await db.query('SELECT * FROM admins WHERE email = $1', [adminEmail]);
-        if (!existingAdmin || existingAdmin.rows.length === 0) {
-            await db.execute(
-                'INSERT INTO admins (name, email, password) VALUES ($1, $2, $3)',
-                ['Shamsi TN', adminEmail, hashedAdminPassword]
-            );
-            console.log('✅ Admin account created');
-        } else {
-            console.log('ℹ️ Admin account already exists');
-        }
-        
-        // إنشاء مدير تجريبي إذا لم يكن موجود
-        const managerEmail = 'manager@shamsi.tn';
-        const managerPassword = 'manager123';
-        const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
-        
-        const existingManager = await db.query('SELECT * FROM managers WHERE email = $1', [managerEmail]);
-        if (!existingManager || existingManager.rows.length === 0) {
-            await db.execute(
-                'INSERT INTO managers (name, email, password, phone, company_name, city) VALUES ($1, $2, $3, $4, $5, $6)',
-                ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس']
-            );
-            console.log('✅ Manager account created');
-        } else {
-            console.log('ℹ️ Manager account already exists');
-        }
-        
-        // إنشاء شركات تجريبية إذا لم تكن موجودة
-        const companies = [
-            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية للمنازل والشركات', 4.8, 120],
-            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة في الجنوب التونسي', 4.7, 95],
-            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان في السوق التونسية', 4.9, 150]
-        ];
-        
-        for (const company of companies) {
-            const existing = await db.query('SELECT * FROM companies WHERE email = $1', [company[1]]);
-            if (!existing || existing.rows.length === 0) {
-                await db.execute(
-                    'INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                    company
-                );
-                console.log(`✅ Company added: ${company[0]}`);
-            }
-        }
-        
-        // إنشاء طلب تجريبي
-        const leadsExists = await db.query('SELECT * FROM leads LIMIT 1');
-        if (!leadsExists || leadsExists.rows.length === 0) {
-            await db.execute(`
-                INSERT INTO leads (
-                    user_name, phone, city, property_type, payment_method,
-                    monthly_bill, roof_area, roof_direction, shading,
-                    required_kw, estimated_price, panels, panel_power,
-                    annual_production, annual_savings, payback_years, commission, status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-            `, [
-                'أحمد بن علي', '12345678', 'تونس', 'house', 'cash',
-                250, 80, 'جنوب', 'لا يوجد',
-                5, 16000, 10, 0.5,
-                7500, 1650, 9.7, 500, 'new'
-            ]);
-            console.log('✅ Test lead created');
-        }
-        
-        console.log('✅ Database seeding completed');
-        
-    } catch (error) {
-        console.error('❌ Error seeding database:', error.message);
-    }
-}
-
-// =============================================
-// بدء الخادم
-// =============================================
-// مسار مؤقت لإضافة بيانات تجريبية
-app.get('/api/add-sample-data', async (req, res) => {
-    try {
-        // إضافة طلب تجريبي
-        await db.execute(`
-            INSERT INTO leads (user_name, phone, city, property_type, monthly_bill, required_kw, estimated_price, panels, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, ['أحمد بن علي', '12345678', 'تونس', 'house', 250, 5, 16000, 10, 'new']);
-        
-        // عرض عدد الطلبات
-        const result = await db.query('SELECT COUNT(*) as count FROM leads');
-        const leadsCount = result.rows ? result.rows[0]?.count : result[0]?.count;
-        
-        res.json({ 
-            message: 'Test data added successfully',
-            totalLeads: leadsCount
-        });
-    } catch (error) {
-        console.error('Error adding data:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-// =============================================
 // مسارات مؤقتة لتنظيف البيانات وإعادة تعيين التسلسل
 // =============================================
 
-// حذف البيانات المكررة وإعادة تعيين التسلسل
+// حذف جميع البيانات وإعادة تعيين التسلسل
 app.get('/api/clean-duplicates', async (req, res) => {
     try {
-        // حذف جميع البيانات من جدول leads
         await db.query('DELETE FROM leads');
-        // إعادة تعيين التسلسل
         await db.query('SELECT setval(\'leads_id_seq\', 1, false)');
         console.log('✅ Cleaned leads table and reset sequence');
         res.json({ message: 'Cleanup completed. All leads deleted, sequence reset to 1' });
@@ -242,6 +152,74 @@ app.get('/api/add-sample-lead', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// =============================================
+// Seed Database - إضافة البيانات الافتراضية عند التشغيل
+// =============================================
+async function seedDatabase() {
+    try {
+        console.log('🌱 Checking database seed...');
+        
+        // إنشاء حساب الأدمن إذا لم يكن موجود
+        const adminEmail = 'shamsi.tns@gmail.com';
+        const adminPassword = 'Levis1992*&';
+        const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
+        
+        const existingAdmin = await db.query('SELECT * FROM admins WHERE email = $1', [adminEmail]);
+        if (!existingAdmin || existingAdmin.rows.length === 0) {
+            await db.query(
+                'INSERT INTO admins (name, email, password) VALUES ($1, $2, $3)',
+                ['Shamsi TN', adminEmail, hashedAdminPassword]
+            );
+            console.log('✅ Admin account created');
+        } else {
+            console.log('ℹ️ Admin account already exists');
+        }
+        
+        // إنشاء مدير تجريبي إذا لم يكن موجود
+        const managerEmail = 'manager@shamsi.tn';
+        const managerPassword = 'manager123';
+        const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
+        
+        const existingManager = await db.query('SELECT * FROM managers WHERE email = $1', [managerEmail]);
+        if (!existingManager || existingManager.rows.length === 0) {
+            await db.query(
+                'INSERT INTO managers (name, email, password, phone, company_name, city) VALUES ($1, $2, $3, $4, $5, $6)',
+                ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس']
+            );
+            console.log('✅ Manager account created');
+        } else {
+            console.log('ℹ️ Manager account already exists');
+        }
+        
+        // إنشاء شركات تجريبية إذا لم تكن موجودة
+        const companies = [
+            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية للمنازل والشركات', 4.8, 120],
+            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة في الجنوب التونسي', 4.7, 95],
+            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان في السوق التونسية', 4.9, 150]
+        ];
+        
+        for (const company of companies) {
+            const existing = await db.query('SELECT * FROM companies WHERE email = $1', [company[1]]);
+            if (!existing || existing.rows.length === 0) {
+                await db.query(
+                    'INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    company
+                );
+                console.log(`✅ Company added: ${company[0]}`);
+            }
+        }
+        
+        console.log('✅ Database seeding completed');
+        
+    } catch (error) {
+        console.error('❌ Error seeding database:', error.message);
+    }
+}
+
+// =============================================
+// بدء الخادم
+// =============================================
 app.listen(PORT, async () => {
     console.log(`
     ════════════════════════════════════════════
@@ -251,6 +229,7 @@ app.listen(PORT, async () => {
     🌐 URL: http://localhost:${PORT}/api
     📊 Status: Running
     💾 Database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'}
+    ⚡ Compression: Enabled
     ════════════════════════════════════════════
     `);
     
