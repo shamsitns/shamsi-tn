@@ -51,10 +51,10 @@ async function seedDatabase() {
         const adminPassword = 'Levis1992*&';
         const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
         
-        const [existingAdmin] = await db.query('SELECT * FROM admins WHERE email = ?', [adminEmail]);
-        if (!existingAdmin || existingAdmin.length === 0) {
+        const existingAdmin = await db.query('SELECT * FROM admins WHERE email = $1', [adminEmail]);
+        if (!existingAdmin || existingAdmin.rows.length === 0) {
             await db.execute(
-                'INSERT INTO admins (name, email, password) VALUES (?, ?, ?)',
+                'INSERT INTO admins (name, email, password) VALUES ($1, $2, $3)',
                 ['Shamsi TN', adminEmail, hashedAdminPassword]
             );
             console.log('✅ Admin account created');
@@ -67,10 +67,10 @@ async function seedDatabase() {
         const managerPassword = 'manager123';
         const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
         
-        const [existingManager] = await db.query('SELECT * FROM managers WHERE email = ?', [managerEmail]);
-        if (!existingManager || existingManager.length === 0) {
+        const existingManager = await db.query('SELECT * FROM managers WHERE email = $1', [managerEmail]);
+        if (!existingManager || existingManager.rows.length === 0) {
             await db.execute(
-                'INSERT INTO managers (name, email, password, phone, company_name, city) VALUES (?, ?, ?, ?, ?, ?)',
+                'INSERT INTO managers (name, email, password, phone, company_name, city) VALUES ($1, $2, $3, $4, $5, $6)',
                 ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس']
             );
             console.log('✅ Manager account created');
@@ -86,32 +86,13 @@ async function seedDatabase() {
         ];
         
         for (const company of companies) {
-            const [existing] = await db.query('SELECT * FROM companies WHERE email = ?', [company[1]]);
-            if (!existing || existing.length === 0) {
+            const existing = await db.query('SELECT * FROM companies WHERE email = $1', [company[1]]);
+            if (!existing || existing.rows.length === 0) {
                 await db.execute(
-                    'INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO companies (name, email, password, phone, city, description, rating, projects_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     company
                 );
                 console.log(`✅ Company added: ${company[0]}`);
-            }
-        }
-        
-        // إضافة الأعمدة المفقودة إذا لزم الأمر
-        const columnsToAdd = [
-            { name: 'company_id', type: 'INTEGER' },
-            { name: 'panel_recommendation', type: 'TEXT' },
-            { name: 'panel_brand', type: 'TEXT' }
-        ];
-        
-        for (const col of columnsToAdd) {
-            try {
-                await db.execute(`ALTER TABLE leads ADD COLUMN ${col.name} ${col.type}`);
-                console.log(`✅ Added column: ${col.name}`);
-            } catch (err) {
-                // العمود موجود بالفعل، نتجاهل الخطأ
-                if (!err.message.includes('duplicate column')) {
-                    console.log(`⚠️ Could not add ${col.name}: ${err.message}`);
-                }
             }
         }
         

@@ -173,6 +173,8 @@ async function seedDatabase() {
                 ['Shamsi TN', adminEmail, hashedAdminPassword]
             );
             console.log('✅ Admin account created');
+        } else {
+            console.log('ℹ️ Admin account already exists');
         }
         
         // إنشاء مدير تجريبي
@@ -187,13 +189,15 @@ async function seedDatabase() {
                 ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس']
             );
             console.log('✅ Manager account created');
+        } else {
+            console.log('ℹ️ Manager account already exists');
         }
         
         // إنشاء شركات تجريبية
         const companies = [
-            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية', 4.8, 120],
-            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة', 4.7, 95],
-            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان', 4.9, 150]
+            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية للمنازل والشركات', 4.8, 120],
+            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة في الجنوب التونسي', 4.7, 95],
+            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان في السوق التونسية', 4.9, 150]
         ];
         
         for (const company of companies) {
