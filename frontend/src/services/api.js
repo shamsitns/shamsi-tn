@@ -54,6 +54,19 @@ api.interceptors.response.use(
 
 // ==================== Leads API ====================
 export const leadsAPI = {
+    // حساب النظام الشمسي فقط (بدون حفظ)
+    calculate: async (data) => {
+        console.log('📤 Calculating solar system with data:', data);
+        try {
+            const response = await api.post('/leads/calculate', data);
+            return response;
+        } catch (error) {
+            console.error('❌ Error calculating:', error.response?.data || error.message);
+            throw error;
+        }
+    },
+    
+    // إنشاء طلب جديد (حفظ في قاعدة البيانات)
     create: async (data) => {
         console.log('📤 Creating lead with data:', data);
         try {
@@ -64,7 +77,11 @@ export const leadsAPI = {
             throw error;
         }
     },
+    
+    // الحصول على طلب محدد
     get: (id) => api.get(`/leads/${id}`),
+    
+    // الحصول على جميع الطلبات (لأدمن)
     getAll: (params) => api.get('/admin/leads', { params }),
 };
 
