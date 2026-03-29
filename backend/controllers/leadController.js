@@ -177,5 +177,58 @@ exports.updateLeadStatus = async (req, res) => {
     } catch (error) {
         console.error('Error updating lead status:', error);
         res.status(500).json({ message: 'حدث خطأ في الخادم' });
+        // حساب النظام الشمسي فقط (بدون حفظ في قاعدة البيانات)
+exports.calculateLead = async (req, res) => {
+    try {
+        console.log('📝 Calculation request (no save):', req.body);
+        
+        const {
+            user_name,
+            phone,
+            city,
+            property_type,
+            payment_method,
+            monthly_bill,
+            monthly_consumption,
+            meter_owner,
+            roof_area,
+            roof_direction,
+            shading
+        } = req.body;
+        
+        // التحقق من البيانات المطلوبة
+        if (!user_name || !phone || !city || !monthly_bill) {
+            return res.status(400).json({ 
+                message: 'البيانات غير كاملة',
+                errors: ['الاسم، الهاتف، المدينة، والفاتورة مطلوبة']
+            });
+        }
+        
+        // حساب النظام الشمسي فقط (لا يتم حفظه)
+        const solarData = calculateSolarSystem(
+            parseFloat(monthly_bill),
+            monthly_consumption ? parseFloat(monthly_consumption) : null,
+            city,
+            roof_direction || 'جنوب',
+            shading || 'لا يوجد',
+            property_type || 'house'
+        );
+        
+        console.log('📊 Solar calculation result (not saved):', solarData);
+        
+        res.status(200).json({
+            message: 'تم حساب النظام الشمسي بنجاح',
+            solarData
+        });
+        
+    } catch (error) {
+        console.error('❌ Error calculating solar system:', error);
+        res.status(500).json({ 
+            message: 'حدث خطأ في حساب النظام الشمسي',
+            error: error.message 
+        });
     }
+};
+    }
+
 };
