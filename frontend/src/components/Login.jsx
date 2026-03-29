@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
-import { FaSun, FaUserShield, FaUserTie } from 'react-icons/fa';
+import { FaSun, FaUserShield, FaUserTie, FaBuilding } from 'react-icons/fa';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -24,8 +24,13 @@ const Login = () => {
             
             toast.success('تم تسجيل الدخول بنجاح');
             
-            if (role === 'admin') {
+            // توجيه حسب الدور (role) من قاعدة البيانات
+            const userRole = response.data.user.role;
+            
+            if (userRole === 'admin') {
                 navigate('/admin');
+            } else if (userRole === 'operations') {
+                navigate('/operations');
             } else {
                 navigate('/manager');
             }
@@ -78,6 +83,9 @@ const Login = () => {
                                 مدير
                             </button>
                         </div>
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                            ملاحظة: يتم التوجيه تلقائياً حسب صلاحيات الحساب (مدير تنفيذي / مدير عمليات)
+                        </p>
                     </div>
                     
                     <div className="mb-4">
