@@ -44,7 +44,6 @@ app.use(cors({
 
 // Cache-Control للاستجابات
 app.use((req, res, next) => {
-    // عدم تطبيق cache على مسارات API
     if (req.path.startsWith('/api/')) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
@@ -158,27 +157,23 @@ app.get('/api/add-sample-lead', async (req, res) => {
 // =============================================
 app.get('/api/add-operations-manager', async (req, res) => {
     try {
-        // إضافة عمود role في جدول managers إذا لم يكن موجوداً
         try {
             await db.query(`ALTER TABLE managers ADD COLUMN role VARCHAR(50) DEFAULT 'executive'`);
             console.log('✅ Added role column to managers table');
         } catch (err) {
-            // العمود موجود مسبقاً، نتجاهل الخطأ
             if (!err.message.includes('duplicate column') && !err.message.includes('already exists')) {
-                console.log('ℹ️ Role column already exists or error:', err.message);
+                console.log('ℹ️ Role column already exists');
             }
         }
         
         const hashedPassword = bcrypt.hashSync('operations123', 10);
         
-        // إضافة Operations Manager
         await db.query(`
             INSERT INTO managers (name, email, password, phone, company_name, city, role) 
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (email) DO NOTHING
-        `, ['محمد إبراهيم الحصايري', 'operations@shamsi.tn', hashedPassword, '24661499', 'Shamsi.tn', 'تونس', 'operations']);
+        `, ['أحمد شبوح', 'operations@shamsi.tn', hashedPassword, '24661499', 'Shamsi.tn', 'تونس', 'operations']);
         
-        // تحديث المدير الحالي ليكون مديراً تنفيذياً
         await db.query(`
             UPDATE managers SET role = 'executive' WHERE email = 'manager@shamsi.tn'
         `);
@@ -201,19 +196,16 @@ app.get('/api/add-operations-manager', async (req, res) => {
 // =============================================
 app.get('/api/update-manager-roles', async (req, res) => {
     try {
-        // تحديث manager@shamsi.tn ليكون مديراً تنفيذياً
         await db.query(
             `UPDATE managers SET role = 'executive' WHERE email = $1`,
             ['manager@shamsi.tn']
         );
         
-        // تحديث operations@shamsi.tn ليكون مدير عمليات
         await db.query(
             `UPDATE managers SET role = 'operations' WHERE email = $1`,
             ['operations@shamsi.tn']
         );
         
-        // عرض جميع المديرين بعد التحديث
         const result = await db.query('SELECT id, name, email, role FROM managers');
         
         res.json({
@@ -228,13 +220,59 @@ app.get('/api/update-manager-roles', async (req, res) => {
 });
 
 // =============================================
-// Seed Database - إضافة البيانات الافتراضية عند التشغيل
+// مسار مؤقت لتنظيف وتحديث المديرين
+// =============================================
+app.get('/api/clean-managers', async (req, res) => {
+    try {
+        await db.query(`
+            DELETE FROM managers 
+            WHERE email NOT IN ('manager@shamsi.tn', 'operations@shamsi.tn')
+        `);
+        
+        await db.query(`
+            UPDATE managers 
+            SET name = 'محمد إبراهيم الحصايري', 
+                role = 'executive',
+                phone = '24661499',
+                company_name = 'Shamsi.tn',
+                city = 'تونس'
+            WHERE email = 'manager@shamsi.tn'
+        `);
+        
+        const hashedPassword = bcrypt.hashSync('operations123', 10);
+        
+        await db.query(`
+            INSERT INTO managers (name, email, password, phone, company_name, city, role)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (email) DO UPDATE SET
+                name = EXCLUDED.name,
+                password = EXCLUDED.password,
+                phone = EXCLUDED.phone,
+                company_name = EXCLUDED.company_name,
+                city = EXCLUDED.city,
+                role = EXCLUDED.role
+        `, ['أحمد شبوح', 'operations@shamsi.tn', hashedPassword, '24661499', 'Shamsi.tn', 'تونس', 'operations']);
+        
+        const result = await db.query('SELECT id, name, email, role FROM managers ORDER BY role');
+        
+        res.json({
+            message: 'Managers cleaned and updated successfully',
+            managers: result.rows
+        });
+        
+    } catch (error) {
+        console.error('Error cleaning managers:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// Seed Database
 // =============================================
 async function seedDatabase() {
     try {
         console.log('🌱 Checking database seed...');
         
-        // إنشاء حساب الأدمن إذا لم يكن موجود
         const adminEmail = 'shamsi.tns@gmail.com';
         const adminPassword = 'Levis1992*&';
         const hashedAdminPassword = bcrypt.hashSync(adminPassword, 10);
@@ -250,7 +288,6 @@ async function seedDatabase() {
             console.log('ℹ️ Admin account already exists');
         }
         
-        // إنشاء مدير تجريبي إذا لم يكن موجود
         const managerEmail = 'manager@shamsi.tn';
         const managerPassword = 'manager123';
         const hashedManagerPassword = bcrypt.hashSync(managerPassword, 10);
@@ -259,18 +296,15 @@ async function seedDatabase() {
         if (!existingManager || existingManager.rows.length === 0) {
             await db.query(
                 'INSERT INTO managers (name, email, password, phone, company_name, city, role) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس', 'executive']
+                ['محمد إبراهيم الحصايري', managerEmail, hashedManagerPassword, '24661499', 'Shamsi.tn', 'تونس', 'executive']
             );
-            console.log('✅ Manager account created');
-        } else {
-            console.log('ℹ️ Manager account already exists');
+            console.log('✅ Executive Manager account created');
         }
         
-        // إنشاء شركات تجريبية إذا لم تكن موجودة
         const companies = [
-            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية للمنازل والشركات', 4.8, 120],
-            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة في الجنوب التونسي', 4.7, 95],
-            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان في السوق التونسية', 4.9, 150]
+            ['شركة الطاقة الشمسية تونس', 'contact@solar-tunisie.com', bcrypt.hashSync('solar123', 10), '71234567', 'تونس', 'متخصصون في تركيب الأنظمة الشمسية', 4.8, 120],
+            ['Solar Tunisie', 'info@solartunisie.tn', bcrypt.hashSync('solar123', 10), '74234567', 'صفاقس', 'خدمة ممتازة وأسعار منافسة', 4.7, 95],
+            ['Green Energy Tunisia', 'contact@greenenergy.tn', bcrypt.hashSync('solar123', 10), '73234567', 'سوسة', 'أفضل جودة وأطول ضمان', 4.9, 150]
         ];
         
         for (const company of companies) {
@@ -307,7 +341,6 @@ app.listen(PORT, async () => {
     ════════════════════════════════════════════
     `);
     
-    // تشغيل seed بعد 2 ثانية من بدء الخادم
     setTimeout(() => {
         seedDatabase();
     }, 2000);
