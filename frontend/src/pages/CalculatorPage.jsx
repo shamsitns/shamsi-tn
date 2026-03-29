@@ -3,8 +3,8 @@ import { leadsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
     FaSun, FaHome, FaBuilding, FaIndustry, FaTractor, 
-    FaCompass, FaTree, FaRuler, FaMoneyBillWave, 
-    FaArrowRight, FaArrowLeft, FaWhatsapp, FaBolt,
+    FaRuler, FaMoneyBillWave, 
+    FaArrowLeft, FaWhatsapp, FaBolt,
     FaUser, FaPhone, FaMapMarkerAlt, FaPlug, FaCalculator
 } from 'react-icons/fa';
 
@@ -16,24 +16,6 @@ const tunisianCities = [
     'توزر', 'قفصة'
 ];
 
-// اتجاهات السطح
-const roofDirections = [
-    { value: 'جنوب', label: 'جنوب', recommended: true, icon: '⬇️' },
-    { value: 'جنوب شرق', label: 'جنوب شرق', recommended: true, icon: '↙️' },
-    { value: 'جنوب غرب', label: 'جنوب غرب', recommended: true, icon: '↘️' },
-    { value: 'شرق', label: 'شرق', recommended: false, icon: '⬅️' },
-    { value: 'غرب', label: 'غرب', recommended: false, icon: '➡️' },
-    { value: 'شمال', label: 'شمال', recommended: false, icon: '⬆️' }
-];
-
-// درجات التظليل
-const shadingLevels = [
-    { value: 'لا يوجد', label: 'لا يوجد', description: 'السطح مكشوف بالكامل', color: 'green' },
-    { value: 'قليل', label: 'قليل', description: 'تظليل بسيط من جدار أو شجرة صغيرة', color: 'yellow' },
-    { value: 'متوسط', label: 'متوسط', description: 'تظليل من عدة أشجار أو مبانٍ', color: 'orange' },
-    { value: 'كثيف', label: 'كثيف', description: 'تظليل كبير من مبانٍ عالية أو أشجار كثيفة', color: 'red' }
-];
-
 const CalculatorPage = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -43,8 +25,6 @@ const CalculatorPage = () => {
         phone: '',
         city: '',
         property_type: 'house',
-        roof_direction: 'جنوب',
-        shading: 'لا يوجد',
         roof_area: '',
         monthly_bill: '',
         payment_method: 'cash'
@@ -189,54 +169,6 @@ const CalculatorPage = () => {
             
             <div>
                 <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaCompass /> اتجاه السطح *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                    {roofDirections.map((dir) => (
-                        <button
-                            key={dir.value}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, roof_direction: dir.value })}
-                            className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition ${
-                                formData.roof_direction === dir.value
-                                    ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                                    : 'border-gray-300 text-gray-600'
-                            } ${dir.recommended ? 'bg-green-50/30' : ''}`}
-                        >
-                            <span className="text-lg">{dir.icon}</span>
-                            {dir.label}
-                            {dir.recommended && <span className="text-xs text-green-600">✓</span>}
-                        </button>
-                    ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">الاتجاه الجنوب هو الأفضل للإنتاجية</p>
-            </div>
-            
-            <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaTree /> درجة التظليل *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                    {shadingLevels.map((shade) => (
-                        <button
-                            key={shade.value}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, shading: shade.value })}
-                            className={`p-3 rounded-lg border-2 transition text-center ${
-                                formData.shading === shade.value
-                                    ? `border-${shade.color}-500 bg-${shade.color}-50 text-${shade.color}-700`
-                                    : 'border-gray-300 text-gray-600'
-                            }`}
-                        >
-                            <div className="font-semibold text-sm">{shade.label}</div>
-                            <div className="text-xs opacity-75">{shade.description}</div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-            
-            <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
                     <FaRuler /> مساحة السطح (متر مربع) *
                 </label>
                 <input
@@ -314,7 +246,7 @@ const CalculatorPage = () => {
             </h2>
             
             <div>
-                <label className="block text-gray-700 mb-2">قيمة فاتورة الكهرباء الشهرية (دينار) *</label>
+                <label className="block text-gray-700 mb-2">متوسط قيمة فاتورة الكهرباء (شهرين - 60 يوم) *</label>
                 <input
                     type="number"
                     name="monthly_bill"
@@ -322,14 +254,14 @@ const CalculatorPage = () => {
                     onChange={handleChange}
                     required
                     className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    placeholder="مثال: 200"
+                    placeholder="مثال: 400"
                 />
-                <p className="text-xs text-gray-500 mt-1">الطاقة الشمسية مجدي اقتصادياً للفاتورة ≥ 120 دينار</p>
+                <p className="text-xs text-gray-500 mt-1">أدخل قيمة فاتورة شهرين (60 يوم) لتحصل على دراسة دقيقة</p>
             </div>
             
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <p className="text-sm text-blue-700">
-                    💡 ملاحظة: إذا كانت فاتورتك أقل من 120 دينار، قد لا يكون النظام الشمسي مجدي اقتصادياً.
+                    💡 ملاحظة: إذا كانت فاتورتك أقل من 240 دينار (شهرين)، قد لا يكون النظام الشمسي مجدي اقتصادياً.
                 </p>
             </div>
             
@@ -362,11 +294,8 @@ const CalculatorPage = () => {
         </div>
     );
 
-    // Step 4: عرض النتائج
+    // Step 4: عرض النتائج (بدون سعر وبدون عمولة)
     const renderResult = () => {
-        const discount = formData.payment_method === 'cash' ? 0.1 : 0;
-        const finalPrice = result.estimatedPrice * (1 - discount);
-        
         return (
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -398,44 +327,6 @@ const CalculatorPage = () => {
                     </div>
                 </div>
                 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-gray-600">السعر الأصلي:</span>
-                        <span className="text-lg font-semibold">{result.estimatedPrice.toLocaleString()} دينار</span>
-                    </div>
-                    {discount > 0 && (
-                        <div className="flex justify-between items-center mb-2 text-green-600">
-                            <span>خصم الدفع النقدي (10%):</span>
-                            <span>- {(result.estimatedPrice * discount).toLocaleString()} دينار</span>
-                        </div>
-                    )}
-                    <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                        <span className="font-bold text-gray-800">السعر النهائي:</span>
-                        <span className="text-2xl font-bold text-green-600">{finalPrice.toLocaleString()} دينار</span>
-                    </div>
-                    {formData.payment_method === 'steg' && (
-                        <p className="text-sm text-blue-600 mt-2 text-center">
-                            ⚡ يمكن تقسيط المبلغ مع STEG - تواصل معنا للمزيد من المعلومات
-                        </p>
-                    )}
-                </div>
-                
-                {/* قسم العمولة */}
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-700 font-semibold flex items-center gap-1">
-                            <FaMoneyBillWave className="text-blue-600" />
-                            عمولة المنصة:
-                        </span>
-                        <span className="text-xl font-bold text-blue-700">
-                            {result.commission?.toLocaleString() || '0'} دينار
-                        </span>
-                    </div>
-                    <p className="text-xs text-gray-500 text-center mt-2">
-                        (150 دينار لكل كيلوواط - {result.requiredKw} kW × 150 = {result.commission?.toLocaleString()} دينار)
-                    </p>
-                </div>
-                
                 <div className="flex gap-3">
                     <a
                         href={`https://wa.me/21624661499?text=${encodeURIComponent('مرحباً، أريد استشارة حول الطاقة الشمسية')}`}
@@ -453,8 +344,7 @@ const CalculatorPage = () => {
                         setResult(null); 
                         setFormData({ 
                             user_name: '', phone: '', city: '', property_type: 'house', 
-                            roof_direction: 'جنوب', shading: 'لا يوجد', roof_area: '', 
-                            monthly_bill: '', payment_method: 'cash' 
+                            roof_area: '', monthly_bill: '', payment_method: 'cash' 
                         }); 
                     }}
                     className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
