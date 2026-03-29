@@ -14,9 +14,11 @@ const ManagerDashboard = () => {
         fetchStats();
     }, [filter]);
     
+    // إصلاح الفلاتر: إرسال params فقط عندما لا يكون الفلتر 'all'
     const fetchData = async () => {
         try {
-            const response = await managerAPI.getLeads({ status: filter !== 'all' ? filter : undefined });
+            const params = filter !== 'all' ? { status: filter } : {};
+            const response = await managerAPI.getLeads(params);
             console.log('📊 Leads data:', response.data);
             setLeads(response.data || []);
         } catch (error) {
