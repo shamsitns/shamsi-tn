@@ -18,7 +18,6 @@ const AdminDashboard = () => {
         fetchStats();
     }, [filter]);
     
-    // إصلاح الفلاتر: إرسال params فقط عندما لا يكون الفلتر 'all'
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -132,7 +131,7 @@ const AdminDashboard = () => {
             return;
         }
         
-        const notes = prompt('أضف ملاحظات للمدير (اختياري):');
+        const notes = selectedLead.notes || '';
         
         try {
             await adminAPI.sendToManager(
@@ -142,6 +141,7 @@ const AdminDashboard = () => {
             );
             toast.success('📨 تم إرسال الطلب للمدير');
             setShowModal(false);
+            setSelectedLead(null);
             fetchData();
             fetchStats();
         } catch (error) {
@@ -280,6 +280,14 @@ const AdminDashboard = () => {
                         مرسلة لمدير
                     </button>
                     <button
+                        onClick={() => setFilter('assigned_to_company')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            filter === 'assigned_to_company' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'
+                        }`}
+                    >
+                        مرسل لشركة
+                    </button>
+                    <button
                         onClick={() => setFilter('rejected')}
                         className={`px-4 py-2 rounded-lg font-semibold transition ${
                             filter === 'rejected' ? 'bg-red-600 text-white' : 'bg-white text-gray-700 border'
@@ -363,7 +371,7 @@ const AdminDashboard = () => {
                                                     {lead.status === 'approved_by_admin' && (
                                                         <button
                                                             onClick={() => {
-                                                                setSelectedLead({ id: lead.id, managerId: '' });
+                                                                setSelectedLead({ id: lead.id, managerId: '', notes: '' });
                                                                 setShowModal(true);
                                                             }}
                                                             className="text-blue-600 hover:text-blue-800 p-1"
@@ -394,21 +402,31 @@ const AdminDashboard = () => {
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold mb-4">إرسال الطلب لمدير</h3>
-                        <p className="text-gray-600 mb-4">العميل: {selectedLead?.user_name}</p>
+                        <h3 className="text-xl font-bold mb-4">📨 إرسال الطلب لمدير</h3>
+                        <p className="text-gray-600 mb-4">العميل: <span className="font-semibold">{selectedLead?.user_name}</span></p>
                         
+                        <label className="block text-gray-700 mb-2">اختر المدير التنفيذي:</label>
                         <select
                             onChange={(e) => setSelectedLead({ ...selectedLead, managerId: e.target.value })}
                             className="w-full px-4 py-2 border rounded-lg mb-4"
                             value={selectedLead?.managerId || ''}
                         >
-                            <option value="">اختر مدير...</option>
+                            <option value="">-- اختر مدير --</option>
                             {managers.map((manager) => (
                                 <option key={manager.id} value={manager.id}>
                                     {manager.name} - {manager.company_name || manager.city}
                                 </option>
                             ))}
                         </select>
+                        
+                        <label className="block text-gray-700 mb-2">ملاحظات (اختياري):</label>
+                        <textarea
+                            placeholder="أضف ملاحظات للمدير..."
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            rows="3"
+                            value={selectedLead?.notes || ''}
+                            onChange={(e) => setSelectedLead({ ...selectedLead, notes: e.target.value })}
+                        />
                         
                         <div className="flex gap-3">
                             <button
@@ -418,7 +436,10 @@ const AdminDashboard = () => {
                                 إرسال
                             </button>
                             <button
-                                onClick={() => setShowModal(false)}
+                                onClick={() => {
+                                    setShowModal(false);
+                                    setSelectedLead(null);
+                                }}
                                 className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
                             >
                                 إلغاء
