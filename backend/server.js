@@ -154,6 +154,80 @@ app.get('/api/add-sample-lead', async (req, res) => {
 });
 
 // =============================================
+// مسار مؤقت لإضافة Operations Manager
+// =============================================
+app.get('/api/add-operations-manager', async (req, res) => {
+    try {
+        // إضافة عمود role في جدول managers إذا لم يكن موجوداً
+        try {
+            await db.query(`ALTER TABLE managers ADD COLUMN role VARCHAR(50) DEFAULT 'executive'`);
+            console.log('✅ Added role column to managers table');
+        } catch (err) {
+            // العمود موجود مسبقاً، نتجاهل الخطأ
+            if (!err.message.includes('duplicate column') && !err.message.includes('already exists')) {
+                console.log('ℹ️ Role column already exists or error:', err.message);
+            }
+        }
+        
+        const hashedPassword = bcrypt.hashSync('operations123', 10);
+        
+        // إضافة Operations Manager
+        await db.query(`
+            INSERT INTO managers (name, email, password, phone, company_name, city, role) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (email) DO NOTHING
+        `, ['محمد إبراهيم الحصايري', 'operations@shamsi.tn', hashedPassword, '24661499', 'Shamsi.tn', 'تونس', 'operations']);
+        
+        // تحديث المدير الحالي ليكون مديراً تنفيذياً
+        await db.query(`
+            UPDATE managers SET role = 'executive' WHERE email = 'manager@shamsi.tn'
+        `);
+        
+        const result = await db.query('SELECT id, name, email, role FROM managers');
+        
+        res.json({
+            message: 'Operations Manager added successfully',
+            managers: result.rows
+        });
+        
+    } catch (error) {
+        console.error('Error adding operations manager:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// مسار مؤقت لتحديث أدوار المديرين
+// =============================================
+app.get('/api/update-manager-roles', async (req, res) => {
+    try {
+        // تحديث manager@shamsi.tn ليكون مديراً تنفيذياً
+        await db.query(
+            `UPDATE managers SET role = 'executive' WHERE email = $1`,
+            ['manager@shamsi.tn']
+        );
+        
+        // تحديث operations@shamsi.tn ليكون مدير عمليات
+        await db.query(
+            `UPDATE managers SET role = 'operations' WHERE email = $1`,
+            ['operations@shamsi.tn']
+        );
+        
+        // عرض جميع المديرين بعد التحديث
+        const result = await db.query('SELECT id, name, email, role FROM managers');
+        
+        res.json({
+            message: 'Manager roles updated successfully',
+            managers: result.rows
+        });
+        
+    } catch (error) {
+        console.error('Error updating manager roles:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
 // Seed Database - إضافة البيانات الافتراضية عند التشغيل
 // =============================================
 async function seedDatabase() {
@@ -184,8 +258,8 @@ async function seedDatabase() {
         const existingManager = await db.query('SELECT * FROM managers WHERE email = $1', [managerEmail]);
         if (!existingManager || existingManager.rows.length === 0) {
             await db.query(
-                'INSERT INTO managers (name, email, password, phone, company_name, city) VALUES ($1, $2, $3, $4, $5, $6)',
-                ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس']
+                'INSERT INTO managers (name, email, password, phone, company_name, city, role) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                ['مدير تجريبي', managerEmail, hashedManagerPassword, '12345678', 'شركة الطاقة الشمسية', 'تونس', 'executive']
             );
             console.log('✅ Manager account created');
         } else {
@@ -216,52 +290,6 @@ async function seedDatabase() {
         console.error('❌ Error seeding database:', error.message);
     }
 }
-// =============================================
-// مسار مؤقت لإضافة Operations Manager
-// =============================================
-app.get('/api/add-operations-manager', async (req, res) => {
-    try {
-        // إضافة عمود role في جدول managers إذا لم يكن موجوداً
-        try {
-            await db.query(`ALTER TABLE managers ADD COLUMN role VARCHAR(50) DEFAULT 'executive'`);
-            console.log('✅ Added role column to managers table');
-        } catch (err) {
-            // العمود موجود مسبقاً، نتجاهل الخطأ
-            if (!err.message.includes('duplicate column') && !err.message.includes('already exists')) {
-                console.log('ℹ️ Role column already exists or error:', err.message);
-            }
-        }
-        
-        const bcrypt = require('bcryptjs');
-        
-        // كلمة المرور المشفرة لـ "operations123"
-        const hashedPassword = bcrypt.hashSync('operations123', 10);
-        
-        // إضافة Operations Manager
-        await db.query(`
-            INSERT INTO managers (name, email, password, phone, company_name, city, role) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (email) DO NOTHING
-        `, ['محمد إبراهيم الحصايري', 'operations@shamsi.tn', hashedPassword, '24661499', 'Shamsi.tn', 'تونس', 'operations']);
-        
-        // تحديث المدير الحالي ليكون مديراً تنفيذياً
-        await db.query(`
-            UPDATE managers SET role = 'executive' WHERE email = 'manager@shamsi.tn'
-        `);
-        
-        // عرض جميع المديرين
-        const result = await db.query('SELECT id, name, email, role FROM managers');
-        
-        res.json({
-            message: 'Operations Manager added successfully',
-            managers: result.rows
-        });
-        
-    } catch (error) {
-        console.error('Error adding operations manager:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // =============================================
 // بدء الخادم
