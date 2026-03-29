@@ -14,7 +14,6 @@ exports.login = async (req, res) => {
         
         if (role === 'admin') {
             const result = await db.query('SELECT * FROM admins WHERE email = $1', [email]);
-            // التحقق من النتيجة حسب نوع قاعدة البيانات
             const rows = result.rows || result;
             if (rows && rows.length > 0) {
                 user = rows[0];
@@ -25,7 +24,8 @@ exports.login = async (req, res) => {
             const rows = result.rows || result;
             if (rows && rows.length > 0) {
                 user = rows[0];
-                userRole = 'manager';
+                // جلب الدور من قاعدة البيانات (executive, operations)
+                userRole = user.role || 'executive';
             }
         }
         
@@ -46,7 +46,7 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
         
-        console.log('✅ Login successful:', email);
+        console.log('✅ Login successful:', email, 'Role:', userRole);
         
         res.json({
             token,
@@ -82,40 +82,39 @@ exports.authenticate = (req, res, next) => {
 };
 
 // مصادقة للمديرين فقط
-// مصادقة للمديرين فقط
 exports.isManager = (req, res, next) => {
-    // حل مؤقت: في بيئة التطوير، اسمح بالمرور بدون تحقق
     if (process.env.NODE_ENV === 'development') {
         console.log('⚠️ Development mode: Skipping manager check');
         return next();
     }
-    if (req.user.role !== 'manager') {
+    if (req.user.role !== 'executive' && req.user.role !== 'operations') {
         return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير' });
+    }
+    next();
+};
+
+// مصادقة للمدير التنفيذي فقط
+exports.isExecutiveManager = (req, res, next) => {
+    if (req.user.role !== 'executive') {
+        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير تنفيذي' });
+    }
+    next();
+};
+
+// مصادقة لمدير العمليات فقط
+exports.isOperationsManager = (req, res, next) => {
+    if (req.user.role !== 'operations') {
+        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير عمليات' });
     }
     next();
 };
 
 // مصادقة للأدمن فقط
 exports.isAdmin = (req, res, next) => {
-    // حل مؤقت: في بيئة التطوير، اسمح بالمرور بدون تحقق
     if (process.env.NODE_ENV === 'development') {
         console.log('⚠️ Development mode: Skipping admin check');
         return next();
     }
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات أدمن' });
-    }
-    next();
-};
-exports.isManager = (req, res, next) => {
-    if (req.user.role !== 'manager') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير' });
-    }
-    next();
-};
-
-// مصادقة للأدمن فقط
-exports.isAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات أدمن' });
     }
