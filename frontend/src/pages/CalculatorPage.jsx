@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { 
     FaSun, FaHome, FaBuilding, FaIndustry, FaTractor, 
     FaRuler, FaMoneyBillWave, 
-    FaArrowLeft, FaWhatsapp, FaBolt,
+     FaArrowLeft, FaWhatsapp, FaBolt,
     FaUser, FaPhone, FaMapMarkerAlt, FaPlug, FaCalculator
 } from 'react-icons/fa';
 
@@ -261,7 +261,7 @@ const CalculatorPage = () => {
             
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <p className="text-sm text-blue-700">
-                    💡 ملاحظة: إذا كانت فاتورتك أقل من 240 دينار (شهرين)، قد لا يكون النظام الشمسي مجدي اقتصادياً.
+                    💡 ملاحظة: إذا كانت فاتورتك أقل من 110 دينار (شهرين)، قد لا يكون النظام الشمسي مجدي اقتصادياً.
                 </p>
             </div>
             
