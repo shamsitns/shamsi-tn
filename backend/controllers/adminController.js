@@ -311,6 +311,117 @@ exports.addManager = async (req, res) => {
 };
 
 // =============================================
+// حذف الطلبات (مع حذف جميع البيانات المرتبطة)
+// =============================================
+
+// حذف طلب فردي (مع حذف جميع البيانات المرتبطة)
+exports.deleteLead = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        const adminId = req.user.id;
+        
+        console.log(`🗑️ Admin ${adminId} deleting lead ${leadId} and all related data`);
+        
+        // التحقق من وجود الطلب
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const leads = resultLead.rows || resultLead;
+        if (!leads || leads.length === 0) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        // حذف البيانات المرتبطة بالطلب من جميع الجداول
+        // 1. حذف من lead_companies
+        await db.query('DELETE FROM lead_companies WHERE lead_id = $1', [leadId]);
+        
+        // 2. حذف من manager_assignments
+        await db.query('DELETE FROM manager_assignments WHERE lead_id = $1', [leadId]);
+        
+        // 3. حذف من lead_rejections
+        await db.query('DELETE FROM lead_rejections WHERE lead_id = $1', [leadId]);
+        
+        // 4. حذف الطلب نفسه من leads
+        await db.query('DELETE FROM leads WHERE id = $1', [leadId]);
+        
+        console.log(`✅ Lead ${leadId} and all related data deleted successfully`);
+        res.json({ 
+            message: 'تم حذف الطلب وجميع البيانات المرتبطة بنجاح',
+            leadId
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting lead:', error);
+        res.status(500).json({ message: 'حدث خطأ في حذف الطلب', error: error.message });
+    }
+};
+
+// حذف جميع الطلبات (مع حذف جميع البيانات المرتبطة)
+exports.deleteAllLeads = async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        
+        console.log(`🗑️ Admin ${adminId} deleting ALL leads and related data`);
+        
+        // حذف جميع البيانات المرتبطة
+        await db.query('DELETE FROM lead_companies');
+        await db.query('DELETE FROM manager_assignments');
+        await db.query('DELETE FROM lead_rejections');
+        
+        // حذف جميع الطلبات
+        await db.query('DELETE FROM leads');
+        
+        // إعادة تعيين التسلسل
+        await db.query('SELECT setval(\'leads_id_seq\', 1, false)');
+        
+        console.log(`✅ All leads and related data deleted successfully`);
+        res.json({ 
+            message: 'تم حذف جميع الطلبات والبيانات المرتبطة بنجاح',
+            deletedCount: 'all'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting all leads:', error);
+        res.status(500).json({ message: 'حدث خطأ في حذف الطلبات', error: error.message });
+    }
+};
+
+// حذف الطلبات المرفوضة فقط (مع حذف البيانات المرتبطة)
+exports.deleteRejectedLeads = async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        
+        console.log(`🗑️ Admin ${adminId} deleting rejected leads`);
+        
+        // الحصول على IDs الطلبات المرفوضة
+        const rejectedLeads = await db.query('SELECT id FROM leads WHERE status = $1', ['rejected']);
+        const leadIds = rejectedLeads.rows || rejectedLeads;
+        
+        if (leadIds.length > 0) {
+            // حذف البيانات المرتبطة لكل طلب مرفوض
+            for (const lead of leadIds) {
+                await db.query('DELETE FROM lead_companies WHERE lead_id = $1', [lead.id]);
+                await db.query('DELETE FROM manager_assignments WHERE lead_id = $1', [lead.id]);
+                await db.query('DELETE FROM lead_rejections WHERE lead_id = $1', [lead.id]);
+            }
+            
+            // حذف الطلبات المرفوضة
+            await db.query('DELETE FROM leads WHERE status = $1', ['rejected']);
+        }
+        
+        const deletedCount = leadIds.length;
+        
+        console.log(`✅ ${deletedCount} rejected leads and related data deleted`);
+        res.json({ 
+            message: `تم حذف ${deletedCount} طلب مرفوض وجميع البيانات المرتبطة بنجاح`,
+            deletedCount 
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting rejected leads:', error);
+        res.status(500).json({ message: 'حدث خطأ في حذف الطلبات المرفوضة', error: error.message });
+    }
+};
+
+// =============================================
 // إحصائيات وإدارة عامة
 // =============================================
 
