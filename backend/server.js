@@ -267,6 +267,100 @@ app.get('/api/clean-managers', async (req, res) => {
 });
 
 // =============================================
+// مسار مؤقت لإصلاح العمولات الناقصة
+// =============================================
+app.get('/api/fix-commissions', async (req, res) => {
+    try {
+        console.log("🛠️ Executing commission fix...");
+        
+        const result = await db.query(`
+            UPDATE leads 
+            SET commission = required_kw * 150 
+            WHERE commission IS NULL OR commission = 0
+            RETURNING id, required_kw, commission
+        `);
+        
+        const updatedLeads = result.rows || result;
+        
+        console.log(`✅ Updated ${updatedLeads.length} leads with commission`);
+        
+        res.json({
+            message: `✅ تم تحديث ${updatedLeads.length} طلب/طلبات بنجاح.`,
+            updatedLeads: updatedLeads
+        });
+        
+    } catch (error) {
+        console.error("❌ Error fixing commissions:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// مسارات مؤقتة للتحقق من البيانات وإصلاحها
+// =============================================
+
+// عرض جميع الطلبات مع العمولة
+app.get('/api/check-leads', async (req, res) => {
+    try {
+        const result = await db.query('SELECT id, user_name, required_kw, commission, status, created_at FROM leads ORDER BY id DESC');
+        const leads = result.rows || result;
+        
+        res.json({
+            count: leads.length,
+            leads: leads
+        });
+    } catch (error) {
+        console.error('Error checking leads:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// تحديث عمولة طلب محدد
+app.get('/api/fix-lead-commission/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const result = await db.query('SELECT required_kw, commission FROM leads WHERE id = $1', [id]);
+        const leads = result.rows || result;
+        
+        if (!leads || leads.length === 0) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        const lead = leads[0];
+        const newCommission = lead.required_kw * 150;
+        
+        await db.query('UPDATE leads SET commission = $1 WHERE id = $2', [newCommission, id]);
+        
+        res.json({ 
+            message: `✅ تم تحديث الطلب ${id}`,
+            old_commission: lead.commission,
+            new_commission: newCommission,
+            required_kw: lead.required_kw
+        });
+    } catch (error) {
+        console.error('Error fixing commission:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// تحديث جميع الطلبات
+app.get('/api/fix-all-commissions', async (req, res) => {
+    try {
+        const result = await db.query('UPDATE leads SET commission = required_kw * 150 RETURNING id, required_kw, commission');
+        const updated = result.rows || result;
+        
+        res.json({ 
+            message: `✅ تم تحديث ${updated.length} طلب`,
+            updated: updated
+        });
+    } catch (error) {
+        console.error('Error fixing all commissions:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
 // Seed Database
 // =============================================
 async function seedDatabase() {
@@ -328,35 +422,6 @@ async function seedDatabase() {
 // =============================================
 // بدء الخادم
 // =============================================
-// =============================================
-// مسار مؤقت لإصلاح العمولات الناقصة
-// =============================================
-app.get('/api/fix-commissions', async (req, res) => {
-    try {
-        console.log("🛠️ Executing commission fix...");
-        
-        // تحديث جميع الطلبات التي عمولتها 0 أو NULL
-        const result = await db.query(`
-            UPDATE leads 
-            SET commission = required_kw * 150 
-            WHERE commission IS NULL OR commission = 0
-            RETURNING id, required_kw, commission
-        `);
-        
-        const updatedLeads = result.rows || result;
-        
-        console.log(`✅ Updated ${updatedLeads.length} leads with commission`);
-        
-        res.json({
-            message: `✅ تم تحديث ${updatedLeads.length} طلب/طلبات بنجاح.`,
-            updatedLeads: updatedLeads
-        });
-        
-    } catch (error) {
-        console.error("❌ Error fixing commissions:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
 app.listen(PORT, async () => {
     console.log(`
     ════════════════════════════════════════════
