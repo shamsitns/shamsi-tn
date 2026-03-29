@@ -18,10 +18,12 @@ const AdminDashboard = () => {
         fetchStats();
     }, [filter]);
     
+    // إصلاح الفلاتر: إرسال params فقط عندما لا يكون الفلتر 'all'
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await adminAPI.getLeads({ status: filter !== 'all' ? filter : undefined });
+            const params = filter !== 'all' ? { status: filter } : {};
+            const response = await adminAPI.getLeads(params);
             console.log('📊 Leads data:', response.data);
             setLeads(response.data.leads || []);
         } catch (error) {
@@ -370,7 +372,6 @@ const AdminDashboard = () => {
                                                             <FaPaperPlane size={18} />
                                                         </button>
                                                     )}
-                                                    {/* زر حذف لجميع الطلبات */}
                                                     <button
                                                         onClick={() => handleDeleteLead(lead.id)}
                                                         className="text-gray-500 hover:text-red-600 p-1"
