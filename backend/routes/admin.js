@@ -6,7 +6,10 @@ const {
     rejectLead,
     sendToManager,
     getAllManagers,
-    getLeadStats
+    getLeadStats,
+    deleteLead,
+    deleteAllLeads,
+    deleteRejectedLeads
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -22,5 +25,10 @@ router.get('/stats', getLeadStats);
 router.post('/leads/:leadId/approve', approveLead);
 router.post('/leads/:leadId/reject', rejectLead);
 router.post('/leads/:leadId/send-to-manager', sendToManager);
+
+// مسارات الحذف (جديدة)
+router.delete('/leads/:leadId', deleteLead);
+router.delete('/leads/all', deleteAllLeads);
+router.delete('/leads/rejected', deleteRejectedLeads);
 
 module.exports = router;
