@@ -4,8 +4,9 @@ import toast from 'react-hot-toast';
 import { 
     FaSun, FaHome, FaBuilding, FaIndustry, FaTractor, 
     FaRuler, FaMoneyBillWave, 
-     FaArrowLeft, FaWhatsapp, FaBolt,
-    FaUser, FaPhone, FaMapMarkerAlt, FaPlug, FaCalculator
+    FaArrowLeft, FaWhatsapp, FaBolt,
+    FaUser, FaPhone, FaMapMarkerAlt, FaPlug, FaCalculator,
+    FaPaperPlane
 } from 'react-icons/fa';
 
 // قائمة الولايات التونسية
@@ -19,6 +20,7 @@ const tunisianCities = [
 const CalculatorPage = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [sending, setSending] = useState(false);
     const [result, setResult] = useState(null);
     const [formData, setFormData] = useState({
         user_name: '',
@@ -60,6 +62,26 @@ const CalculatorPage = () => {
             toast.error(errorMsg);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // دالة إرسال الطلب
+    const handleSendRequest = async () => {
+        setSending(true);
+        try {
+            await leadsAPI.create(formData);
+            toast.success('✅ تم إرسال طلبك بنجاح! سنتواصل معك قريباً');
+            setStep(1);
+            setResult(null);
+            setFormData({ 
+                user_name: '', phone: '', city: '', property_type: 'house', 
+                roof_area: '', monthly_bill: '', payment_method: 'cash' 
+            });
+        } catch (error) {
+            console.error('Error sending request:', error);
+            toast.error('❌ حدث خطأ في إرسال الطلب');
+        } finally {
+            setSending(false);
         }
     };
 
@@ -327,12 +349,29 @@ const CalculatorPage = () => {
                     </div>
                 </div>
                 
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3">
+                    <button
+                        onClick={handleSendRequest}
+                        disabled={sending}
+                        className="w-full bg-yellow-500 text-white py-3 rounded-lg font-semibold hover:bg-yellow-600 transition flex items-center justify-center gap-2"
+                    >
+                        {sending ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                جاري الإرسال...
+                            </>
+                        ) : (
+                            <>
+                                <FaPaperPlane /> إرسال طلب الدراسة
+                            </>
+                        )}
+                    </button>
+                    
                     <a
                         href={`https://wa.me/21624661499?text=${encodeURIComponent('مرحباً، أريد استشارة حول الطاقة الشمسية')}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2"
+                        className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2"
                     >
                         <FaWhatsapp /> تواصل عبر WhatsApp
                     </a>
