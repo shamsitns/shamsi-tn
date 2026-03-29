@@ -24,7 +24,7 @@ const HomePage = () => {
                         </div>
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
-                        وفّر حتى <span className="text-yellow-400">60%</span> من فاتورة الكهرباء
+                        وفّر حتى <span className="text-yellow-400">80%</span> من فاتورة الكهرباء
                         <br />
                         باستخدام الطاقة الشمسية في تونس
                     </h1>
