@@ -73,6 +73,7 @@ const ManagerDashboard = () => {
             'approved_by_admin': 'bg-blue-100 text-blue-800',
             'sent_to_manager': 'bg-purple-100 text-purple-800',
             'sent_to_operations': 'bg-indigo-100 text-indigo-800',
+            'assigned_to_company': 'bg-pink-100 text-pink-800',
             'completed': 'bg-green-100 text-green-800',
             'rejected': 'bg-red-100 text-red-800'
         };
@@ -82,6 +83,7 @@ const ManagerDashboard = () => {
             'approved_by_admin': 'تمت الموافقة',
             'sent_to_manager': 'قيد المعالجة',
             'sent_to_operations': 'مرسل لمدير العمليات',
+            'assigned_to_company': 'مرسل لشركة',
             'completed': 'مكتمل',
             'rejected': 'مرفوض'
         };
@@ -198,6 +200,26 @@ const ManagerDashboard = () => {
                         قيد المعالجة
                     </button>
                     <button
+                        onClick={() => setFilter('sent_to_operations')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            filter === 'sent_to_operations' 
+                                ? 'bg-indigo-600 text-white shadow-md' 
+                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                        }`}
+                    >
+                        مرسل لمدير العمليات
+                    </button>
+                    <button
+                        onClick={() => setFilter('assigned_to_company')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            filter === 'assigned_to_company' 
+                                ? 'bg-pink-600 text-white shadow-md' 
+                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                        }`}
+                    >
+                        مرسل لشركة
+                    </button>
+                    <button
                         onClick={() => setFilter('completed')}
                         className={`px-4 py-2 rounded-lg font-semibold transition ${
                             filter === 'completed' 
@@ -306,6 +328,7 @@ const ManagerDashboard = () => {
                                             <span className="text-gray-500">السعر التقريبي:</span>
                                             <span className="font-medium">{formatCurrency(lead.estimated_price)} دينار</span>
                                         </div>
+                                        
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
                                                 <FaMoneyBillWave className="text-green-600" />
