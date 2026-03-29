@@ -328,6 +328,35 @@ async function seedDatabase() {
 // =============================================
 // بدء الخادم
 // =============================================
+// =============================================
+// مسار مؤقت لإصلاح العمولات الناقصة
+// =============================================
+app.get('/api/fix-commissions', async (req, res) => {
+    try {
+        console.log("🛠️ Executing commission fix...");
+        
+        // تحديث جميع الطلبات التي عمولتها 0 أو NULL
+        const result = await db.query(`
+            UPDATE leads 
+            SET commission = required_kw * 150 
+            WHERE commission IS NULL OR commission = 0
+            RETURNING id, required_kw, commission
+        `);
+        
+        const updatedLeads = result.rows || result;
+        
+        console.log(`✅ Updated ${updatedLeads.length} leads with commission`);
+        
+        res.json({
+            message: `✅ تم تحديث ${updatedLeads.length} طلب/طلبات بنجاح.`,
+            updatedLeads: updatedLeads
+        });
+        
+    } catch (error) {
+        console.error("❌ Error fixing commissions:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
 app.listen(PORT, async () => {
     console.log(`
     ════════════════════════════════════════════
