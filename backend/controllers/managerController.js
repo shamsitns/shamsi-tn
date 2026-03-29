@@ -114,6 +114,7 @@ exports.getManagerStats = async (req, res) => {
                 COUNT(CASE WHEN l.status = 'completed' THEN 1 END) as completed,
                 COUNT(CASE WHEN l.status = 'rejected' THEN 1 END) as rejected,
                 COALESCE(SUM(CASE WHEN l.status = 'completed' THEN l.commission ELSE 0 END), 0) as total_commission,
+                COALESCE(SUM(CASE WHEN l.status = 'sent_to_operations' THEN l.commission ELSE 0 END), 0) as sent_to_operations_commission,
                 COALESCE(SUM(CASE WHEN l.status = 'completed' THEN 1 ELSE 0 END), 0) as total_completed_count
             FROM leads l
             LEFT JOIN manager_assignments ma ON l.id = ma.lead_id
@@ -127,6 +128,7 @@ exports.getManagerStats = async (req, res) => {
             completed: 0, 
             rejected: 0, 
             total_commission: 0,
+            sent_to_operations_commission: 0,
             total_completed_count: 0
         };
         
@@ -293,7 +295,7 @@ exports.getAvailableCompanies = async (req, res) => {
 };
 
 // =============================================
-// إرسال الطلب لمدير العمليات (بعد اتصال المدير التنفيذي)
+// إرسال الطلب لمدير العمليات (مع العمولة)
 // =============================================
 exports.sendToOperationsManager = async (req, res) => {
     try {
@@ -309,6 +311,11 @@ exports.sendToOperationsManager = async (req, res) => {
         if (!leads || leads.length === 0) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
+        
+        const lead = leads[0];
+        const commission = lead.commission || (lead.required_kw * 150);
+        
+        console.log(`💰 Commission for lead ${leadId}: ${commission} TND (${lead.required_kw} kW × 150)`);
         
         // الحصول على أول Operations Manager
         const resultOps = await db.query(`
@@ -334,20 +341,21 @@ exports.sendToOperationsManager = async (req, res) => {
             [operationsManager.id, leadId]
         );
         
-        // تسجيل التعيين
+        // تسجيل التعيين مع العمولة
         await db.query(
             `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, status) 
              VALUES ($1, $2, $3, $4, $5)`,
-            [leadId, operationsManager.id, executiveId, notes || `تم إرسال الطلب من قبل المدير التنفيذي`, 'pending']
+            [leadId, operationsManager.id, executiveId, notes || `تم إرسال الطلب من قبل المدير التنفيذي - العمولة: ${commission} دينار`, 'pending']
         );
         
-        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.id}`);
+        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.id} with commission ${commission}`);
         
         res.json({ 
-            message: `تم إرسال الطلب لمدير العمليات: ${operationsManager.name}`,
+            message: `تم إرسال الطلب لمدير العمليات: ${operationsManager.name} (العمولة: ${commission} دينار)`,
             leadId,
             operationsManagerId: operationsManager.id,
-            operationsManagerName: operationsManager.name
+            operationsManagerName: operationsManager.name,
+            commission: commission
         });
         
     } catch (error) {
