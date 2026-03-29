@@ -189,14 +189,14 @@ exports.sendToManager = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // التحقق من وجود المدير
+        // التحقق من وجود المدير (مدير تنفيذي فقط)
         const resultManager = await db.query(
-            'SELECT id, name FROM managers WHERE id = $1',
-            [managerId]
+            'SELECT id, name FROM managers WHERE id = $1 AND (role = $2 OR role IS NULL)',
+            [managerId, 'executive']
         );
         const managers = resultManager.rows || resultManager;
         if (!managers || managers.length === 0) {
-            return res.status(404).json({ message: 'المدير غير موجود' });
+            return res.status(404).json({ message: 'المدير غير موجود أو ليس مديراً تنفيذياً' });
         }
         
         const manager = managers[0];
@@ -252,7 +252,7 @@ exports.sendToManager = async (req, res) => {
 // إدارة المديرين
 // =============================================
 
-// الحصول على جميع المديرين
+// الحصول على جميع المديرين التنفيذيين فقط (لإرسال الطلبات)
 exports.getAllManagers = async (req, res) => {
     try {
         const result = await db.query(`
@@ -261,11 +261,12 @@ exports.getAllManagers = async (req, res) => {
                    (SELECT COUNT(*) FROM leads WHERE manager_id = managers.id AND status = 'completed') as completed_leads_count,
                    created_at
             FROM managers 
+            WHERE role = 'executive' OR role IS NULL
             ORDER BY created_at DESC
         `);
         const managers = result.rows || result;
         
-        console.log(`👥 Found ${managers?.length || 0} managers`);
+        console.log(`👥 Found ${managers?.length || 0} executive managers`);
         res.json(managers || []);
         
     } catch (error) {
@@ -277,9 +278,9 @@ exports.getAllManagers = async (req, res) => {
 // إضافة مدير جديد
 exports.addManager = async (req, res) => {
     try {
-        const { name, email, password, phone, company_name, city } = req.body;
+        const { name, email, password, phone, company_name, city, role } = req.body;
         
-        console.log(`👥 Adding new manager: ${name}, ${email}`);
+        console.log(`👥 Adding new manager: ${name}, ${email}, role: ${role || 'executive'}`);
         
         // التحقق من وجود البريد
         const resultExisting = await db.query('SELECT id FROM managers WHERE email = $1', [email]);
@@ -289,17 +290,18 @@ exports.addManager = async (req, res) => {
         }
         
         const hashedPassword = bcrypt.hashSync(password, 10);
+        const managerRole = role || 'executive';
         
         await db.query(
-            `INSERT INTO managers (name, email, password, phone, company_name, city) 
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [name, email, hashedPassword, phone || null, company_name || null, city || null]
+            `INSERT INTO managers (name, email, password, phone, company_name, city, role) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [name, email, hashedPassword, phone || null, company_name || null, city || null, managerRole]
         );
         
         console.log(`✅ Manager ${name} added successfully`);
         res.status(201).json({ 
             message: 'تم إضافة المدير بنجاح',
-            manager: { name, email }
+            manager: { name, email, role: managerRole }
         });
         
     } catch (error) {
