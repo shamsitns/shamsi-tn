@@ -20,7 +20,6 @@ exports.calculateLead = async (req, res) => {
             shading
         } = req.body;
         
-        // التحقق من البيانات المطلوبة
         if (!user_name || !phone || !city || !monthly_bill) {
             return res.status(400).json({ 
                 message: 'البيانات غير كاملة',
@@ -28,7 +27,6 @@ exports.calculateLead = async (req, res) => {
             });
         }
         
-        // حساب النظام الشمسي فقط (لا يتم حفظه)
         const solarData = calculateSolarSystem(
             parseFloat(monthly_bill),
             monthly_consumption ? parseFloat(monthly_consumption) : null,
@@ -73,7 +71,6 @@ exports.createLead = async (req, res) => {
             shading
         } = req.body;
         
-        // التحقق من البيانات المطلوبة
         if (!user_name || !phone || !city || !monthly_bill) {
             return res.status(400).json({ 
                 message: 'البيانات غير كاملة',
@@ -81,7 +78,6 @@ exports.createLead = async (req, res) => {
             });
         }
         
-        // حساب النظام الشمسي
         const solarData = calculateSolarSystem(
             parseFloat(monthly_bill),
             monthly_consumption ? parseFloat(monthly_consumption) : null,
@@ -93,7 +89,6 @@ exports.createLead = async (req, res) => {
         
         console.log('📊 Solar calculation result:', solarData);
         
-        // إدخال البيانات في قاعدة البيانات (صيغة PostgreSQL)
         const query = `
             INSERT INTO leads (
                 user_name, phone, city, property_type, payment_method,
@@ -125,7 +120,7 @@ exports.createLead = async (req, res) => {
             solarData.annualProduction,
             solarData.annualSavings,
             solarData.paybackYears,
-            solarData.commission,
+            (solarData.requiredKw * 150),  // العمولة: 150 دينار لكل كيلوواط
             'new'
         ];
         
@@ -150,10 +145,7 @@ exports.getLead = async (req, res) => {
     try {
         const { id } = req.params;
         
-        const result = await db.query(
-            'SELECT * FROM leads WHERE id = $1',
-            [id]
-        );
+        const result = await db.query('SELECT * FROM leads WHERE id = $1', [id]);
         const leads = result.rows || result;
         
         if (!leads || leads.length === 0) {
