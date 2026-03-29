@@ -13,7 +13,7 @@ const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
-const OperationsDashboard = lazy(() => import('./components/OperationsDashboard'));
+const OperationsDashboard = lazy(() => import('./components/OperationsDashboard'));  // تأكد من هذا السطر
 const Login = lazy(() => import('./components/Login'));
 
 // مكون تحميل مؤقت
@@ -39,7 +39,7 @@ function App() {
                             <Route path="/login" element={<Login />} />
                             <Route path="/admin" element={<AdminDashboard />} />
                             <Route path="/manager" element={<ManagerDashboard />} />
-                            <Route path="/operations" element={<OperationsDashboard />} />
+                            <Route path="/operations" element={<OperationsDashboard />} />  {/* تأكد من هذا السطر */}
                         </Routes>
                     </main>
                     <Footer />
