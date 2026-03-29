@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { createLead, getLead } = require('../controllers/leadController');
+const { createLead, getLead, calculateLead } = require('../controllers/leadController');
 
 const router = express.Router();
 
@@ -13,7 +13,10 @@ const validateLead = [
     body('roof_area').optional().isFloat({ min: 0 }).withMessage('مساحة السطح يجب أن تكون رقماً موجباً')
 ];
 
-// إنشاء طلب جديد
+// مسار الحساب فقط (بدون حفظ في قاعدة البيانات)
+router.post('/calculate', validateLead, calculateLead);
+
+// إنشاء طلب جديد (حفظ في قاعدة البيانات)
 router.post('/', validateLead, createLead);
 
 // الحصول على طلب محدد
