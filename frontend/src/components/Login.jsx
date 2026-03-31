@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
-import { FaSun, FaUserShield, FaUserTie, FaBuilding } from 'react-icons/fa';
+import { FaSun, FaUserShield, FaUserTie } from 'react-icons/fa';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -27,10 +27,16 @@ const Login = () => {
             // توجيه حسب الدور (role) من قاعدة البيانات
             const userRole = response.data.user.role;
             
-            if (userRole === 'admin') {
+            if (userRole === 'owner') {
+                navigate('/owner');
+            } else if (userRole === 'general_manager' || userRole === 'admin') {
                 navigate('/admin');
-            } else if (userRole === 'operations') {
+            } else if (userRole === 'executive_manager') {
+                navigate('/manager');
+            } else if (userRole === 'operations_manager') {
                 navigate('/operations');
+            } else if (userRole === 'call_center') {
+                navigate('/callcenter');
             } else {
                 navigate('/manager');
             }
@@ -68,7 +74,7 @@ const Login = () => {
                                 }`}
                             >
                                 <FaUserShield />
-                                أدمن
+                                أدمن / مدير عام
                             </button>
                             <button
                                 type="button"
@@ -80,11 +86,11 @@ const Login = () => {
                                 }`}
                             >
                                 <FaUserTie />
-                                مدير
+                                مدير تنفيذي
                             </button>
                         </div>
                         <p className="text-xs text-gray-500 mt-2 text-center">
-                            ملاحظة: يتم التوجيه تلقائياً حسب صلاحيات الحساب (مدير تنفيذي / مدير عمليات)
+                            ملاحظة: يتم التوجيه تلقائياً حسب صلاحيات الحساب
                         </p>
                     </div>
                     
@@ -120,6 +126,10 @@ const Login = () => {
                         {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
                     </button>
                 </form>
+                
+                <div className="mt-6 text-center text-xs text-gray-400">
+                    <p>للحصول على المساعدة، تواصل مع مدير النظام</p>
+                </div>
             </div>
         </div>
     );

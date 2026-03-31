@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaSun, FaChartLine, FaHandshake, FaStar, FaArrowLeft, FaBuilding, FaTractor, FaIndustry, FaHome, FaWhatsapp, FaShieldAlt, FaClock, FaThumbsUp } from 'react-icons/fa';
+import { 
+    FaSun, FaChartLine, FaHandshake, FaStar, FaWhatsapp, 
+    FaShieldAlt, FaClock, FaThumbsUp, FaCheckCircle, FaMapMarkerAlt 
+} from 'react-icons/fa';
 
 const HomePage = () => {
     return (
@@ -111,42 +114,77 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Real Projects */}
-            <section className="py-16 px-4 bg-white">
-                <div className="max-w-6xl mx-auto">
-                    <h2 className="text-3xl font-bold text-center text-gray-800 mb-4">
-                        مشاريع حقيقية في تونس
-                    </h2>
-                    <p className="text-center text-gray-600 mb-12">
-                        شاهد أمثلة لتركيبات الطاقة الشمسية التي قمنا بها
-                    </p>
-                    <div className="grid md:grid-cols-3 gap-6">
-                        {[
-                            { city: 'صفاقس', kw: '5 kW', savings: '2,400 دينار/سنة', type: 'منزل', icon: FaHome },
-                            { city: 'سوسة', kw: '3 kW', savings: '1,500 دينار/سنة', type: 'محل تجاري', icon: FaBuilding },
-                            { city: 'تونس', kw: '6 kW', savings: '3,000 دينار/سنة', type: 'مصنع', icon: FaIndustry }
-                        ].map((project, i) => {
-                            const Icon = project.icon;
-                            return (
-                                <div key={i} className="bg-gray-100 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition group">
-                                    <div className="h-48 bg-gradient-to-r from-yellow-500 to-green-500 flex items-center justify-center relative overflow-hidden">
-                                        <Icon className="text-7xl text-white opacity-50 group-hover:scale-110 transition duration-500" />
-                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition"></div>
-                                    </div>
-                                    <div className="p-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="font-bold text-lg">{project.city}</h3>
-                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{project.type}</span>
-                                        </div>
-                                        <p className="text-gray-600">قدرة: {project.kw}</p>
-                                        <p className="text-green-600 font-semibold">توفير: {project.savings}</p>
-                                    </div>
-                                </div>
-                            );
-                        })}
+            {/* Real Projects Section */}
+<section className="py-16 px-4 bg-white">
+    <div className="max-w-6xl mx-auto">
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-4">
+            مشاريع حقيقية في تونس
+        </h2>
+        <p className="text-center text-gray-600 mb-12">
+            شاهد أمثلة لتركيبات الطاقة الشمسية التي قمنا بها مع عملائنا
+        </p>
+        <div className="grid md:grid-cols-3 gap-6">
+            {[
+                { 
+                    city: 'صفاقس', 
+                    kw: '5 kW', 
+                    savings: '2,400 دينار/سنة',
+                    type: 'منزل',
+                    image: '/images/project-sfax.jpg',
+                    description: 'تركيب نظام 5 كيلوواط لمنزل في صفاقس، توفير 50% من فاتورة الكهرباء'
+                },
+                { 
+                    city: 'سوسة', 
+                    kw: '3 kW', 
+                    savings: '1,500 دينار/سنة',
+                    type: 'محل تجاري',
+                    image: '/images/project-sousse.jpg',
+                    description: 'نظام شمسي لمحل تجاري في سوسة، انخفاض كبير في فاتورة الكهرباء'
+                },
+                { 
+                    city: 'تونس', 
+                    kw: '6 kW', 
+                    savings: '3,000 دينار/سنة',
+                    type: 'مصنع',
+                    image: '/images/project-tunis.jpg',
+                    description: 'تركيب نظام 6 كيلوواط لمصنع في تونس، عائد استثماري ممتاز'
+                }
+            ].map((project, i) => (
+                <div key={i} className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition group">
+                    <div className="relative h-56 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10"></div>
+                        <div className="absolute bottom-3 left-3 z-20">
+                            <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                                {project.type}
+                            </span>
+                        </div>
+                        <img 
+                            src={project.image} 
+                            alt={`مشروع الطاقة الشمسية في ${project.city}`}
+                            className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                            onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://via.placeholder.com/400x300?text=صورة+مشروع+شمسي';
+                            }}
+                        />
+                    </div>
+                    <div className="p-5">
+                        <h3 className="font-bold text-xl mb-2">{project.city}</h3>
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-gray-600">قدرة النظام:</span>
+                            <span className="font-bold text-green-600">{project.kw}</span>
+                        </div>
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-gray-600">التوفير السنوي:</span>
+                            <span className="font-bold text-green-600">{project.savings}</span>
+                        </div>
+                        <p className="text-gray-500 text-sm">{project.description}</p>
                     </div>
                 </div>
-            </section>
+            ))}
+        </div>
+    </div>
+</section>
 
             {/* Testimonials */}
             <section className="py-16 px-4 bg-yellow-50">

@@ -1,4 +1,9 @@
 # robots.txt for Shamsi.tn
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /manager
+Disallow: /operations
+Disallow: /callcenter
+Disallow: /owner
 Sitemap: https://shamsi-tns.onrender.com/sitemap.xml

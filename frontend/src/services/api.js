@@ -133,7 +133,7 @@ export const managerAPI = {
     },
     getStats: () => {
         console.log('📈 Fetching manager stats');
-        return api.get('/manager/stats');
+        return api.get('/manager/stats');  
     },
     updateLeadStatus: (leadId, status, notes) => {
         console.log('🔄 Updating lead status:', leadId, status);
