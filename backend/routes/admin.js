@@ -13,11 +13,7 @@ const {
     assignToCallCenter,
     deleteLead,
     deleteAllLeads,
-    deleteRejectedLeads,
-    getAllCompanies,
-    addCompany,
-    updateCompany,
-    deleteCompany
+    deleteRejectedLeads
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -52,13 +48,5 @@ router.get('/users', getAllUsers);
 router.post('/users', addUser);
 router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
-
-// =============================================
-// مسارات إدارة الشركات
-// =============================================
-router.get('/companies', getAllCompanies);
-router.post('/companies', addCompany);
-router.put('/companies/:id', updateCompany);
-router.delete('/companies/:id', deleteCompany);
 
 module.exports = router;
