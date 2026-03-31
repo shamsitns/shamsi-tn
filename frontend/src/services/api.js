@@ -99,21 +99,6 @@ export const adminAPI = {
         console.log('📈 Fetching stats');
         return api.get('/admin/stats');
     },
-    // ==================== Admin API ====================
-export const adminAPI = {
-    getLeads: (params) => {
-        console.log('📊 Fetching leads with params:', params);
-        return api.get('/admin/leads', { params });
-    },
-    getManagers: () => {
-        console.log('👥 Fetching managers');
-        return api.get('/admin/managers');
-    },
-    getStats: () => {
-        console.log('📈 Fetching stats');
-        return api.get('/admin/stats');
-    },
-    // أضف هذه الدالة
     getCommissionStats: () => {
         console.log('💰 Fetching commission stats');
         return api.get('/admin/commission-stats');
@@ -142,31 +127,23 @@ export const adminAPI = {
         console.log('🗑️ Deleting rejected leads');
         return api.delete('/admin/leads/rejected');
     },
-};
-    approveLead: (leadId) => {
-        console.log('✅ Approving lead:', leadId);
-        return api.post(`/admin/leads/${leadId}/approve`);
+    // إدارة الشركات
+    getCompanies: () => {
+        console.log('🏢 Fetching companies');
+        return api.get('/admin/companies');
     },
-    rejectLead: (leadId, reason) => {
-        console.log('❌ Rejecting lead:', leadId, reason);
-        return api.post(`/admin/leads/${leadId}/reject`, { reason });
+    addCompany: (data) => {
+        console.log('➕ Adding company:', data);
+        return api.post('/admin/companies', data);
     },
-    sendToManager: (leadId, managerId, notes) => {
-        console.log('📨 Sending lead to manager:', leadId, managerId);
-        return api.post(`/admin/leads/${leadId}/send-to-manager`, { managerId, notes });
+    updateCompany: (id, data) => {
+        console.log('✏️ Updating company:', id);
+        return api.put(`/admin/companies/${id}`, data);
     },
-    deleteLead: (leadId) => {
-        console.log('🗑️ Deleting lead:', leadId);
-        return api.delete(`/admin/leads/${leadId}`);
-    },
-    deleteAllLeads: () => {
-        console.log('🗑️ Deleting all leads');
-        return api.delete('/admin/leads/all');
-    },
-    deleteRejectedLeads: () => {
-        console.log('🗑️ Deleting rejected leads');
-        return api.delete('/admin/leads/rejected');
-    },
+    deleteCompany: (id) => {
+        console.log('🗑️ Deleting company:', id);
+        return api.delete(`/admin/companies/${id}`);
+    }
 };
 
 // ==================== Manager API ====================
@@ -177,7 +154,7 @@ export const managerAPI = {
     },
     getStats: () => {
         console.log('📈 Fetching manager stats');
-        return api.get('/manager/stats');  
+        return api.get('/manager/stats');
     },
     updateLeadStatus: (leadId, status, notes) => {
         console.log('🔄 Updating lead status:', leadId, status);
