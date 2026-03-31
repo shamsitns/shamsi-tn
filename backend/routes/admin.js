@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticate, isAdmin, isGeneralManager, isOwner } = require('../middleware/auth');
+const { authenticate, isAdmin } = require('../middleware/auth');
 const {
     getAllLeads,
     getDashboardStats,
@@ -23,10 +23,10 @@ const {
 const router = express.Router();
 
 // =============================================
-// جميع المسارات تحتاج مصادقة وصلاحيات مدير عام أو مالك
+// جميع المسارات تحتاج مصادقة وصلاحيات أدمن
 // =============================================
 router.use(authenticate);
-router.use(isGeneralManager);
+router.use(isAdmin);
 
 // =============================================
 // مسارات الطلبات والإحصائيات
