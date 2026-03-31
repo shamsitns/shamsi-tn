@@ -1,29 +1,26 @@
 const db = require('./config/database');
 
 async function addColumns() {
-    console.log('🔧 Starting database migration...');
-    
-    const columnsToAdd = [
-        { name: 'company_id', type: 'INTEGER' },
-        { name: 'panel_recommendation', type: 'TEXT' },
-        { name: 'panel_brand', type: 'TEXT' },
-        { name: 'assigned_to_company', type: 'TEXT DEFAULT NULL' }
-    ];
-    
-    for (const col of columnsToAdd) {
-        try {
-            await db.execute(`ALTER TABLE leads ADD COLUMN ${col.name} ${col.type}`);
-            console.log(`✅ Added column: ${col.name}`);
-        } catch (err) {
-            if (err.message.includes('duplicate column')) {
-                console.log(`ℹ️ Column ${col.name} already exists`);
-            } else {
-                console.log(`⚠️ Could not add ${col.name}: ${err.message}`);
-            }
-        }
-    }
-    
-    console.log('✅ Migration completed');
+  console.log('🔧 Adding new columns if not exist...');
+
+  try {
+    // مثال: إضافة عمود panel_brand للـ leads
+    await db.query(`
+      ALTER TABLE leads
+      ADD COLUMN IF NOT EXISTS panel_brand VARCHAR(100)
+    `);
+    console.log('✅ Column panel_brand added to leads (if not exists)');
+
+    await db.query(`
+      ALTER TABLE leads
+      ADD COLUMN IF NOT EXISTS panel_recommendation VARCHAR(100)
+    `);
+    console.log('✅ Column panel_recommendation added to leads (if not exists)');
+
+    console.log('✅ All columns checked/added');
+  } catch (error) {
+    console.error('❌ Error adding columns:', error);
+  }
 }
 
 addColumns();

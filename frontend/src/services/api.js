@@ -99,6 +99,50 @@ export const adminAPI = {
         console.log('📈 Fetching stats');
         return api.get('/admin/stats');
     },
+    // ==================== Admin API ====================
+export const adminAPI = {
+    getLeads: (params) => {
+        console.log('📊 Fetching leads with params:', params);
+        return api.get('/admin/leads', { params });
+    },
+    getManagers: () => {
+        console.log('👥 Fetching managers');
+        return api.get('/admin/managers');
+    },
+    getStats: () => {
+        console.log('📈 Fetching stats');
+        return api.get('/admin/stats');
+    },
+    // أضف هذه الدالة
+    getCommissionStats: () => {
+        console.log('💰 Fetching commission stats');
+        return api.get('/admin/commission-stats');
+    },
+    approveLead: (leadId) => {
+        console.log('✅ Approving lead:', leadId);
+        return api.post(`/admin/leads/${leadId}/approve`);
+    },
+    rejectLead: (leadId, reason) => {
+        console.log('❌ Rejecting lead:', leadId, reason);
+        return api.post(`/admin/leads/${leadId}/reject`, { reason });
+    },
+    sendToManager: (leadId, managerId, notes) => {
+        console.log('📨 Sending lead to manager:', leadId, managerId);
+        return api.post(`/admin/leads/${leadId}/send-to-manager`, { managerId, notes });
+    },
+    deleteLead: (leadId) => {
+        console.log('🗑️ Deleting lead:', leadId);
+        return api.delete(`/admin/leads/${leadId}`);
+    },
+    deleteAllLeads: () => {
+        console.log('🗑️ Deleting all leads');
+        return api.delete('/admin/leads/all');
+    },
+    deleteRejectedLeads: () => {
+        console.log('🗑️ Deleting rejected leads');
+        return api.delete('/admin/leads/rejected');
+    },
+};
     approveLead: (leadId) => {
         console.log('✅ Approving lead:', leadId);
         return api.post(`/admin/leads/${leadId}/approve`);

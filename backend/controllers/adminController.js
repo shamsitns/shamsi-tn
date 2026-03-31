@@ -60,7 +60,6 @@ exports.getAllLeads = async (req, res) => {
         const result = await db.query(query, queryParams);
         const leads = result.rows || result;
         
-        // الحصول على العدد الإجمالي
         let countQuery = 'SELECT COUNT(*) as total FROM leads WHERE 1=1';
         const countParams = [];
         let countIndex = 1;
@@ -101,8 +100,8 @@ exports.getAllLeads = async (req, res) => {
     }
 };
 
-/// =============================================
-// إحصائيات متقدمة (لـ General Manager)1
+// =============================================
+// إحصائيات متقدمة (لـ General Manager)
 // =============================================
 exports.getDashboardStats = async (req, res) => {
     try {
@@ -124,7 +123,7 @@ exports.getDashboardStats = async (req, res) => {
                 SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
                 COALESCE(SUM(commission), 0) as total_commission,
                 COALESCE(SUM(estimated_price), 0) as total_value,
-                COALESCE(SUM(required_kw), 0) as total_kw   // <--- تغيير هنا
+                COALESCE(SUM(required_kw), 0) as total_kw
             FROM leads
         `);
         const stats = resultStats.rows || resultStats;
@@ -624,7 +623,10 @@ exports.deleteRejectedLeads = async (req, res) => {
     } catch (error) {
         console.error('❌ Error deleting rejected leads:', error);
         res.status(500).json({ message: 'حدث خطأ في حذف الطلبات المرفوضة', error: error.message });
-    // =============================================
+    }
+};
+
+// =============================================
 // إدارة الشركات (للمدير العام)
 // =============================================
 
@@ -653,7 +655,6 @@ exports.addCompany = async (req, res) => {
         
         console.log(`🏢 Adding new company: ${name}, ${email}`);
         
-        // التحقق من وجود البريد
         const resultExisting = await db.query('SELECT id FROM companies WHERE email = $1', [email]);
         const existing = resultExisting.rows || resultExisting;
         if (existing && existing.length > 0) {
@@ -713,7 +714,6 @@ exports.deleteCompany = async (req, res) => {
         
         console.log(`🏢 Deleting company ${id}`);
         
-        // التحقق من وجود طلبات مرتبطة
         const resultLeads = await db.query('SELECT COUNT(*) as count FROM lead_companies WHERE company_id = $1', [id]);
         const leads = resultLeads.rows || resultLeads;
         if (leads[0]?.count > 0) {
@@ -732,5 +732,4 @@ exports.deleteCompany = async (req, res) => {
         console.error('❌ Error deleting company:', error);
         res.status(500).json({ message: 'حدث خطأ في حذف الشركة' });
     }
-};}
 };
