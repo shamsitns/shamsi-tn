@@ -19,6 +19,8 @@ const GeneralManagerDashboard = lazy(() => import('./components/GeneralManagerDa
 const ExecutiveManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
 const OperationsManagerDashboard = lazy(() => import('./components/OperationsDashboard'));
 const CallCenterDashboard = lazy(() => import('./components/CallCenterDashboard'));
+const BankManagerDashboard = lazy(() => import('./components/BankManagerDashboard'));
+const LeasingManagerDashboard = lazy(() => import('./components/LeasingManagerDashboard'));
 
 // مكون تحميل مؤقت
 const LoadingSpinner = () => (
@@ -32,23 +34,23 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     
     if (!user) {
-        return <Navigate to="/login" />;
+        return <Navigate to="/login" replace />;
     }
     
     if (allowedRoles && !allowedRoles.includes(user.role)) {
         // التوجيه حسب الدور
-        if (user.role === 'owner') {
-            return <Navigate to="/owner" />;
-        } else if (user.role === 'general_manager' || user.role === 'admin') {
-            return <Navigate to="/admin" />;
-        } else if (user.role === 'executive_manager') {
-            return <Navigate to="/manager" />;
-        } else if (user.role === 'operations_manager') {
-            return <Navigate to="/operations" />;
-        } else if (user.role === 'call_center') {
-            return <Navigate to="/callcenter" />;
-        }
-        return <Navigate to="/" />;
+        const roleRedirects = {
+            'owner': '/owner',
+            'general_manager': '/admin',
+            'executive_manager': '/manager',
+            'operations_manager': '/operations',
+            'call_center': '/callcenter',
+            'bank_manager': '/bank',
+            'leasing_manager': '/leasing'
+        };
+        
+        const redirectPath = roleRedirects[user.role] || '/';
+        return <Navigate to={redirectPath} replace />;
     }
     
     return children;
@@ -84,7 +86,7 @@ function App() {
                             <Route 
                                 path="/admin" 
                                 element={
-                                    <ProtectedRoute allowedRoles={['general_manager', 'admin']}>
+                                    <ProtectedRoute allowedRoles={['general_manager']}>
                                         <GeneralManagerDashboard />
                                     </ProtectedRoute>
                                 } 
@@ -120,8 +122,28 @@ function App() {
                                 } 
                             />
                             
+                            {/* لوحة مدير البنك */}
+                            <Route 
+                                path="/bank" 
+                                element={
+                                    <ProtectedRoute allowedRoles={['bank_manager']}>
+                                        <BankManagerDashboard />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
+                            {/* لوحة مدير التأجير */}
+                            <Route 
+                                path="/leasing" 
+                                element={
+                                    <ProtectedRoute allowedRoles={['leasing_manager']}>
+                                        <LeasingManagerDashboard />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
                             {/* أي مسار غير معروف - يوجه للصفحة الرئيسية */}
-                            <Route path="*" element={<Navigate to="/" />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </main>
                     <Footer />

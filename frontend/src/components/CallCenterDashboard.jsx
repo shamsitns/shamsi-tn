@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { managerAPI, adminAPI } from '../services/api';
+import { managerAPI, leadsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
     FaPhone, FaCheck, FaTimes, FaUser, FaMapMarkerAlt, 
     FaMoneyBillWave, FaBolt, FaCalendarAlt, FaWhatsapp,
     FaFileAlt, FaUpload, FaEye, FaPaperPlane, FaSun,
     FaBuilding, FaHome, FaIndustry, FaTractor, FaStore,
-    FaClock, FaComment, FaEnvelope, FaUserCheck
+    FaClock, FaComment, FaEnvelope, FaUserCheck, FaSync
 } from 'react-icons/fa';
 
 const CallCenterDashboard = () => {
@@ -15,13 +15,10 @@ const CallCenterDashboard = () => {
     // =============================================
     const [leads, setLeads] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('assigned_to_call_center');
+    const [filter, setFilter] = useState('contacted');
     const [selectedLead, setSelectedLead] = useState(null);
-    const [showDocumentModal, setShowDocumentModal] = useState(false);
-    const [documentNote, setDocumentNote] = useState('');
-    const [showDevisModal, setShowDevisModal] = useState(false);
-    const [devisPrice, setDevisPrice] = useState('');
-    const [devisNotes, setDevisNotes] = useState('');
+    const [showNoteModal, setShowNoteModal] = useState(false);
+    const [noteText, setNoteText] = useState('');
     
     // =============================================
     // Fetch Data
@@ -34,9 +31,10 @@ const CallCenterDashboard = () => {
         setLoading(true);
         try {
             // جلب الطلبات المعينة لمركز الاتصال
-            const response = await managerAPI.getLeads({ status: filter !== 'all' ? filter : undefined });
+            const params = filter !== 'all' ? { status: filter } : {};
+            const response = await managerAPI.getLeads(params);
             console.log('📊 Call Center leads data:', response.data);
-            setLeads(response.data || []);
+            setLeads(response.data.leads || []);
         } catch (error) {
             console.error('Error fetching leads:', error);
             toast.error('حدث خطأ في جلب البيانات');
@@ -46,43 +44,34 @@ const CallCenterDashboard = () => {
     };
     
     // =============================================
-    // Document Management
+    // Update Lead Status
     // =============================================
-    const handleDocumentsReceived = async () => {
-        if (!selectedLead) return;
-        
+    const handleUpdateStatus = async (leadId, newStatus, notes = '') => {
         try {
-            await adminAPI.updateDocuments(selectedLead.id, true, documentNote);
-            toast.success('✅ تم تسجيل استلام المستندات');
-            setShowDocumentModal(false);
-            setSelectedLead(null);
-            setDocumentNote('');
+            await managerAPI.updateLeadStatus(leadId, newStatus, notes);
+            toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
             fetchData();
         } catch (error) {
-            console.error('Error updating documents:', error);
-            toast.error('❌ حدث خطأ');
+            console.error('Error updating status:', error);
+            toast.error('❌ حدث خطأ في تحديث الحالة');
         }
     };
     
-    // =============================================
-    // Devis Management
-    // =============================================
-    const handleDevisReady = async () => {
-        if (!selectedLead || !devisPrice) {
-            toast.error('يرجى إدخال قيمة devis');
+    const handleAddNote = async () => {
+        if (!selectedLead || !noteText.trim()) {
+            toast.error('يرجى إدخال ملاحظة');
             return;
         }
         
         try {
-            await adminAPI.updateDevis(selectedLead.id, parseFloat(devisPrice), devisNotes);
-            toast.success('✅ تم تسجيل devis وإرساله للعميل');
-            setShowDevisModal(false);
+            await leadsAPI.addNote(selectedLead.id, noteText);
+            toast.success('✅ تم إضافة الملاحظة');
+            setShowNoteModal(false);
             setSelectedLead(null);
-            setDevisPrice('');
-            setDevisNotes('');
+            setNoteText('');
             fetchData();
         } catch (error) {
-            console.error('Error updating devis:', error);
+            console.error('Error adding note:', error);
             toast.error('❌ حدث خطأ');
         }
     };
@@ -90,8 +79,8 @@ const CallCenterDashboard = () => {
     // =============================================
     // Contact Client
     // =============================================
-    const handleWhatsApp = (phone) => {
-        const message = encodeURIComponent('مرحباً، هذا مركز الاتصال من Shamsi.tn. نود التواصل معكم بخصوص طلبكم للطاقة الشمسية.');
+    const handleWhatsApp = (phone, name) => {
+        const message = encodeURIComponent(`مرحباً ${name}، هذا مركز الاتصال من Shamsi.tn. نود التواصل معكم بخصوص طلبكم للطاقة الشمسية.`);
         window.open(`https://wa.me/216${phone}?text=${message}`, '_blank');
     };
     
@@ -102,25 +91,38 @@ const CallCenterDashboard = () => {
     // =============================================
     // Helpers
     // =============================================
+    const getStatusText = (status) => {
+        const texts = {
+            pending: 'قيد المراجعة',
+            approved: 'تمت الموافقة',
+            contacted: 'تم التواصل',
+            sent_to_operations: 'مرسل لعمليات',
+            assigned_to_company: 'مرسل لشركة',
+            completed: 'مكتمل',
+            cancelled: 'ملغي'
+        };
+        return texts[status] || status;
+    };
+    
     const getStatusBadge = (status) => {
         const badges = {
-            assigned_to_call_center: 'bg-indigo-100 text-indigo-800',
-            documents_received: 'bg-cyan-100 text-cyan-800',
-            devis_ready: 'bg-orange-100 text-orange-800',
-            customer_confirmed: 'bg-green-100 text-green-800',
-            financing_pending: 'bg-pink-100 text-pink-800',
+            pending: 'bg-yellow-100 text-yellow-800',
+            approved: 'bg-blue-100 text-blue-800',
+            contacted: 'bg-purple-100 text-purple-800',
+            sent_to_operations: 'bg-indigo-100 text-indigo-800',
+            assigned_to_company: 'bg-pink-100 text-pink-800',
             completed: 'bg-green-100 text-green-800',
-            rejected: 'bg-red-100 text-red-800'
+            cancelled: 'bg-red-100 text-red-800'
         };
         
         const texts = {
-            assigned_to_call_center: 'في انتظار الاتصال',
-            documents_received: 'تم استلام المستندات',
-            devis_ready: 'devis جاهز',
-            customer_confirmed: 'تم تأكيد العميل',
-            financing_pending: 'في انتظار التمويل',
+            pending: 'قيد المراجعة',
+            approved: 'تمت الموافقة',
+            contacted: 'تم التواصل',
+            sent_to_operations: 'مرسل لعمليات',
+            assigned_to_company: 'مرسل لشركة',
             completed: 'مكتمل',
-            rejected: 'مرفوض'
+            cancelled: 'ملغي'
         };
         
         return (
@@ -141,9 +143,15 @@ const CallCenterDashboard = () => {
         }
     };
     
-    const formatCurrency = (amount) => {
-        if (!amount && amount !== 0) return '0';
-        return amount.toLocaleString();
+    const getPropertyText = (type) => {
+        const texts = {
+            house: 'منزل',
+            apartment: 'شقة',
+            farm: 'مزرعة',
+            commercial: 'محل تجاري',
+            factory: 'مصنع'
+        };
+        return texts[type] || type;
     };
     
     // =============================================
@@ -168,34 +176,14 @@ const CallCenterDashboard = () => {
                                 <FaPhone className="text-yellow-300" />
                                 لوحة تحكم مركز الاتصال
                             </h1>
-                            <p className="text-indigo-100 mt-1">التواصل مع العملاء وجمع المستندات وإرسال العروض</p>
+                            <p className="text-indigo-100 mt-1">التواصل مع العملاء وجمع المعلومات وإضافة الملاحظات</p>
                         </div>
-                        <div className="flex gap-2 mt-3 sm:mt-0">
-                            <button
-                                onClick={() => setFilter('assigned_to_call_center')}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filter === 'assigned_to_call_center' ? 'bg-white text-indigo-700' : 'bg-indigo-700 text-white hover:bg-indigo-800'}`}
-                            >
-                                قيد الاتصال
-                            </button>
-                            <button
-                                onClick={() => setFilter('documents_received')}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filter === 'documents_received' ? 'bg-white text-indigo-700' : 'bg-indigo-700 text-white hover:bg-indigo-800'}`}
-                            >
-                                مستندات مستلمة
-                            </button>
-                            <button
-                                onClick={() => setFilter('devis_ready')}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filter === 'devis_ready' ? 'bg-white text-indigo-700' : 'bg-indigo-700 text-white hover:bg-indigo-800'}`}
-                            >
-                                devis جاهز
-                            </button>
-                            <button
-                                onClick={() => setFilter('all')}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filter === 'all' ? 'bg-white text-indigo-700' : 'bg-indigo-700 text-white hover:bg-indigo-800'}`}
-                            >
-                                الكل
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => fetchData()}
+                            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                        >
+                            <FaSync /> تحديث
+                        </button>
                     </div>
                 </div>
             </div>
@@ -204,21 +192,51 @@ const CallCenterDashboard = () => {
             <div className="max-w-7xl mx-auto px-4 py-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-indigo-600">{leads.filter(l => l.status === 'assigned_to_call_center').length}</div>
-                        <div className="text-sm text-gray-500">في انتظار الاتصال</div>
+                        <div className="text-2xl font-bold text-yellow-600">{leads.filter(l => l.status === 'pending').length}</div>
+                        <div className="text-sm text-gray-500">في انتظار التواصل</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-cyan-600">{leads.filter(l => l.status === 'documents_received').length}</div>
-                        <div className="text-sm text-gray-500">مستندات مستلمة</div>
+                        <div className="text-2xl font-bold text-purple-600">{leads.filter(l => l.status === 'contacted').length}</div>
+                        <div className="text-sm text-gray-500">تم التواصل</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-orange-600">{leads.filter(l => l.status === 'devis_ready').length}</div>
-                        <div className="text-sm text-gray-500">devis جاهز</div>
+                        <div className="text-2xl font-bold text-indigo-600">{leads.filter(l => l.status === 'sent_to_operations').length}</div>
+                        <div className="text-sm text-gray-500">مرسل لعمليات</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-green-600">{leads.filter(l => l.status === 'customer_confirmed').length}</div>
-                        <div className="text-sm text-gray-500">تم تأكيد العميل</div>
+                        <div className="text-2xl font-bold text-green-600">{leads.filter(l => l.status === 'completed').length}</div>
+                        <div className="text-sm text-gray-500">مكتملة</div>
                     </div>
+                </div>
+            </div>
+            
+            {/* Filters */}
+            <div className="max-w-7xl mx-auto px-4 mb-6">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setFilter('all')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'all' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'}`}
+                    >
+                        الكل
+                    </button>
+                    <button
+                        onClick={() => setFilter('pending')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'pending' ? 'bg-yellow-600 text-white' : 'bg-white text-gray-700 border'}`}
+                    >
+                        قيد التواصل
+                    </button>
+                    <button
+                        onClick={() => setFilter('contacted')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'contacted' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 border'}`}
+                    >
+                        تم التواصل
+                    </button>
+                    <button
+                        onClick={() => setFilter('sent_to_operations')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'sent_to_operations' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'}`}
+                    >
+                        مرسل لعمليات
+                    </button>
                 </div>
             </div>
             
@@ -245,7 +263,7 @@ const CallCenterDashboard = () => {
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <FaMapMarkerAlt className="text-gray-400 text-xs" />
-                                        <p className="text-sm text-gray-500">{lead.city}</p>
+                                        <p className="text-sm text-gray-500">{lead.city || 'غير محدد'}</p>
                                     </div>
                                 </div>
                                 
@@ -263,7 +281,10 @@ const CallCenterDashboard = () => {
                                                 فاتورة الكهرباء:
                                             </span>
                                             <span className="font-bold text-green-600">
-                                                {lead.bill_value} دينار ({lead.bill_period === 60 ? 'شهرين' : 'شهر'})
+                                                {lead.bill_amount} دينار
+                                                <span className="text-xs text-gray-500 block">
+                                                    ({lead.bill_period_months === 60 ? 'شهرين' : 'شهر'})
+                                                </span>
                                             </span>
                                         </div>
                                         
@@ -272,38 +293,16 @@ const CallCenterDashboard = () => {
                                                 <FaBolt className="text-yellow-600" />
                                                 القدرة الموصى بها:
                                             </span>
-                                            <span className="font-medium">{lead.recommended_system} kWp</span>
+                                            <span className="font-medium">{lead.required_kw} kWp</span>
                                         </div>
                                         
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
                                             <span className="font-medium flex items-center gap-1">
                                                 {getPropertyIcon(lead.property_type)}
-                                                {lead.property_type === 'house' ? 'منزل' :
-                                                 lead.property_type === 'apartment' ? 'شقة' :
-                                                 lead.property_type === 'farm' ? 'مزرعة' :
-                                                 lead.property_type === 'commercial' ? 'محل تجاري' :
-                                                 lead.property_type === 'factory' ? 'مصنع' : lead.property_type}
+                                                {getPropertyText(lead.property_type)}
                                             </span>
                                         </div>
-                                        
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">طريقة الدفع:</span>
-                                            <span className={`font-medium ${lead.payment_method === 'cash' ? 'text-green-600' : 'text-blue-600'}`}>
-                                                {lead.payment_method === 'cash' ? 'نقدي' :
-                                                 lead.payment_method === 'steg' ? 'STEG' :
-                                                 lead.payment_method === 'prosol' ? 'PROSOL' :
-                                                 lead.payment_method === 'bank' ? 'بنكي' :
-                                                 lead.payment_method === 'leasing' ? 'Leasing' : lead.payment_method}
-                                            </span>
-                                        </div>
-                                        
-                                        {lead.devis_price && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-500">سعر devis:</span>
-                                                <span className="font-bold text-orange-600">{formatCurrency(lead.devis_price)} دينار</span>
-                                            </div>
-                                        )}
                                         
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
@@ -319,7 +318,7 @@ const CallCenterDashboard = () => {
                                     {lead.notes && (
                                         <div className="mb-4 p-2 bg-gray-50 rounded-lg text-sm border-r-4 border-indigo-400">
                                             <p className="text-gray-600 font-semibold text-xs mb-1">📝 ملاحظات:</p>
-                                            <p className="text-gray-600">{lead.notes}</p>
+                                            <p className="text-gray-600 text-xs">{lead.notes}</p>
                                         </div>
                                     )}
                                 </div>
@@ -334,42 +333,37 @@ const CallCenterDashboard = () => {
                                             <FaPhone /> اتصل
                                         </button>
                                         <button
-                                            onClick={() => handleWhatsApp(lead.phone)}
+                                            onClick={() => handleWhatsApp(lead.phone, lead.name)}
                                             className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm"
                                         >
                                             <FaWhatsapp /> واتساب
                                         </button>
                                     </div>
                                     
-                                    {lead.status === 'assigned_to_call_center' && (
+                                    {lead.status === 'pending' && (
                                         <button
-                                            onClick={() => { setSelectedLead(lead); setShowDocumentModal(true); }}
+                                            onClick={() => handleUpdateStatus(lead.id, 'contacted', 'تم التواصل مع العميل بواسطة مركز الاتصال')}
+                                            className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            <FaUserCheck /> تم التواصل مع العميل
+                                        </button>
+                                    )}
+                                    
+                                    {lead.status === 'contacted' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus(lead.id, 'sent_to_operations', 'تم جمع جميع المعلومات وإرسالها لمدير العمليات')}
                                             className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm"
                                         >
-                                            <FaUpload /> تم استلام المستندات
+                                            <FaPaperPlane /> إرسال لمدير العمليات
                                         </button>
                                     )}
                                     
-                                    {lead.status === 'documents_received' && (
-                                        <button
-                                            onClick={() => { setSelectedLead(lead); setShowDevisModal(true); }}
-                                            className="w-full bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 transition flex items-center justify-center gap-2 text-sm"
-                                        >
-                                            <FaFileAlt /> devis جاهز
-                                        </button>
-                                    )}
-                                    
-                                    {lead.status === 'devis_ready' && (
-                                        <div className="text-center text-sm text-orange-600 py-2">
-                                            ⏳ في انتظار تأكيد العميل
-                                        </div>
-                                    )}
-                                    
-                                    {lead.status === 'customer_confirmed' && (
-                                        <div className="text-center text-sm text-green-600 py-2">
-                                            ✅ تم تأكيد العميل - جاهز للتمويل
-                                        </div>
-                                    )}
+                                    <button
+                                        onClick={() => { setSelectedLead(lead); setNoteText(''); setShowNoteModal(true); }}
+                                        className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2 text-sm"
+                                    >
+                                        <FaComment /> إضافة ملاحظة
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -377,63 +371,25 @@ const CallCenterDashboard = () => {
                 )}
             </div>
             
-            {/* Document Modal */}
-            {showDocumentModal && selectedLead && (
+            {/* Add Note Modal */}
+            {showNoteModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold mb-4">📄 تأكيد استلام المستندات</h3>
+                        <h3 className="text-xl font-bold mb-4">📝 إضافة ملاحظة</h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-4">فاتورة: {selectedLead.bill_value} دينار - {selectedLead.bill_period === 60 ? 'شهرين' : 'شهر'}</p>
+                        <p className="text-gray-500 text-sm mb-4">هاتف: {selectedLead.phone}</p>
                         
                         <textarea
-                            placeholder="ملاحظات (اختياري)..."
-                            value={documentNote}
-                            onChange={(e) => setDocumentNote(e.target.value)}
+                            placeholder="أدخل ملاحظات عن المكالمة مع العميل..."
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
                             className="w-full px-4 py-2 border rounded-lg mb-4"
-                            rows="3"
+                            rows="4"
                         />
                         
                         <div className="flex gap-3">
-                            <button onClick={handleDocumentsReceived} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">تأكيد الاستلام</button>
-                            <button onClick={() => { setShowDocumentModal(false); setSelectedLead(null); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {/* Devis Modal */}
-            {showDevisModal && selectedLead && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold mb-4">📊 إضافة devis</h3>
-                        <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-4">قدرة النظام: {selectedLead.recommended_system} kWp</p>
-                        
-                        <div className="mb-4">
-                            <label className="block text-gray-700 mb-1">قيمة devis (دينار) *</label>
-                            <input
-                                type="number"
-                                value={devisPrice}
-                                onChange={(e) => setDevisPrice(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-lg"
-                                placeholder="مثال: 15000"
-                            />
-                        </div>
-                        
-                        <div className="mb-4">
-                            <label className="block text-gray-700 mb-1">ملاحظات devis (اختياري)</label>
-                            <textarea
-                                value={devisNotes}
-                                onChange={(e) => setDevisNotes(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-lg"
-                                rows="3"
-                                placeholder="تفاصيل العقد، الضمان، مدة التركيب..."
-                            />
-                        </div>
-                        
-                        <div className="flex gap-3">
-                            <button onClick={handleDevisReady} className="flex-1 bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700">إرسال devis للعميل</button>
-                            <button onClick={() => { setShowDevisModal(false); setSelectedLead(null); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
+                            <button onClick={handleAddNote} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">إضافة</button>
+                            <button onClick={() => { setShowNoteModal(false); setSelectedLead(null); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
                         </div>
                     </div>
                 </div>

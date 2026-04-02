@@ -1,5 +1,7 @@
-// معاملات الإشعاع الشمسي حسب الولاية (kWh/m²/day)
+// ============================================
+// بيانات الإشعاع الشمسي حسب الولاية (kWh/m²/day)
 // هذه الأرقام مستمدة من بيانات الوكالة الوطنية للتحكم في الطاقة (ANME)
+// ============================================
 
 const solarRadiationByCity = {
     // الشمال
@@ -33,7 +35,9 @@ const solarRadiationByCity = {
     'قفصة': 5.4
 };
 
+// ============================================
 // معامل اتجاه السطح - يؤثر على الإنتاجية
+// ============================================
 const directionCoefficient = {
     'جنوب': 1.0,        // أفضل اتجاه
     'جنوب شرق': 0.95,   // ممتاز
@@ -45,7 +49,9 @@ const directionCoefficient = {
     'شمال': 0.65        // ضعيف
 };
 
+// ============================================
 // معامل التظليل - يؤثر على الإنتاجية
+// ============================================
 const shadingCoefficient = {
     'لا يوجد': 1.0,     // بدون تظليل
     'قليل': 0.95,       // تظليل بسيط (5% خسارة)
@@ -53,20 +59,19 @@ const shadingCoefficient = {
     'كثيف': 0.70        // تظليل كثيف (30% خسارة)
 };
 
-// مساحة اللوح الواحد بالمتر المربع (للألواح 500W)
+// ============================================
+// مساحة اللوح الواحد بالمتر المربع (للألواح 500W-550W)
+// ============================================
 const PANEL_AREA = 2.2;
 
+// ============================================
 // كفاءة النظام (خسائر الكابلات، العاكس، الحرارة، الغبار)
+// ============================================
 const SYSTEM_EFFICIENCY = 0.85;
 
-/**
- * حساب الإنتاج السنوي المتوقع (kWh/سنة)
- * @param {number} kw - قدرة النظام بالكيلوواط
- * @param {string} city - الولاية
- * @param {string} roofDirection - اتجاه السطح
- * @param {string} shading - درجة التظليل
- * @returns {number} الإنتاج السنوي المتوقع
- */
+// ============================================
+// حساب الإنتاج السنوي المتوقع (kWh/سنة)
+// ============================================
 function calculateAnnualProduction(kw, city, roofDirection = 'جنوب', shading = 'لا يوجد') {
     // الحصول على الإشعاع الشمسي حسب الولاية
     const radiation = solarRadiationByCity[city] || 4.8;
@@ -83,14 +88,9 @@ function calculateAnnualProduction(kw, city, roofDirection = 'جنوب', shading
     return Math.round(annualProduction);
 }
 
-/**
- * حساب القدرة المطلوبة بناءً على الاستهلاك الشهري
- * @param {number} monthlyConsumption - الاستهلاك الشهري بالكيلوواط/ساعة
- * @param {string} city - الولاية
- * @param {string} roofDirection - اتجاه السطح
- * @param {string} shading - درجة التظليل
- * @returns {number} القدرة المطلوبة بالكيلوواط
- */
+// ============================================
+// حساب القدرة المطلوبة بناءً على الاستهلاك الشهري
+// ============================================
 function calculateRequiredKw(monthlyConsumption, city, roofDirection = 'جنوب', shading = 'لا يوجد') {
     const annualConsumption = monthlyConsumption * 12;
     const radiation = solarRadiationByCity[city] || 4.8;
@@ -103,50 +103,39 @@ function calculateRequiredKw(monthlyConsumption, city, roofDirection = 'جنوب
     return parseFloat(requiredKw.toFixed(1));
 }
 
-/**
- * حساب عدد الألواح المطلوبة
- * @param {number} requiredKw - القدرة المطلوبة بالكيلوواط
- * @param {number} panelPower - قدرة اللوح الواحد بالكيلوواط (افتراضي 0.5kW = 500W)
- * @returns {number} عدد الألواح
- */
-function calculatePanelsCount(requiredKw, panelPower = 0.5) {
+// ============================================
+// حساب عدد الألواح المطلوبة
+// ============================================
+function calculatePanelsCount(requiredKw, panelPower = 0.55) {
     return Math.ceil(requiredKw / panelPower);
 }
 
-/**
- * حساب المساحة المطلوبة على السطح
- * @param {number} panelsCount - عدد الألواح
- * @returns {number} المساحة المطلوبة بالمتر المربع
- */
+// ============================================
+// حساب المساحة المطلوبة على السطح
+// ============================================
 function calculateRequiredRoofArea(panelsCount) {
     return Math.round(panelsCount * PANEL_AREA);
 }
 
-/**
- * حساب توفير ثاني أكسيد الكربون
- * @param {number} annualProduction - الإنتاج السنوي بالكيلوواط/ساعة
- * @returns {number} كمية CO2 الموفرة بالكيلوغرام
- */
+// ============================================
+// حساب توفير ثاني أكسيد الكربون
+// ============================================
 function calculateCO2Savings(annualProduction) {
     // 0.4 kg CO2 لكل kWh من الكهرباء التقليدية (المتوسط في تونس)
     return Math.round(annualProduction * 0.4);
 }
 
-/**
- * حساب قدرة العاكس المطلوبة
- * @param {number} requiredKw - قدرة النظام بالكيلوواط
- * @returns {number} قدرة العاكس بالكيلوواط
- */
+// ============================================
+// حساب قدرة العاكس المطلوبة
+// ============================================
 function calculateInverterPower(requiredKw) {
     // العاكس يجب أن يكون أكبر بنسبة 10-20% من قدرة الألواح
     return parseFloat((requiredKw * 1.1).toFixed(1));
 }
 
-/**
- * الحصول على توصيات بناءً على اتجاه السطح
- * @param {string} roofDirection - اتجاه السطح
- * @returns {object} توصيات
- */
+// ============================================
+// الحصول على توصيات بناءً على اتجاه السطح
+// ============================================
 function getRecommendations(roofDirection) {
     const recommendations = {
         'جنوب': { message: '✓ اتجاه ممتاز - إنتاجية قصوى', color: 'green' },
@@ -162,11 +151,9 @@ function getRecommendations(roofDirection) {
     return recommendations[roofDirection] || { message: 'اتجاه غير محدد', color: 'gray' };
 }
 
-/**
- * الحصول على توصيات بناءً على التظليل
- * @param {string} shading - درجة التظليل
- * @returns {object} توصيات
- */
+// ============================================
+// الحصول على توصيات بناءً على التظليل
+// ============================================
 function getShadingRecommendations(shading) {
     const recommendations = {
         'لا يوجد': { message: '✓ ممتاز - لا يوجد تأثير على الإنتاج', color: 'green' },
@@ -178,6 +165,9 @@ function getShadingRecommendations(shading) {
     return recommendations[shading] || { message: 'تظليل غير محدد', color: 'gray' };
 }
 
+// ============================================
+// تصدير الدوال والثوابت
+// ============================================
 module.exports = {
     solarRadiationByCity,
     directionCoefficient,

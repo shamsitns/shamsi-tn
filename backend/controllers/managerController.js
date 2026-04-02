@@ -1,45 +1,81 @@
 const db = require('../config/database');
 
+// Helper function to handle both PostgreSQL and SQLite results
+const getRows = (result) => {
+    return result.rows || result || [];
+};
+
+const getFirstRow = (result) => {
+    const rows = getRows(result);
+    return rows[0] || null;
+};
+
 // =============================================
 // الحصول على طلبات المدير
 // =============================================
 exports.getMyLeads = async (req, res) => {
     try {
         const managerId = req.user.id;
+        const role = req.user.role;
         const { status, page = 1, limit = 20 } = req.query;
         const offset = (page - 1) * limit;
         
-        console.log(`📊 Manager ${managerId} fetching leads, status: ${status}`);
+        console.log(`📊 Manager ${managerId} (${role}) fetching leads, status: ${status}`);
         
         let query = `
-            SELECT l.*, 
-                   ma.assigned_at, 
-                   ma.notes, 
-                   ma.status as assignment_status,
-                   c.name as company_name,
-                   c.rating as company_rating
+            SELECT l.*
             FROM leads l
-            LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = $1
-            LEFT JOIN companies c ON l.company_id = c.id
-            WHERE ma.manager_id = $1 OR l.assigned_to = $1
+            WHERE 1=1
         `;
-        const queryParams = [managerId];
+        const queryParams = [];
+        let paramIndex = 1;
         
-        if (status && status !== 'all') {
-            query += ' AND l.status = $2';
-            queryParams.push(status);
-            query += ' ORDER BY l.created_at DESC LIMIT $3 OFFSET $4';
-            queryParams.push(parseInt(limit), parseInt(offset));
-        } else {
-            query += ' ORDER BY l.created_at DESC LIMIT $2 OFFSET $3';
-            queryParams.push(parseInt(limit), parseInt(offset));
+        // Filter by assigned_to for managers
+        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
+            query += ` AND l.assigned_to = $${paramIndex}`;
+            queryParams.push(managerId);
+            paramIndex++;
         }
         
-        const result = await db.query(query, queryParams);
-        const leads = result.rows || result;
+        if (status && status !== 'all') {
+            query += ` AND l.status = $${paramIndex}`;
+            queryParams.push(status);
+            paramIndex++;
+        }
         
-        console.log(`✅ Found ${leads?.length || 0} leads`);
-        res.json(leads || []);
+        query += ` ORDER BY l.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        queryParams.push(parseInt(limit), parseInt(offset));
+        
+        const result = await db.query(query, queryParams);
+        const leads = getRows(result);
+        
+        // Get total count
+        let countQuery = `SELECT COUNT(*) as total FROM leads WHERE 1=1`;
+        const countParams = [];
+        let countIndex = 1;
+        
+        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
+            countQuery += ` AND assigned_to = $${countIndex}`;
+            countParams.push(managerId);
+            countIndex++;
+        }
+        
+        if (status && status !== 'all') {
+            countQuery += ` AND status = $${countIndex}`;
+            countParams.push(status);
+            countIndex++;
+        }
+        
+        const countResult = await db.query(countQuery, countParams);
+        const total = getFirstRow(countResult)?.total || 0;
+        
+        console.log(`✅ Found ${leads?.length || 0} leads, total: ${total}`);
+        res.json({
+            leads: leads || [],
+            total: total,
+            page: parseInt(page),
+            totalPages: Math.ceil(total / limit)
+        });
         
     } catch (error) {
         console.error('❌ Error getting manager leads:', error);
@@ -56,36 +92,39 @@ exports.updateLeadStatus = async (req, res) => {
         const { status, notes } = req.body;
         const managerId = req.user.id;
         
-        console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
+        const validStatuses = ['pending', 'approved', 'contacted', 'sent_to_operations', 'assigned_to_company', 'completed', 'cancelled'];
         
-        const resultAssign = await db.query(
-            `SELECT id FROM manager_assignments 
-             WHERE lead_id = $1 AND manager_id = $2`,
-            [leadId, managerId]
-        );
-        const assignments = resultAssign.rows || resultAssign;
-        
-        if (!assignments || assignments.length === 0) {
-            await db.query(
-                `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, status, notes) 
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [leadId, managerId, managerId, status, notes || null]
-            );
-        } else {
-            await db.query(
-                `UPDATE manager_assignments 
-                 SET status = $1, notes = $2, assigned_at = CURRENT_TIMESTAMP 
-                 WHERE lead_id = $3 AND manager_id = $4`,
-                [status, notes || null, leadId, managerId]
-            );
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ message: 'حالة غير صالحة' });
         }
         
-        await db.query(
-            `UPDATE leads 
-             SET status = $1, updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [status, leadId]
-        );
+        console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
+        
+        // Update lead status
+        let updateQuery = `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP`;
+        const updateParams = [status];
+        let paramIndex = 2;
+        
+        if (status === 'contacted') {
+            updateQuery += `, contacted_by = $${paramIndex}, contacted_at = CURRENT_TIMESTAMP`;
+            updateParams.push(managerId);
+            paramIndex++;
+        } else if (status === 'sent_to_operations') {
+            updateQuery += `, sent_to_operations_by = $${paramIndex}, sent_to_operations_at = CURRENT_TIMESTAMP`;
+            updateParams.push(managerId);
+            paramIndex++;
+        }
+        
+        if (notes) {
+            updateQuery += `, notes = $${paramIndex}`;
+            updateParams.push(notes);
+            paramIndex++;
+        }
+        
+        updateQuery += ` WHERE id = $${paramIndex}`;
+        updateParams.push(leadId);
+        
+        await db.query(updateQuery, updateParams);
         
         console.log(`✅ Lead ${leadId} updated to ${status}`);
         res.json({ 
@@ -101,36 +140,50 @@ exports.updateLeadStatus = async (req, res) => {
 };
 
 // =============================================
-// الحصول على إحصائيات المدير
+// الحصول على إحصائيات المدير (مع العمولة)
 // =============================================
 exports.getManagerStats = async (req, res) => {
     try {
         const managerId = req.user.id;
+        const role = req.user.role;
         
-        console.log(`📈 Getting stats for manager ${managerId}`);
+        console.log(`📈 Getting stats for manager ${managerId} (${role})`);
         
-        const result = await db.query(`
+        let query = `
             SELECT 
-                COUNT(CASE WHEN l.status = 'assigned_to_executive' AND l.assigned_to = $1 THEN 1 END) as pending,
-                COUNT(CASE WHEN l.status = 'assigned_to_company' AND l.assigned_to = $1 THEN 1 END) as assigned,
-                COUNT(CASE WHEN l.status = 'completed' AND l.assigned_to = $1 THEN 1 END) as completed,
-                COUNT(CASE WHEN l.status = 'rejected' AND l.assigned_to = $1 THEN 1 END) as rejected,
-                COALESCE(SUM(CASE WHEN l.status = 'completed' AND l.assigned_to = $1 THEN l.commission ELSE 0 END), 0) as total_commission,
-                COALESCE(SUM(CASE WHEN l.status = 'sent_to_operations' AND l.assigned_to = $1 THEN l.commission ELSE 0 END), 0) as sent_to_operations_commission,
-                COALESCE(SUM(CASE WHEN l.status = 'completed' AND l.assigned_to = $1 THEN 1 ELSE 0 END), 0) as total_completed_count
-            FROM leads l
-            WHERE l.assigned_to = $1
-        `, [managerId]);
+                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+                COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
+                COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
+                COUNT(CASE WHEN status = 'sent_to_operations' THEN 1 END) as sent_to_operations,
+                COUNT(CASE WHEN status = 'assigned_to_company' THEN 1 END) as assigned_to_company,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+                COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled,
+                COALESCE(SUM(CASE WHEN status = 'completed' THEN commission_amount ELSE 0 END), 0) as total_commission
+            FROM leads
+        `;
         
-        const statsArray = result.rows || result;
-        const stats = statsArray[0] || { 
-            pending: 0, 
-            assigned: 0,
-            completed: 0, 
-            rejected: 0, 
-            total_commission: 0,
-            sent_to_operations_commission: 0,
-            total_completed_count: 0
+        // If manager has assigned_to filter
+        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
+            query = `
+                SELECT 
+                    COUNT(CASE WHEN status = 'pending' AND assigned_to = $1 THEN 1 END) as pending,
+                    COUNT(CASE WHEN status = 'approved' AND assigned_to = $1 THEN 1 END) as approved,
+                    COUNT(CASE WHEN status = 'contacted' AND assigned_to = $1 THEN 1 END) as contacted,
+                    COUNT(CASE WHEN status = 'sent_to_operations' AND assigned_to = $1 THEN 1 END) as sent_to_operations,
+                    COUNT(CASE WHEN status = 'assigned_to_company' AND assigned_to = $1 THEN 1 END) as assigned_to_company,
+                    COUNT(CASE WHEN status = 'completed' AND assigned_to = $1 THEN 1 END) as completed,
+                    COUNT(CASE WHEN status = 'cancelled' AND assigned_to = $1 THEN 1 END) as cancelled,
+                    COALESCE(SUM(CASE WHEN status = 'completed' AND assigned_to = $1 THEN commission_amount ELSE 0 END), 0) as total_commission
+                FROM leads
+                WHERE assigned_to = $1
+            `;
+        }
+        
+        const result = await db.query(query, role === 'executive_manager' || role === 'operations_manager' || role === 'call_center' ? [managerId] : []);
+        const stats = getFirstRow(result) || { 
+            pending: 0, approved: 0, contacted: 0,
+            sent_to_operations: 0, assigned_to_company: 0,
+            completed: 0, cancelled: 0, total_commission: 0
         };
         
         console.log(`📊 Stats: pending=${stats.pending}, completed=${stats.completed}, commission=${stats.total_commission}`);
@@ -148,74 +201,56 @@ exports.getManagerStats = async (req, res) => {
 exports.assignToCompany = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const { companyId, price, notes } = req.body;
+        const { companyId, notes } = req.body;
         const managerId = req.user.id;
         
-        console.log(`🏢 Assigning lead ${leadId} to company ${companyId} with price ${price}`);
+        console.log(`🏢 Assigning lead ${leadId} to company ${companyId}`);
         
+        // Check if lead exists
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const leads = resultLead.rows || resultLead;
-        if (!leads || leads.length === 0) {
+        const lead = getFirstRow(resultLead);
+        if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
+        // Check if company exists
         const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
-        const companies = resultCompany.rows || resultCompany;
-        if (!companies || companies.length === 0) {
+        const company = getFirstRow(resultCompany);
+        if (!company) {
             return res.status(404).json({ message: 'الشركة غير موجودة' });
         }
         
-        const company = companies[0];
-        
+        // Update lead with company
         await db.query(
             `UPDATE leads 
              SET status = 'assigned_to_company', 
-                 company_id = $1, 
+                 assigned_company_id = $1, 
+                 assigned_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
             [companyId, leadId]
         );
         
+        // Check if lead_company assignment exists
         const resultExisting = await db.query(
             `SELECT id FROM lead_companies 
              WHERE lead_id = $1 AND company_id = $2`,
             [leadId, companyId]
         );
-        const existing = resultExisting.rows || resultExisting;
+        const existing = getRows(resultExisting);
         
         if (existing && existing.length > 0) {
             await db.query(
                 `UPDATE lead_companies 
-                 SET assigned_by = $1, price = $2, notes = $3, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
-                 WHERE lead_id = $4 AND company_id = $5`,
-                [managerId, price || null, notes || null, leadId, companyId]
+                 SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
+                 WHERE lead_id = $3 AND company_id = $4`,
+                [managerId, notes || null, leadId, companyId]
             );
         } else {
             await db.query(
-                `INSERT INTO lead_companies (lead_id, company_id, assigned_by, price, notes, status) 
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [leadId, companyId, managerId, price || null, notes || null, 'assigned']
-            );
-        }
-        
-        const resultAssignment = await db.query(
-            `SELECT id FROM manager_assignments WHERE lead_id = $1 AND manager_id = $2`,
-            [leadId, managerId]
-        );
-        const assignment = resultAssignment.rows || resultAssignment;
-        
-        if (assignment && assignment.length > 0) {
-            await db.query(
-                `UPDATE manager_assignments 
-                 SET status = 'assigned_to_company', notes = $1, assigned_at = CURRENT_TIMESTAMP
-                 WHERE lead_id = $2 AND manager_id = $3`,
-                [notes || `تم إرسال الطلب للشركة: ${company.name}`, leadId, managerId]
-            );
-        } else {
-            await db.query(
-                `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, status, notes) 
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [leadId, managerId, managerId, 'assigned_to_company', `تم إرسال الطلب للشركة: ${company.name}`]
+                `INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                [leadId, companyId, managerId, notes || null, 'assigned']
             );
         }
         
@@ -239,32 +274,28 @@ exports.assignToCompany = async (req, res) => {
 exports.getLeadDetails = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const managerId = req.user.id;
         
         const result = await db.query(`
             SELECT l.*, 
                    c.name as company_name,
                    c.phone as company_phone,
-                   c.city as company_city,
-                   ma.notes as manager_notes,
-                   ma.assigned_at
+                   c.address as company_address
             FROM leads l
-            LEFT JOIN companies c ON l.company_id = c.id
-            LEFT JOIN manager_assignments ma ON l.id = ma.lead_id AND ma.manager_id = $1
-            WHERE l.id = $2
-        `, [managerId, leadId]);
+            LEFT JOIN companies c ON l.assigned_company_id = c.id
+            WHERE l.id = $1
+        `, [leadId]);
         
-        const leads = result.rows || result;
+        const lead = getFirstRow(result);
         
-        if (!leads || leads.length === 0) {
+        if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        res.json(leads[0]);
+        res.json(lead);
         
     } catch (error) {
         console.error('❌ Error getting lead details:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب تفاصيل الطلب' });
+        res.status(500).json({ message: 'حدث خطأ في جلب تفاصيل الطلب', error: error.message });
     }
 };
 
@@ -273,31 +304,24 @@ exports.getLeadDetails = async (req, res) => {
 // =============================================
 exports.getAvailableCompanies = async (req, res) => {
     try {
-        const { city } = req.query;
+        const result = await db.query(`
+            SELECT id, name, phone, address, contact_person, is_active 
+            FROM companies 
+            WHERE is_active = true
+            ORDER BY name ASC
+        `);
         
-        let query = 'SELECT id, name, city, rating, projects_count, description FROM companies WHERE is_active = 1';
-        const params = [];
-        
-        if (city) {
-            query += ' AND city = $1';
-            params.push(city);
-        }
-        
-        query += ' ORDER BY rating DESC';
-        
-        const result = await db.query(query, params);
-        const companies = result.rows || result;
-        
+        const companies = getRows(result);
         res.json(companies || []);
         
     } catch (error) {
         console.error('❌ Error getting available companies:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب الشركات' });
+        res.status(500).json({ message: 'حدث خطأ في جلب الشركات', error: error.message });
     }
 };
 
 // =============================================
-// إرسال الطلب لمدير العمليات (للمدير التنفيذي)
+// إرسال الطلب لمدير العمليات (للمدير التنفيذي) - مع نقل جميع المعلومات
 // =============================================
 exports.sendToOperationsManager = async (req, res) => {
     try {
@@ -307,53 +331,89 @@ exports.sendToOperationsManager = async (req, res) => {
         
         console.log(`📤 Executive ${executiveId} sending lead ${leadId} to operations manager`);
         
+        // Check if lead exists
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const leads = resultLead.rows || resultLead;
-        if (!leads || leads.length === 0) {
+        const lead = getFirstRow(resultLead);
+        if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        const lead = leads[0];
-        const commission = lead.commission || (lead.recommended_system * 150);
+        // Calculate commission (150 DT per kW)
+        const commission = lead.commission_amount || (lead.required_kw * 150);
         
-        console.log(`💰 Commission for lead ${leadId}: ${commission} TND (${lead.recommended_system} kW × 150)`);
+        console.log(`💰 Commission for lead ${leadId}: ${commission} TND (${lead.required_kw} kW × 150)`);
         
+        // Find an operations manager
         const resultOps = await db.query(`
             SELECT id, name FROM users 
-            WHERE role = 'operations_manager' 
+            WHERE role = 'operations_manager' AND is_active = true
             ORDER BY id ASC LIMIT 1
         `);
-        const operationsManagers = resultOps.rows || resultOps;
+        const operationsManager = getFirstRow(resultOps);
         
-        if (!operationsManagers || operationsManagers.length === 0) {
+        if (!operationsManager) {
             return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
         
-        const operationsManager = operationsManagers[0];
+        // تجميع جميع المعلومات لنقلها لمدير العمليات
+        const fullNotes = `
+📋 معلومات الطلب الكاملة من المدير التنفيذي:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 معلومات العميل:
+   • الاسم: ${lead.name}
+   • الهاتف: ${lead.phone}
+   • المدينة: ${lead.city || 'غير مدخلة'}
+
+⚡ معلومات الكهرباء:
+   • قيمة الفاتورة: ${lead.bill_amount} دينار
+   • فترة الفاتورة: ${lead.bill_period_months === 60 ? 'شهرين' : 'شهر'}
+
+☀️ نتائج الدراسة:
+   • القدرة المطلوبة: ${lead.required_kw} kWp
+   • عدد الألواح: ${lead.panels_count}
+   • العمولة: ${commission} دينار
+
+📝 معلومات إضافية من العميل:
+${lead.additional_info || 'لا توجد معلومات إضافية'}
+
+${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        `;
         
+        // Update lead status
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
                  assigned_to = $1, 
+                 sent_to_operations_by = $2,
+                 sent_to_operations_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [operationsManager.id, leadId]
+             WHERE id = $3`,
+            [operationsManager.id, executiveId, leadId]
         );
         
+        // إضافة سجل التعيين مع جميع المعلومات
         await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, status) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [leadId, operationsManager.id, executiveId, notes || `تم إرسال الطلب من قبل المدير التنفيذي - العمولة: ${commission} دينار`, 'pending']
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes) 
+             VALUES ($1, $2, $3, $4)`,
+            [leadId, operationsManager.id, executiveId, fullNotes]
         );
         
-        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.id} with commission ${commission}`);
+        console.log(`✅ Lead ${leadId} sent to operations manager with commission ${commission}`);
         
         res.json({ 
-            message: `تم إرسال الطلب لمدير العمليات: ${operationsManager.name} (العمولة: ${commission} دينار)`,
+            message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
-            operationsManagerId: operationsManager.id,
-            operationsManagerName: operationsManager.name,
-            commission: commission
+            commission: commission,
+            leadInfo: {
+                name: lead.name,
+                phone: lead.phone,
+                city: lead.city,
+                bill_amount: lead.bill_amount,
+                required_kw: lead.required_kw,
+                panels_count: lead.panels_count,
+                additional_info: lead.additional_info
+            }
         });
         
     } catch (error) {
@@ -373,51 +433,89 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
         
         console.log(`✅ Executive ${executiveId} accepting lead ${leadId} and sending to operations`);
         
+        // Check if lead exists
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const leads = resultLead.rows || resultLead;
-        if (!leads || leads.length === 0) {
+        const lead = getFirstRow(resultLead);
+        if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        const lead = leads[0];
-        const commission = lead.commission || (lead.recommended_system * 150);
+        // Calculate commission (150 DT per kW)
+        const commission = lead.commission_amount || (lead.required_kw * 150);
         
+        // Find an operations manager
         const resultOps = await db.query(`
             SELECT id, name FROM users 
-            WHERE role = 'operations_manager' 
+            WHERE role = 'operations_manager' AND is_active = true
             ORDER BY id ASC LIMIT 1
         `);
-        const operationsManagers = resultOps.rows || resultOps;
+        const operationsManager = getFirstRow(resultOps);
         
-        if (!operationsManagers || operationsManagers.length === 0) {
+        if (!operationsManager) {
             return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
         
-        const operationsManager = operationsManagers[0];
+        // تجميع جميع المعلومات لنقلها لمدير العمليات
+        const fullNotes = `
+📋 معلومات الطلب الكاملة (مقبول من المدير التنفيذي):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ تم قبول الطلب من قبل المدير التنفيذي
+
+👤 معلومات العميل:
+   • الاسم: ${lead.name}
+   • الهاتف: ${lead.phone}
+   • المدينة: ${lead.city || 'غير مدخلة'}
+
+⚡ معلومات الكهرباء:
+   • قيمة الفاتورة: ${lead.bill_amount} دينار
+   • فترة الفاتورة: ${lead.bill_period_months === 60 ? 'شهرين' : 'شهر'}
+
+☀️ نتائج الدراسة:
+   • القدرة المطلوبة: ${lead.required_kw} kWp
+   • عدد الألواح: ${lead.panels_count}
+   • العمولة: ${commission} دينار
+
+📝 معلومات إضافية من العميل:
+${lead.additional_info || 'لا توجد معلومات إضافية'}
+
+${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        `;
         
+        // Update lead status
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
                  assigned_to = $1, 
+                 contacted_by = $2,
+                 contacted_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [operationsManager.id, leadId]
+             WHERE id = $3`,
+            [operationsManager.id, executiveId, leadId]
         );
         
+        // إضافة سجل التعيين مع جميع المعلومات
         await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, status) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [leadId, operationsManager.id, executiveId, notes || `تم قبول الطلب من قبل المدير التنفيذي وإرساله لمدير العمليات - العمولة: ${commission} دينار`, 'accepted']
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes) 
+             VALUES ($1, $2, $3, $4)`,
+            [leadId, operationsManager.id, executiveId, fullNotes]
         );
         
-        console.log(`✅ Lead ${leadId} accepted and sent to operations manager ${operationsManager.id}`);
+        console.log(`✅ Lead ${leadId} accepted and sent to operations manager with commission ${commission}`);
         
         res.json({ 
-            message: `تم قبول الطلب وإرساله لمدير العمليات: ${operationsManager.name} (العمولة: ${commission} دينار)`,
+            message: `تم قبول الطلب وإرساله لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
-            operationsManagerId: operationsManager.id,
-            operationsManagerName: operationsManager.name,
-            commission: commission
+            commission: commission,
+            leadInfo: {
+                name: lead.name,
+                phone: lead.phone,
+                city: lead.city,
+                bill_amount: lead.bill_amount,
+                required_kw: lead.required_kw,
+                panels_count: lead.panels_count,
+                additional_info: lead.additional_info
+            }
         });
         
     } catch (error) {

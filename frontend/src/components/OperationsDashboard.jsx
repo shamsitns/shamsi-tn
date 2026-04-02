@@ -4,9 +4,9 @@ import toast from 'react-hot-toast';
 import { 
     FaCheck, FaTimes, FaPhone, FaBuilding, FaSun, 
     FaMoneyBillWave, FaUser, FaMapMarkerAlt, FaCalendarAlt, 
-    FaBolt, FaRuler, FaWhatsapp, FaEye, FaPaperPlane,
+    FaBolt, FaWhatsapp, FaEye, FaPaperPlane,
     FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf,
-    FaIndustry, FaHome, FaStore, FaTractor
+    FaIndustry, FaHome, FaStore, FaTractor, FaSync
 } from 'react-icons/fa';
 
 const OperationsDashboard = () => {
@@ -19,9 +19,11 @@ const OperationsDashboard = () => {
     const [showCompanyModal, setShowCompanyModal] = useState(false);
     const [selectedLead, setSelectedLead] = useState(null);
     const [selectedCompany, setSelectedCompany] = useState('');
+    const [assignmentNotes, setAssignmentNotes] = useState('');
     const [filter, setFilter] = useState('all');
     const [showNotesModal, setShowNotesModal] = useState(false);
     const [notes, setNotes] = useState('');
+    const [stats, setStats] = useState(null);
     
     // =============================================
     // Fetch Data
@@ -29,14 +31,16 @@ const OperationsDashboard = () => {
     useEffect(() => {
         fetchData();
         fetchCompanies();
+        fetchStats();
     }, [filter]);
     
     const fetchData = async () => {
+        setLoading(true);
         try {
             const params = filter !== 'all' ? { status: filter } : {};
             const response = await managerAPI.getLeads(params);
             console.log('📊 Operations leads data:', response.data);
-            setLeads(response.data || []);
+            setLeads(response.data.leads || []);
         } catch (error) {
             console.error('Error fetching leads:', error);
             toast.error('حدث خطأ في جلب البيانات');
@@ -54,6 +58,15 @@ const OperationsDashboard = () => {
         }
     };
     
+    const fetchStats = async () => {
+        try {
+            const response = await managerAPI.getStats();
+            setStats(response.data);
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        }
+    };
+    
     // =============================================
     // Lead Management
     // =============================================
@@ -64,14 +77,30 @@ const OperationsDashboard = () => {
         }
         
         try {
-            await managerAPI.assignToCompany(selectedLead.id, selectedCompany);
+            await managerAPI.assignToCompany(selectedLead.id, selectedCompany, assignmentNotes);
             toast.success('✅ تم إرسال الطلب للشركة بنجاح');
             setShowCompanyModal(false);
             setSelectedLead(null);
             setSelectedCompany('');
+            setAssignmentNotes('');
             fetchData();
+            fetchStats();
         } catch (error) {
             console.error('Error assigning to company:', error);
+            toast.error('❌ حدث خطأ');
+        }
+    };
+    
+    const handleUpdateStatus = async (leadId, newStatus) => {
+        const statusNotes = prompt('أضف ملاحظات عن تحديث الحالة:');
+        
+        try {
+            await managerAPI.updateLeadStatus(leadId, newStatus, statusNotes);
+            toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
+            fetchData();
+            fetchStats();
+        } catch (error) {
+            console.error('Error updating status:', error);
             toast.error('❌ حدث خطأ');
         }
     };
@@ -92,22 +121,11 @@ const OperationsDashboard = () => {
         }
     };
     
-    const handleUpdateStatus = async (leadId, newStatus) => {
-        try {
-            await managerAPI.updateLeadStatus(leadId, newStatus);
-            toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
-            fetchData();
-        } catch (error) {
-            console.error('Error updating status:', error);
-            toast.error('❌ حدث خطأ');
-        }
-    };
-    
     // =============================================
     // Contact
     // =============================================
     const handleWhatsApp = (phone, name) => {
-        const message = encodeURIComponent(`مرحباً ${name}، هذا مركز العمليات من Shamsi.tn. بخصوص طلبكم للطاقة الشمسية.`);
+        const message = encodeURIComponent(`مرحباً ${name}، هذا مدير العمليات من Shamsi.tn. بخصوص طلبكم للطاقة الشمسية.`);
         window.open(`https://wa.me/216${phone}?text=${message}`, '_blank');
     };
     
@@ -122,17 +140,15 @@ const OperationsDashboard = () => {
         const badges = {
             sent_to_operations: 'bg-indigo-100 text-indigo-800',
             assigned_to_company: 'bg-purple-100 text-purple-800',
-            installation_completed: 'bg-emerald-100 text-emerald-800',
             completed: 'bg-green-100 text-green-800',
-            rejected: 'bg-red-100 text-red-800'
+            cancelled: 'bg-red-100 text-red-800'
         };
         
         const texts = {
             sent_to_operations: 'في انتظار الشركة',
             assigned_to_company: 'مرسل لشركة',
-            installation_completed: 'تم التركيب',
             completed: 'مكتمل',
-            rejected: 'مرفوض'
+            cancelled: 'ملغي'
         };
         
         return (
@@ -144,9 +160,10 @@ const OperationsDashboard = () => {
     
     const getStatusText = (status) => {
         const texts = {
-            installation_completed: 'تم التركيب',
+            sent_to_operations: 'في انتظار الشركة',
+            assigned_to_company: 'مرسل لشركة',
             completed: 'مكتمل',
-            rejected: 'مرفوض'
+            cancelled: 'ملغي'
         };
         return texts[status] || status;
     };
@@ -160,6 +177,17 @@ const OperationsDashboard = () => {
             case 'factory': return <FaIndustry className="text-gray-500" />;
             default: return <FaHome className="text-gray-400" />;
         }
+    };
+    
+    const getPropertyText = (type) => {
+        const texts = {
+            house: 'منزل',
+            apartment: 'شقة',
+            farm: 'مزرعة',
+            commercial: 'محل تجاري',
+            factory: 'مصنع'
+        };
+        return texts[type] || type;
     };
     
     const formatCurrency = (amount) => {
@@ -191,6 +219,12 @@ const OperationsDashboard = () => {
                             </h1>
                             <p className="text-purple-100 mt-1">إدارة الطلبات وتوزيعها على شركات التركيب</p>
                         </div>
+                        <button
+                            onClick={() => { fetchData(); fetchStats(); }}
+                            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                        >
+                            <FaSync /> تحديث
+                        </button>
                     </div>
                 </div>
             </div>
@@ -207,12 +241,12 @@ const OperationsDashboard = () => {
                         <div className="text-sm text-gray-500">مرسل لشركة</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-emerald-600">{leads.filter(l => l.status === 'installation_completed').length}</div>
-                        <div className="text-sm text-gray-500">تم التركيب</div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-4">
                         <div className="text-2xl font-bold text-green-600">{leads.filter(l => l.status === 'completed').length}</div>
                         <div className="text-sm text-gray-500">مكتمل</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <div className="text-2xl font-bold text-purple-600">{stats?.total_commission?.toLocaleString() || 0} دينار</div>
+                        <div className="text-sm text-gray-500">إجمالي العمولات</div>
                     </div>
                 </div>
             </div>
@@ -223,7 +257,6 @@ const OperationsDashboard = () => {
                     <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'all' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 border'}`}>الكل</button>
                     <button onClick={() => setFilter('sent_to_operations')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'sent_to_operations' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'}`}>في انتظار الشركة</button>
                     <button onClick={() => setFilter('assigned_to_company')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'assigned_to_company' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 border'}`}>مرسل لشركة</button>
-                    <button onClick={() => setFilter('installation_completed')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'installation_completed' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700 border'}`}>تم التركيب</button>
                     <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'completed' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 border'}`}>مكتمل</button>
                 </div>
                 
@@ -249,7 +282,7 @@ const OperationsDashboard = () => {
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <FaMapMarkerAlt className="text-gray-400 text-xs" />
-                                        <p className="text-sm text-gray-500">{lead.city}</p>
+                                        <p className="text-sm text-gray-500">{lead.city || 'غير محدد'}</p>
                                     </div>
                                 </div>
                                 
@@ -267,7 +300,10 @@ const OperationsDashboard = () => {
                                                 فاتورة الكهرباء:
                                             </span>
                                             <span className="font-bold text-green-600">
-                                                {lead.bill_value} دينار ({lead.bill_period === 60 ? 'شهرين' : 'شهر'})
+                                                {lead.bill_amount} دينار
+                                                <span className="text-xs text-gray-500 block">
+                                                    ({lead.bill_period_months === 60 ? 'شهرين' : 'شهر'})
+                                                </span>
                                             </span>
                                         </div>
                                         
@@ -276,37 +312,14 @@ const OperationsDashboard = () => {
                                                 <FaBolt className="text-yellow-600" />
                                                 القدرة الموصى بها:
                                             </span>
-                                            <span className="font-medium">{lead.recommended_system} kWp</span>
+                                            <span className="font-medium">{lead.required_kw} kWp</span>
                                         </div>
                                         
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
                                             <span className="font-medium flex items-center gap-1">
                                                 {getPropertyIcon(lead.property_type)}
-                                                {lead.property_type === 'house' ? 'منزل' :
-                                                 lead.property_type === 'apartment' ? 'شقة' :
-                                                 lead.property_type === 'farm' ? 'مزرعة' :
-                                                 lead.property_type === 'commercial' ? 'محل تجاري' :
-                                                 lead.property_type === 'factory' ? 'مصنع' : lead.property_type}
-                                            </span>
-                                        </div>
-                                        
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaRuler className="text-blue-600" />
-                                                مساحة السطح:
-                                            </span>
-                                            <span className="font-medium">{lead.roof_area || lead.required_roof_area || 0} m²</span>
-                                        </div>
-                                        
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">طريقة الدفع:</span>
-                                            <span className={`font-medium ${lead.payment_method === 'cash' ? 'text-green-600' : 'text-blue-600'}`}>
-                                                {lead.payment_method === 'cash' ? 'نقدي' :
-                                                 lead.payment_method === 'steg' ? 'STEG' :
-                                                 lead.payment_method === 'prosol' ? 'PROSOL' :
-                                                 lead.payment_method === 'bank' ? 'بنكي' :
-                                                 lead.payment_method === 'leasing' ? 'Leasing' : lead.payment_method}
+                                                {getPropertyText(lead.property_type)}
                                             </span>
                                         </div>
                                         
@@ -316,7 +329,7 @@ const OperationsDashboard = () => {
                                                 عمولة المنصة:
                                             </span>
                                             <span className="font-bold text-purple-600">
-                                                {formatCurrency(lead.commission)} دينار
+                                                {formatCurrency(lead.commission_amount)} دينار
                                             </span>
                                         </div>
                                         
@@ -334,7 +347,7 @@ const OperationsDashboard = () => {
                                     {lead.notes && (
                                         <div className="mb-4 p-2 bg-gray-50 rounded-lg text-sm border-r-4 border-purple-400">
                                             <p className="text-gray-600 font-semibold text-xs mb-1">📝 ملاحظات:</p>
-                                            <p className="text-gray-600">{lead.notes}</p>
+                                            <p className="text-gray-600 text-xs">{lead.notes}</p>
                                         </div>
                                     )}
                                 </div>
@@ -369,23 +382,6 @@ const OperationsDashboard = () => {
                                     )}
                                     
                                     {lead.status === 'assigned_to_company' && (
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleUpdateStatus(lead.id, 'installation_completed')}
-                                                className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition text-sm"
-                                            >
-                                                تم التركيب
-                                            </button>
-                                            <button
-                                                onClick={() => handleUpdateStatus(lead.id, 'rejected')}
-                                                className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition text-sm"
-                                            >
-                                                <FaTimes /> رفض
-                                            </button>
-                                        </div>
-                                    )}
-                                    
-                                    {lead.status === 'installation_completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus(lead.id, 'completed')}
                                             className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm"
@@ -400,7 +396,7 @@ const OperationsDashboard = () => {
                                         </div>
                                     )}
                                     
-                                    {lead.status === 'rejected' && (
+                                    {lead.status === 'cancelled' && (
                                         <div className="text-center text-sm text-red-600 py-2">
                                             <FaTimesCircle className="inline ml-1" /> تم رفض الطلب
                                         </div>
@@ -425,8 +421,8 @@ const OperationsDashboard = () => {
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                         <h3 className="text-xl font-bold mb-4">🏢 اختر شركة التركيب</h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-2">قدرة النظام: {selectedLead.recommended_system} kWp</p>
-                        <p className="text-gray-500 text-sm mb-4">عمولة المنصة: {formatCurrency(selectedLead.commission)} دينار</p>
+                        <p className="text-gray-500 text-sm mb-2">قدرة النظام: {selectedLead.required_kw} kWp</p>
+                        <p className="text-gray-500 text-sm mb-4">عمولة المنصة: {formatCurrency(selectedLead.commission_amount)} دينار</p>
                         
                         <label className="block text-gray-700 mb-2">اختر الشركة:</label>
                         <select
@@ -437,10 +433,19 @@ const OperationsDashboard = () => {
                             <option value="">-- اختر شركة --</option>
                             {companies.map((company) => (
                                 <option key={company.id} value={company.id}>
-                                    {company.name} - {company.city} ⭐ {company.rating}
+                                    {company.name} - {company.address || 'عنوان غير محدد'}
                                 </option>
                             ))}
                         </select>
+                        
+                        <label className="block text-gray-700 mb-2">ملاحظات للشركة (اختياري):</label>
+                        <textarea
+                            placeholder="أضف ملاحظات للشركة..."
+                            value={assignmentNotes}
+                            onChange={(e) => setAssignmentNotes(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            rows="3"
+                        />
                         
                         <div className="flex gap-3">
                             <button
@@ -450,7 +455,7 @@ const OperationsDashboard = () => {
                                 إرسال للشركة
                             </button>
                             <button
-                                onClick={() => { setShowCompanyModal(false); setSelectedLead(null); setSelectedCompany(''); }}
+                                onClick={() => { setShowCompanyModal(false); setSelectedLead(null); setSelectedCompany(''); setAssignmentNotes(''); }}
                                 className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
                             >
                                 إلغاء

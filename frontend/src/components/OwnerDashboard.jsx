@@ -57,6 +57,7 @@ const OwnerDashboard = () => {
     const fetchStats = async () => {
         try {
             const response = await adminAPI.getStats();
+            console.log('📊 Stats data:', response.data);
             setStats(response.data);
         } catch (error) {
             console.error('Error fetching stats:', error);
@@ -67,6 +68,7 @@ const OwnerDashboard = () => {
     const fetchCommissionStats = async () => {
         try {
             const response = await adminAPI.getCommissionStats();
+            console.log('💰 Commission stats:', response.data);
             setCommissionStats(response.data);
         } catch (error) {
             console.error('Error fetching commission stats:', error);
@@ -129,31 +131,6 @@ const OwnerDashboard = () => {
                     'rgba(234, 179, 8, 0.8)',
                     'rgba(249, 115, 22, 0.8)',
                     'rgba(107, 114, 128, 0.8)'
-                ],
-                borderWidth: 0,
-                borderRadius: 8
-            }
-        ]
-    };
-    
-    const paymentChartData = {
-        labels: stats?.byPayment?.map(p => 
-            p.payment_method === 'cash' ? 'نقدي' :
-            p.payment_method === 'steg' ? 'STEG' :
-            p.payment_method === 'prosol' ? 'PROSOL' :
-            p.payment_method === 'bank' ? 'بنكي' :
-            p.payment_method === 'leasing' ? 'Leasing' : p.payment_method
-        ) || [],
-        datasets: [
-            {
-                label: 'عدد الطلبات',
-                data: stats?.byPayment?.map(p => p.count) || [],
-                backgroundColor: [
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(59, 130, 246, 0.8)',
-                    'rgba(234, 179, 8, 0.8)',
-                    'rgba(249, 115, 22, 0.8)',
-                    'rgba(168, 85, 247, 0.8)'
                 ],
                 borderWidth: 0,
                 borderRadius: 8
@@ -261,7 +238,7 @@ const OwnerDashboard = () => {
                                 </div>
                             </div>
                             <div className="mt-2 text-sm text-gray-500">
-                                جديد: {stats.new || 0} | مكتمل: {stats.completed || 0}
+                                قيد المراجعة: {stats.pending || 0} | مكتمل: {stats.completed || 0}
                             </div>
                         </div>
                         
@@ -280,8 +257,8 @@ const OwnerDashboard = () => {
                         <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-500 text-sm">إجمالي قيمة الطلبات</p>
-                                    <p className="text-3xl font-bold text-purple-600">{formatCurrency(stats.total_value)} دينار</p>
+                                    <p className="text-gray-500 text-sm">إجمالي العمولات</p>
+                                    <p className="text-3xl font-bold text-purple-600">{formatCurrency(stats.total_commission)} دينار</p>
                                 </div>
                                 <div className="bg-purple-100 p-3 rounded-full">
                                     <FaMoneyBillWave className="text-purple-600 text-2xl" />
@@ -292,37 +269,29 @@ const OwnerDashboard = () => {
                         <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-500 text-sm">إجمالي العمولات</p>
-                                    <p className="text-3xl font-bold text-yellow-600">{formatCurrency(stats.total_commission)} دينار</p>
+                                    <p className="text-gray-500 text-sm">الزكاة المستحقة</p>
+                                    <p className="text-3xl font-bold text-yellow-600">{formatCurrency(commissionStats?.zakat_amount || 0)} دينار</p>
                                 </div>
                                 <div className="bg-yellow-100 p-3 rounded-full">
-                                    <FaChartLine className="text-yellow-600 text-2xl" />
+                                    <FaHandsHelping className="text-yellow-600 text-2xl" />
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     {/* Status Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white rounded-lg shadow p-3 text-center">
-                            <div className="text-xl font-bold text-yellow-600">{stats.new || 0}</div>
-                            <div className="text-xs text-gray-500">جديد</div>
+                            <div className="text-xl font-bold text-yellow-600">{stats.pending || 0}</div>
+                            <div className="text-xs text-gray-500">قيد المراجعة</div>
                         </div>
                         <div className="bg-white rounded-lg shadow p-3 text-center">
-                            <div className="text-xl font-bold text-blue-600">{stats.assigned_to_executive || 0}</div>
-                            <div className="text-xs text-gray-500">للمدير التنفيذي</div>
+                            <div className="text-xl font-bold text-blue-600">{stats.approved || 0}</div>
+                            <div className="text-xs text-gray-500">تمت الموافقة</div>
                         </div>
                         <div className="bg-white rounded-lg shadow p-3 text-center">
-                            <div className="text-xl font-bold text-indigo-600">{stats.assigned_to_call_center || 0}</div>
-                            <div className="text-xs text-gray-500">لمركز الاتصال</div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-3 text-center">
-                            <div className="text-xl font-bold text-orange-600">{stats.devis_ready || 0}</div>
-                            <div className="text-xs text-gray-500">devis جاهز</div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-3 text-center">
-                            <div className="text-xl font-bold text-pink-600">{stats.financing_pending || 0}</div>
-                            <div className="text-xs text-gray-500">تمويل قيد الانتظار</div>
+                            <div className="text-xl font-bold text-purple-600">{stats.contacted || 0}</div>
+                            <div className="text-xs text-gray-500">تم التواصل</div>
                         </div>
                         <div className="bg-white rounded-lg shadow p-3 text-center">
                             <div className="text-xl font-bold text-green-600">{stats.completed || 0}</div>
@@ -347,22 +316,22 @@ const OwnerDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* By Payment Method */}
+                        {/* By Property Type */}
                         <div className="bg-white rounded-xl shadow-md p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <FaCreditCard className="text-blue-600" /> طريقة الدفع
+                                <FaBuilding className="text-blue-600" /> الطلبات حسب نوع العقار
                             </h3>
                             <div className="space-y-2">
-                                {stats.byPayment?.map((payment) => (
-                                    <div key={payment.payment_method} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+                                {stats.byProperty?.map((prop) => (
+                                    <div key={prop.property_type} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
                                         <span>
-                                            {payment.payment_method === 'cash' ? 'نقدي' :
-                                             payment.payment_method === 'steg' ? 'STEG' :
-                                             payment.payment_method === 'prosol' ? 'PROSOL' :
-                                             payment.payment_method === 'bank' ? 'بنكي' :
-                                             payment.payment_method === 'leasing' ? 'Leasing' : payment.payment_method}
+                                            {prop.property_type === 'house' ? 'منزل' :
+                                             prop.property_type === 'apartment' ? 'شقة' :
+                                             prop.property_type === 'farm' ? 'مزرعة' :
+                                             prop.property_type === 'commercial' ? 'محل تجاري' :
+                                             prop.property_type === 'factory' ? 'مصنع' : prop.property_type}
                                         </span>
-                                        <span className="font-bold text-blue-600">{payment.count} طلب</span>
+                                        <span className="font-bold text-blue-600">{prop.count} طلب</span>
                                     </div>
                                 ))}
                             </div>
@@ -397,16 +366,6 @@ const OwnerDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* Payment Method Chart */}
-                        <div className="bg-white rounded-xl shadow-md p-6">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <FaCreditCard className="text-yellow-600" /> طرق الدفع
-                            </h3>
-                            <div className="h-80 flex justify-center">
-                                <Doughnut data={paymentChartData} options={chartOptions} />
-                            </div>
-                        </div>
-                        
                         {/* City Chart */}
                         <div className="bg-white rounded-xl shadow-md p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -414,6 +373,31 @@ const OwnerDashboard = () => {
                             </h3>
                             <div className="h-80">
                                 <Bar data={cityChartData} options={chartOptions} />
+                            </div>
+                        </div>
+                        
+                        {/* Monthly Summary */}
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <FaCalendarAlt className="text-yellow-600" /> ملخص شهري
+                            </h3>
+                            <div className="space-y-3 max-h-80 overflow-y-auto">
+                                {commissionStats?.monthly?.slice(0, 6).map((item, index) => {
+                                    const date = new Date(item.month);
+                                    const monthName = date.toLocaleDateString('ar-TN', { month: 'long', year: 'numeric' });
+                                    return (
+                                        <div key={index} className="border-b pb-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-medium">{monthName}</span>
+                                                <span className="text-green-600 font-bold">{formatCurrency(item.monthly_commission)} دينار</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm text-gray-500">
+                                                <span>الزكاة:</span>
+                                                <span className="text-yellow-600">{formatCurrency(item.monthly_zakat)} دينار</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>

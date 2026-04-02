@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // تحديد عنوان API
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
 
 // إنشاء instance من axios
 const api = axios.create({
@@ -52,9 +52,47 @@ api.interceptors.response.use(
     }
 );
 
+// ==================== Auth API ====================
+export const authAPI = {
+    login: async (email, password) => {
+        console.log('🔐 Login attempt:', email);
+        try {
+            const response = await api.post('/auth/login', { email, password });
+            if (response.data.token) {
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response;
+        } catch (error) {
+            console.error('❌ Login error:', error.response?.data || error.message);
+            throw error;
+        }
+    },
+    
+    logout: () => {
+        console.log('🚪 Logging out');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+    },
+    
+    getCurrentUser: () => {
+        const user = localStorage.getItem('user');
+        return user ? JSON.parse(user) : null;
+    },
+    
+    isAuthenticated: () => {
+        return !!localStorage.getItem('token');
+    },
+    
+    getMe: async () => {
+        const response = await api.get('/auth/me');
+        return response;
+    }
+};
+
 // ==================== Leads API ====================
 export const leadsAPI = {
-    // حساب النظام الشمسي فقط (بدون حفظ)
     calculate: async (data) => {
         console.log('📤 Calculating solar system with data:', data);
         try {
@@ -66,7 +104,6 @@ export const leadsAPI = {
         }
     },
     
-    // إنشاء طلب جديد (حفظ في قاعدة البيانات)
     create: async (data) => {
         console.log('📤 Creating lead with data:', data);
         try {
@@ -78,129 +115,230 @@ export const leadsAPI = {
         }
     },
     
-    // الحصول على طلب محدد
     get: (id) => api.get(`/leads/${id}`),
     
-    // الحصول على جميع الطلبات (لأدمن)
-    getAll: (params) => api.get('/admin/leads', { params }),
+    getMyLeads: (params) => api.get('/leads/my-leads', { params }),
+    
+    updateStatus: (id, status, notes) => api.put(`/leads/${id}/status`, { status, notes }),
+    
+    addNote: (id, notes) => api.post(`/leads/${id}/notes`, { notes }),
 };
 
-// ==================== Admin API ====================
+// ==================== Admin API (للمدير العام و المالك) ====================
 export const adminAPI = {
+    // الطلبات والإحصائيات
     getLeads: (params) => {
         console.log('📊 Fetching leads with params:', params);
         return api.get('/admin/leads', { params });
     },
-    getManagers: () => {
-        console.log('👥 Fetching managers');
-        return api.get('/admin/managers');
-    },
+    
     getStats: () => {
         console.log('📈 Fetching stats');
         return api.get('/admin/stats');
     },
-    getCommissionStats: () => {
+    
+    getCommissionStats: (startDate, endDate) => {
         console.log('💰 Fetching commission stats');
-        return api.get('/admin/commission-stats');
+        const params = {};
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        return api.get('/admin/commissions/stats', { params });
     },
+    
+    // الموافقة والرفض
     approveLead: (leadId) => {
         console.log('✅ Approving lead:', leadId);
         return api.post(`/admin/leads/${leadId}/approve`);
     },
+    
     rejectLead: (leadId, reason) => {
         console.log('❌ Rejecting lead:', leadId, reason);
         return api.post(`/admin/leads/${leadId}/reject`, { reason });
     },
-    sendToManager: (leadId, managerId, notes) => {
-        console.log('📨 Sending lead to manager:', leadId, managerId);
-        return api.post(`/admin/leads/${leadId}/send-to-manager`, { managerId, notes });
+    
+    // تعيين الطلبات
+    assignToExecutive: (leadId, executiveId, notes) => {
+        console.log('📨 Assigning lead to executive:', leadId, executiveId);
+        return api.post(`/admin/leads/${leadId}/assign-executive`, { executiveId, notes });
     },
+    
+    assignToCallCenter: (leadId, callCenterId, notes) => {
+        console.log('📞 Assigning lead to call center:', leadId, callCenterId);
+        return api.post(`/admin/leads/${leadId}/assign-callcenter`, { callCenterId, notes });
+    },
+    
+    assignToBankManager: (leadId, bankManagerId, bankId, notes) => {
+        console.log('🏦 Assigning lead to bank manager:', leadId, bankManagerId);
+        return api.post(`/admin/leads/${leadId}/assign-bank`, { bankManagerId, bankId, notes });
+    },
+    
+    assignToLeasingManager: (leadId, leasingManagerId, leasingCompanyId, notes) => {
+        console.log('🚗 Assigning lead to leasing manager:', leadId, leasingManagerId);
+        return api.post(`/admin/leads/${leadId}/assign-leasing`, { leasingManagerId, leasingCompanyId, notes });
+    },
+    
+    // حذف الطلبات
     deleteLead: (leadId) => {
         console.log('🗑️ Deleting lead:', leadId);
         return api.delete(`/admin/leads/${leadId}`);
     },
+    
     deleteAllLeads: () => {
         console.log('🗑️ Deleting all leads');
         return api.delete('/admin/leads/all');
     },
+    
     deleteRejectedLeads: () => {
-        console.log('🗑️ Deleting rejected leads');
+        console.log('🗑️ Deleting cancelled leads');
         return api.delete('/admin/leads/rejected');
     },
+    
+    // إدارة المستخدمين
+    getUsers: (role) => {
+        console.log('👥 Fetching users');
+        const params = role ? { role } : {};
+        return api.get('/admin/users', { params });
+    },
+    
+    addUser: (data) => {
+        console.log('➕ Adding user:', data);
+        return api.post('/admin/users', data);
+    },
+    
+    updateUser: (id, data) => {
+        console.log('✏️ Updating user:', id);
+        return api.put(`/admin/users/${id}`, data);
+    },
+    
+    deleteUser: (id) => {
+        console.log('🗑️ Deleting user:', id);
+        return api.delete(`/admin/users/${id}`);
+    },
+    
     // إدارة الشركات
     getCompanies: () => {
         console.log('🏢 Fetching companies');
         return api.get('/admin/companies');
     },
+    
     addCompany: (data) => {
         console.log('➕ Adding company:', data);
         return api.post('/admin/companies', data);
     },
+    
     updateCompany: (id, data) => {
         console.log('✏️ Updating company:', id);
         return api.put(`/admin/companies/${id}`, data);
     },
+    
     deleteCompany: (id) => {
         console.log('🗑️ Deleting company:', id);
         return api.delete(`/admin/companies/${id}`);
     }
 };
 
-// ==================== Manager API ====================
+// ==================== Manager API (للمديرين) ====================
 export const managerAPI = {
     getLeads: (params) => {
         console.log('📊 Fetching my leads:', params);
         return api.get('/manager/leads', { params });
     },
+    
     getStats: () => {
         console.log('📈 Fetching manager stats');
         return api.get('/manager/stats');
     },
+    
     updateLeadStatus: (leadId, status, notes) => {
         console.log('🔄 Updating lead status:', leadId, status);
         return api.put(`/manager/leads/${leadId}/status`, { status, notes });
     },
-    assignToCompany: (leadId, companyId, price, notes) => {
-        console.log('🏢 Assigning lead to company:', leadId, companyId, price);
-        return api.post(`/manager/leads/${leadId}/assign-company`, { companyId, price, notes });
+    
+    getLeadDetails: (leadId) => {
+        console.log('📋 Fetching lead details:', leadId);
+        return api.get(`/manager/leads/${leadId}/details`);
     },
-    sendToOperationsManager: (leadId, notes) => {
-        console.log('📤 Sending lead to operations manager:', leadId);
-        return api.post(`/manager/leads/${leadId}/send-to-operations`, { notes });
-    },
+    
     getAvailableCompanies: () => {
         console.log('🏢 Fetching available companies');
         return api.get('/manager/companies/available');
     },
+    
+    sendToOperationsManager: (leadId, notes) => {
+        console.log('📤 Sending lead to operations manager:', leadId);
+        return api.post(`/manager/leads/${leadId}/send-to-operations`, { notes });
+    },
+    
+    acceptLeadAndSend: (leadId, notes) => {
+        console.log('✅ Accepting lead and sending to operations:', leadId);
+        return api.post(`/manager/leads/${leadId}/accept`, { notes });
+    },
+    
+    assignToCompany: (leadId, companyId, notes) => {
+        console.log('🏢 Assigning lead to company:', leadId, companyId);
+        return api.post(`/manager/leads/${leadId}/assign-company`, { companyId, notes });
+    }
 };
 
-// ==================== Auth API ====================
-export const authAPI = {
-    login: (email, password, role) => {
-        console.log('🔐 Login attempt:', email, role);
-        return api.post('/login', { email, password, role });
+// ==================== Bank API (لمدير البنك) ====================
+export const bankAPI = {
+    getRequests: (params) => {
+        console.log('🏦 Fetching bank requests');
+        return api.get('/bank/requests', { params });
     },
-    logout: () => {
-        console.log('🚪 Logging out');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+    
+    getStats: () => {
+        console.log('📊 Fetching bank stats');
+        return api.get('/bank/stats');
     },
-    getCurrentUser: () => {
-        const user = localStorage.getItem('user');
-        return user ? JSON.parse(user) : null;
+    
+    getRequestDetails: (requestId) => {
+        return api.get(`/bank/requests/${requestId}`);
     },
-    isAuthenticated: () => {
-        return !!localStorage.getItem('token');
+    
+    updateStatus: (requestId, data) => {
+        console.log('🔄 Updating bank request status:', requestId);
+        return api.put(`/bank/requests/${requestId}/status`, data);
     },
+    
+    getAvailableBanks: () => {
+        return api.get('/bank/banks/available');
+    }
 };
 
-// ==================== Companies API ====================
+// ==================== Leasing API (لمدير التأجير) ====================
+export const leasingAPI = {
+    getRequests: (params) => {
+        console.log('🚗 Fetching leasing requests');
+        return api.get('/leasing/requests', { params });
+    },
+    
+    getStats: () => {
+        console.log('📊 Fetching leasing stats');
+        return api.get('/leasing/stats');
+    },
+    
+    getRequestDetails: (requestId) => {
+        return api.get(`/leasing/requests/${requestId}`);
+    },
+    
+    updateStatus: (requestId, data) => {
+        console.log('🔄 Updating leasing request status:', requestId);
+        return api.put(`/leasing/requests/${requestId}/status`, data);
+    },
+    
+    getAvailableCompanies: () => {
+        return api.get('/leasing/companies/available');
+    }
+};
+
+// ==================== Companies API (عام) ====================
 export const companiesAPI = {
     getAll: () => {
         console.log('🏢 Fetching companies');
         return api.get('/companies');
     },
+    
     getOne: (id) => api.get(`/companies/${id}`),
 };
 
@@ -227,11 +365,11 @@ export const handleApiError = (error) => {
             case 401:
                 return { message: 'غير مصرح به - الرجاء تسجيل الدخول' };
             case 403:
-                return { message: 'ليس لديك صلاحية للقيام بهذا الإجراء' };
+                return { message: data.message || 'ليس لديك صلاحية للقيام بهذا الإجراء' };
             case 404:
-                return { message: 'البيانات غير موجودة' };
+                return { message: data.message || 'البيانات غير موجودة' };
             case 500:
-                return { message: 'خطأ في الخادم - الرجاء المحاولة لاحقاً' };
+                return { message: data.message || 'خطأ في الخادم - الرجاء المحاولة لاحقاً' };
             default:
                 return { message: data.message || 'حدث خطأ غير متوقع' };
         }

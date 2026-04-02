@@ -2,78 +2,75 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
 
+// Helper function to handle both PostgreSQL and SQLite results
+const getRows = (result) => {
+    return result.rows || result || [];
+};
+
+const getFirstRow = (result) => {
+    const rows = getRows(result);
+    return rows[0] || null;
+};
+
 // =============================================
 // تسجيل الدخول
 // =============================================
 exports.login = async (req, res) => {
     try {
-        const { email, password, role } = req.body;
+        const { email, password } = req.body;
         
-        console.log('📝 Login attempt:', { email, role });
+        console.log('📝 Login attempt:', { email });
         
-        let user = null;
-        let userRole = null;
-        let sourceTable = null;
-        
-        // البحث في جدول users أولاً (الأدوار الجديدة)
-        const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-        const users = userResult.rows || userResult;
-        
-        if (users && users.length > 0) {
-            user = users[0];
-            userRole = user.role;
-            sourceTable = 'users';
+        if (!email || !password) {
+            return res.status(400).json({ message: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
         }
         
-        // إذا لم يوجد في users، نبحث في جدول admins (للتوافق مع القديم)
-        if (!user && role === 'admin') {
-            const adminResult = await db.query('SELECT * FROM admins WHERE email = $1', [email]);
-            const admins = adminResult.rows || adminResult;
-            if (admins && admins.length > 0) {
-                user = admins[0];
-                userRole = 'admin';
-                sourceTable = 'admins';
-            }
-        }
-        
-        // إذا لم يوجد في users، نبحث في جدول managers (للتوافق مع القديم)
-        if (!user && role === 'manager') {
-            const managerResult = await db.query('SELECT * FROM managers WHERE email = $1', [email]);
-            const managers = managerResult.rows || managerResult;
-            if (managers && managers.length > 0) {
-                user = managers[0];
-                // استخراج الدور من جدول managers (executive أو operations)
-                userRole = user.role || 'executive';
-                sourceTable = 'managers';
-            }
-        }
+        // البحث في جدول users (جميع الأدوار)
+        const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = getFirstRow(result);
         
         if (!user) {
             console.log('❌ User not found:', email);
             return res.status(401).json({ message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
         }
         
+        // التحقق من صحة كلمة المرور
         const validPassword = bcrypt.compareSync(password, user.password);
         if (!validPassword) {
             console.log('❌ Invalid password for:', email);
             return res.status(401).json({ message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
         }
         
+        // التحقق من أن المستخدم نشط
+        if (!user.is_active) {
+            console.log('❌ Inactive user:', email);
+            return res.status(401).json({ message: 'الحساب غير نشط. يرجى التواصل مع المدير' });
+        }
+        
+        // إنشاء التوكن
         const token = jwt.sign(
-            { id: user.id, email: user.email, role: userRole, source: sourceTable },
+            { 
+                id: user.id, 
+                email: user.email, 
+                name: user.name,
+                role: user.role,
+                phone: user.phone
+            },
             process.env.JWT_SECRET || 'shamsi_tn_secret_key_2024',
             { expiresIn: '24h' }
         );
         
-        console.log('✅ Login successful:', email, 'Role:', userRole);
+        console.log('✅ Login successful:', email, 'Role:', user.role);
         
         res.json({
+            success: true,
             token,
             user: {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                role: userRole
+                role: user.role,
+                phone: user.phone
             }
         });
         
@@ -84,13 +81,13 @@ exports.login = async (req, res) => {
 };
 
 // =============================================
-// مصادقة عامة
+// مصادقة عامة (التحقق من التوكن)
 // =============================================
 exports.authenticate = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     
     if (!token) {
-        return res.status(401).json({ message: 'غير مصرح به' });
+        return res.status(401).json({ message: 'غير مصرح به - يرجى تسجيل الدخول' });
     }
     
     try {
@@ -98,6 +95,9 @@ exports.authenticate = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'انتهت صلاحية التوكن، يرجى تسجيل الدخول مرة أخرى' });
+        }
         return res.status(401).json({ message: 'توكن غير صالح' });
     }
 };
@@ -107,7 +107,11 @@ exports.authenticate = (req, res, next) => {
 // =============================================
 exports.isOwner = (req, res, next) => {
     if (req.user.role !== 'owner') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات المالك' });
+        return res.status(403).json({ 
+            message: 'غير مصرح به - هذه الصفحة مخصصة للمالك فقط',
+            requiredRole: 'owner',
+            yourRole: req.user.role
+        });
     }
     next();
 };
@@ -116,8 +120,13 @@ exports.isOwner = (req, res, next) => {
 // مصادقة للمدير العام (General Manager)
 // =============================================
 exports.isGeneralManager = (req, res, next) => {
-    if (req.user.role !== 'general_manager' && req.user.role !== 'owner') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير عام' });
+    const allowedRoles = ['general_manager', 'owner'];
+    if (!allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مدير عام',
+            requiredRole: 'general_manager',
+            yourRole: req.user.role
+        });
     }
     next();
 };
@@ -126,8 +135,13 @@ exports.isGeneralManager = (req, res, next) => {
 // مصادقة للمدير التنفيذي (Executive Manager)
 // =============================================
 exports.isExecutiveManager = (req, res, next) => {
-    if (req.user.role !== 'executive_manager' && req.user.role !== 'owner' && req.user.role !== 'general_manager') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير تنفيذي' });
+    const allowedRoles = ['executive_manager', 'general_manager', 'owner'];
+    if (!allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مدير تنفيذي',
+            requiredRole: 'executive_manager',
+            yourRole: req.user.role
+        });
     }
     next();
 };
@@ -136,8 +150,13 @@ exports.isExecutiveManager = (req, res, next) => {
 // مصادقة لمركز الاتصال (Call Center)
 // =============================================
 exports.isCallCenter = (req, res, next) => {
-    if (req.user.role !== 'call_center' && req.user.role !== 'owner' && req.user.role !== 'general_manager') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مركز اتصال' });
+    const allowedRoles = ['call_center', 'general_manager', 'owner'];
+    if (!allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مركز اتصال',
+            requiredRole: 'call_center',
+            yourRole: req.user.role
+        });
     }
     next();
 };
@@ -146,20 +165,43 @@ exports.isCallCenter = (req, res, next) => {
 // مصادقة لمدير العمليات (Operations Manager)
 // =============================================
 exports.isOperationsManager = (req, res, next) => {
-    if (req.user.role !== 'operations_manager' && req.user.role !== 'owner' && req.user.role !== 'general_manager') {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير عمليات' });
+    const allowedRoles = ['operations_manager', 'general_manager', 'owner'];
+    if (!allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مدير عمليات',
+            requiredRole: 'operations_manager',
+            yourRole: req.user.role
+        });
     }
     next();
 };
 
 // =============================================
-// مصادقة للأدمن (للتوافق مع الكود القديم)
+// مصادقة لمدير البنك (Bank Manager)
 // =============================================
-exports.isAdmin = (req, res, next) => {
-    // قبول الأدوار: owner, general_manager (كمدير عام) والأدمن القديم
-    const allowedRoles = ['owner', 'general_manager', 'admin'];
+exports.isBankManager = (req, res, next) => {
+    const allowedRoles = ['bank_manager', 'general_manager', 'owner'];
     if (!allowedRoles.includes(req.user.role)) {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات أدمن' });
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مدير بنك',
+            requiredRole: 'bank_manager',
+            yourRole: req.user.role
+        });
+    }
+    next();
+};
+
+// =============================================
+// مصادقة لمدير التأجير التمويلي (Leasing Manager)
+// =============================================
+exports.isLeasingManager = (req, res, next) => {
+    const allowedRoles = ['leasing_manager', 'general_manager', 'owner'];
+    if (!allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مدير تأجير',
+            requiredRole: 'leasing_manager',
+            yourRole: req.user.role
+        });
     }
     next();
 };
@@ -168,10 +210,36 @@ exports.isAdmin = (req, res, next) => {
 // مصادقة للمدير (للتوافق مع الكود القديم)
 // =============================================
 exports.isManager = (req, res, next) => {
-    // قبول الأدوار: executive_manager, operations_manager, owner, general_manager
-    const allowedRoles = ['executive_manager', 'operations_manager', 'owner', 'general_manager'];
+    const allowedRoles = ['executive_manager', 'operations_manager', 'call_center', 'bank_manager', 'leasing_manager', 'general_manager', 'owner'];
     if (!allowedRoles.includes(req.user.role)) {
-        return res.status(403).json({ message: 'غير مصرح به - مطلوب صلاحيات مدير' });
+        return res.status(403).json({ 
+            message: 'غير مصرح به - مطلوب صلاحيات مدير',
+            requiredRole: 'manager',
+            yourRole: req.user.role
+        });
     }
     next();
+};
+
+// =============================================
+// الحصول على معلومات المستخدم الحالي
+// =============================================
+exports.getCurrentUser = async (req, res) => {
+    try {
+        const result = await db.query(
+            'SELECT id, name, email, role, phone, is_active, created_at FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        const user = getFirstRow(result);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+        
+        res.json(user);
+        
+    } catch (error) {
+        console.error('❌ Error getting current user:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب معلومات المستخدم', error: error.message });
+    }
 };

@@ -3,10 +3,13 @@ import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
     FaCheck, FaTimes, FaPaperPlane, FaUsers, FaChartLine, 
-    FaEye, FaTrash, FaUser, FaMapMarkerAlt, FaMoneyBillWave, 
-    FaBolt, FaCalendarAlt, FaBuilding, FaPhone, FaEnvelope,
-    FaUserPlus, FaUserEdit, FaUserMinus, FaSync, FaSearch,
-    FaHome, FaIndustry, FaTractor, FaStore, FaCity, FaStar
+    FaEye, FaTrash, FaSync, FaUser, FaMapMarkerAlt, 
+    FaMoneyBillWave, FaBolt, FaCalendarAlt, FaBuilding,
+    FaUserPlus, FaUserTie, FaHeadset, FaUniversity, FaCar,
+    FaHome, FaIndustry, FaStore, FaTractor, FaCity,
+    FaBuilding as FaCompany, FaStar, FaPhone, FaEnvelope, FaGlobe,
+    FaSearch, FaFilter, FaFire, FaTrophy, FaClock, FaCheckCircle,
+    FaHourglassHalf, FaTimesCircle, FaBell, FaChartPie, FaArrowUp
 } from 'react-icons/fa';
 
 const GeneralManagerDashboard = () => {
@@ -14,33 +17,100 @@ const GeneralManagerDashboard = () => {
     // State
     // =============================================
     const [leads, setLeads] = useState([]);
+    const [filteredLeads, setFilteredLeads] = useState([]);
     const [users, setUsers] = useState([]);
+    const [filteredUsers, setFilteredUsers] = useState([]);
+    const [companies, setCompanies] = useState([]);
+    const [filteredCompanies, setFilteredCompanies] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-    const [showUserModal, setShowUserModal] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [cityFilter, setCityFilter] = useState('all');
+    const [priorityFilter, setPriorityFilter] = useState('all');
+    const [activeTab, setActiveTab] = useState('leads');
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [showUserModal, setShowUserModal] = useState(false);
+    const [showCompanyModal, setShowCompanyModal] = useState(false);
+    const [showRejectModal, setShowRejectModal] = useState(false);
     const [selectedLead, setSelectedLead] = useState(null);
     const [selectedUserId, setSelectedUserId] = useState('');
-    const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
-    const [activeTab, setActiveTab] = useState('leads'); // 'leads', 'users', 'stats'
-    
+    const [assignType, setAssignType] = useState('executive');
+    const [rejectReason, setRejectReason] = useState('');
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
+    const [cities, setCities] = useState([]);
+    const [newUser, setNewUser] = useState({
+        name: '',
+        email: '',
+        password: '',
+        role: 'executive_manager',
+        phone: ''
+    });
+    const [newCompany, setNewCompany] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        contact_person: '',
+        description: '',
+        rating: 0,
+        projects_count: 0,
+        established_year: '',
+        license_number: '',
+        website: '',
+        logo: ''
+    });
+
     // =============================================
     // Fetch Data
     // =============================================
     useEffect(() => {
-        fetchData();
-        fetchUsers();
+        if (activeTab === 'leads') {
+            fetchLeads();
+        } else if (activeTab === 'users') {
+            fetchUsers();
+        } else if (activeTab === 'companies') {
+            fetchCompanies();
+        }
         fetchStats();
     }, [filter, activeTab]);
-    
-    const fetchData = async () => {
+
+    useEffect(() => {
+        filterLeads();
+    }, [leads, searchTerm, cityFilter, priorityFilter, filter]);
+
+    useEffect(() => {
+        filterUsers();
+    }, [users, searchTerm]);
+
+    useEffect(() => {
+        filterCompanies();
+    }, [companies, searchTerm]);
+
+    useEffect(() => {
+        if (showAssignModal) {
+            fetchUsers();
+        }
+    }, [showAssignModal]);
+
+    const showNotificationMessage = (message) => {
+        setNotificationMessage(message);
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3000);
+    };
+
+    const fetchLeads = async () => {
         setLoading(true);
         try {
             const params = filter !== 'all' ? { status: filter } : {};
             const response = await adminAPI.getLeads(params);
-            console.log('📊 Leads data:', response.data);
-            setLeads(response.data.leads || []);
+            const leadsData = response.data.leads || [];
+            setLeads(leadsData);
+            
+            // استخراج المدن الفريدة
+            const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
+            setCities(uniqueCities);
         } catch (error) {
             console.error('Error fetching leads:', error);
             toast.error('حدث خطأ في جلب البيانات');
@@ -48,17 +118,26 @@ const GeneralManagerDashboard = () => {
             setLoading(false);
         }
     };
-    
+
     const fetchUsers = async () => {
         try {
             const response = await adminAPI.getUsers();
-            console.log('👥 Users data:', response.data);
             setUsers(response.data || []);
         } catch (error) {
             console.error('Error fetching users:', error);
         }
     };
-    
+
+    const fetchCompanies = async () => {
+        try {
+            const response = await adminAPI.getCompanies();
+            setCompanies(response.data || []);
+        } catch (error) {
+            console.error('Error fetching companies:', error);
+            toast.error('حدث خطأ في جلب الشركات');
+        }
+    };
+
     const fetchStats = async () => {
         try {
             const response = await adminAPI.getStats();
@@ -67,7 +146,91 @@ const GeneralManagerDashboard = () => {
             console.error('Error fetching stats:', error);
         }
     };
-    
+
+    // =============================================
+    // Filtering Logic
+    // =============================================
+    const getLeadPriority = (lead) => {
+        const bill = lead.bill_amount || 0;
+        if (bill > 300) return { level: 'high', text: 'عالي', color: 'red' };
+        if (bill > 150) return { level: 'medium', text: 'متوسط', color: 'yellow' };
+        return { level: 'low', text: 'منخفض', color: 'green' };
+    };
+
+    const getLeadScore = (lead) => {
+        let score = 0;
+        if (lead.bill_amount > 250) score += 30;
+        if (lead.bill_amount > 150) score += 20;
+        if (lead.required_kw > 5) score += 25;
+        if (lead.property_type === 'house' || lead.property_type === 'farm') score += 15;
+        if (lead.city === 'تونس' || lead.city === 'صفاقس' || lead.city === 'سوسة') score += 10;
+        return score;
+    };
+
+    const isHotLead = (lead) => {
+        return getLeadScore(lead) >= 60;
+    };
+
+    const filterLeads = () => {
+        let filtered = [...leads];
+        
+        // فلتر حسب الحالة
+        if (filter !== 'all') {
+            filtered = filtered.filter(lead => lead.status === filter);
+        }
+        
+        // فلتر حسب المدينة
+        if (cityFilter !== 'all') {
+            filtered = filtered.filter(lead => lead.city === cityFilter);
+        }
+        
+        // فلتر حسب الأولوية
+        if (priorityFilter !== 'all') {
+            filtered = filtered.filter(lead => {
+                const priority = getLeadPriority(lead);
+                return priority.level === priorityFilter;
+            });
+        }
+        
+        // فلتر حسب البحث
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(lead => 
+                lead.name.toLowerCase().includes(term) ||
+                lead.phone.includes(term) ||
+                (lead.city && lead.city.toLowerCase().includes(term))
+            );
+        }
+        
+        setFilteredLeads(filtered);
+    };
+
+    const filterUsers = () => {
+        let filtered = [...users];
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(user => 
+                user.name.toLowerCase().includes(term) ||
+                user.email.toLowerCase().includes(term) ||
+                (user.phone && user.phone.includes(term))
+            );
+        }
+        setFilteredUsers(filtered);
+    };
+
+    const filterCompanies = () => {
+        let filtered = [...companies];
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(company => 
+                company.name.toLowerCase().includes(term) ||
+                company.email.toLowerCase().includes(term) ||
+                (company.phone && company.phone.includes(term))
+            );
+        }
+        setFilteredCompanies(filtered);
+    };
+
     // =============================================
     // Lead Management
     // =============================================
@@ -75,55 +238,75 @@ const GeneralManagerDashboard = () => {
         try {
             await adminAPI.approveLead(leadId);
             toast.success('✅ تمت الموافقة على الطلب');
-            fetchData();
+            showNotificationMessage('تمت الموافقة على الطلب بنجاح');
+            fetchLeads();
             fetchStats();
         } catch (error) {
             console.error('Error approving lead:', error);
             toast.error('❌ حدث خطأ في الموافقة');
         }
     };
-    
-    const handleReject = async (leadId) => {
-        const reason = prompt('أدخل سبب الرفض:');
-        if (reason) {
-            try {
-                await adminAPI.rejectLead(leadId, reason);
-                toast.success('❌ تم رفض الطلب');
-                fetchData();
-                fetchStats();
-            } catch (error) {
-                console.error('Error rejecting lead:', error);
-                toast.error('حدث خطأ');
-            }
+
+    const handleReject = async () => {
+        if (!selectedLead || !rejectReason) {
+            toast.error('يرجى إدخال سبب الرفض');
+            return;
+        }
+        
+        try {
+            await adminAPI.rejectLead(selectedLead.id, rejectReason);
+            toast.success('❌ تم رفض الطلب');
+            showNotificationMessage('تم رفض الطلب');
+            setShowRejectModal(false);
+            setSelectedLead(null);
+            setRejectReason('');
+            fetchLeads();
+            fetchStats();
+        } catch (error) {
+            console.error('Error rejecting lead:', error);
+            toast.error('حدث خطأ');
         }
     };
-    
+
     const handleAssign = async () => {
         if (!selectedLead || !selectedUserId) {
             toast.error('يرجى اختيار الطلب والمستخدم');
             return;
         }
-        
+
         try {
-            await adminAPI.assignLead(selectedLead.id, selectedUserId);
-            toast.success('📨 تم تعيين الطلب بنجاح');
+            if (assignType === 'executive') {
+                await adminAPI.assignToExecutive(selectedLead.id, selectedUserId, '');
+                toast.success('📨 تم إرسال الطلب للمدير التنفيذي');
+            } else if (assignType === 'callcenter') {
+                await adminAPI.assignToCallCenter(selectedLead.id, selectedUserId, '');
+                toast.success('📞 تم إرسال الطلب لمركز الاتصال');
+            } else if (assignType === 'bank') {
+                await adminAPI.assignToBankManager(selectedLead.id, selectedUserId, null, '');
+                toast.success('🏦 تم إرسال الطلب لمدير البنك');
+            } else if (assignType === 'leasing') {
+                await adminAPI.assignToLeasingManager(selectedLead.id, selectedUserId, null, '');
+                toast.success('🚗 تم إرسال الطلب لمدير التأجير');
+            }
+            
+            showNotificationMessage('تم إرسال الطلب بنجاح');
             setShowAssignModal(false);
             setSelectedLead(null);
             setSelectedUserId('');
-            fetchData();
+            fetchLeads();
             fetchStats();
         } catch (error) {
-            console.error('Error assigning lead:', error);
+            console.error('Error assigning:', error);
             toast.error('حدث خطأ');
         }
     };
-    
+
     const handleDeleteLead = async (leadId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا الطلب؟')) {
             try {
                 await adminAPI.deleteLead(leadId);
                 toast.success('✅ تم حذف الطلب بنجاح');
-                fetchData();
+                fetchLeads();
                 fetchStats();
             } catch (error) {
                 console.error('Error deleting lead:', error);
@@ -131,7 +314,7 @@ const GeneralManagerDashboard = () => {
             }
         }
     };
-    
+
     // =============================================
     // User Management
     // =============================================
@@ -144,15 +327,16 @@ const GeneralManagerDashboard = () => {
         try {
             await adminAPI.addUser(newUser);
             toast.success('✅ تم إضافة المستخدم بنجاح');
+            showNotificationMessage('تم إضافة مستخدم جديد');
             setShowUserModal(false);
             setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
             fetchUsers();
         } catch (error) {
             console.error('Error adding user:', error);
-            toast.error('❌ حدث خطأ');
+            toast.error('❌ حدث خطأ في إضافة المستخدم');
         }
     };
-    
+
     const handleDeleteUser = async (userId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟')) {
             try {
@@ -161,43 +345,88 @@ const GeneralManagerDashboard = () => {
                 fetchUsers();
             } catch (error) {
                 console.error('Error deleting user:', error);
-                toast.error('❌ حدث خطأ');
+                toast.error('❌ حدث خطأ في حذف المستخدم');
             }
         }
     };
-    
+
+    // =============================================
+    // Company Management
+    // =============================================
+    const handleAddCompany = async () => {
+        if (!newCompany.name || !newCompany.email) {
+            toast.error('يرجى إكمال الاسم والبريد الإلكتروني');
+            return;
+        }
+        
+        try {
+            await adminAPI.addCompany(newCompany);
+            toast.success('✅ تم إضافة الشركة بنجاح');
+            showNotificationMessage('تم إضافة شركة جديدة');
+            setShowCompanyModal(false);
+            setNewCompany({
+                name: '', email: '', phone: '', address: '', contact_person: '',
+                description: '', rating: 0, projects_count: 0, established_year: '',
+                license_number: '', website: '', logo: ''
+            });
+            fetchCompanies();
+        } catch (error) {
+            console.error('Error adding company:', error);
+            toast.error('❌ حدث خطأ في إضافة الشركة');
+        }
+    };
+
+    const handleDeleteCompany = async (companyId) => {
+        if (window.confirm('⚠️ هل أنت متأكد من حذف هذه الشركة؟')) {
+            try {
+                await adminAPI.deleteCompany(companyId);
+                toast.success('✅ تم حذف الشركة بنجاح');
+                fetchCompanies();
+            } catch (error) {
+                console.error('Error deleting company:', error);
+                toast.error('❌ حدث خطأ في حذف الشركة');
+            }
+        }
+    };
+
     // =============================================
     // Helpers
     // =============================================
+    const getProgressPercentage = (status) => {
+        const progress = {
+            pending: 10,
+            approved: 30,
+            contacted: 45,
+            sent_to_operations: 60,
+            assigned_to_company: 75,
+            financing_pending: 85,
+            completed: 100,
+            cancelled: 0
+        };
+        return progress[status] || 0;
+    };
+
     const getStatusBadge = (status) => {
         const badges = {
-            new: 'bg-yellow-100 text-yellow-800',
-            approved_by_admin: 'bg-blue-100 text-blue-800',
-            assigned_to_executive: 'bg-purple-100 text-purple-800',
-            assigned_to_call_center: 'bg-indigo-100 text-indigo-800',
-            documents_received: 'bg-cyan-100 text-cyan-800',
-            devis_ready: 'bg-orange-100 text-orange-800',
-            financing_pending: 'bg-pink-100 text-pink-800',
-            financing_approved: 'bg-green-100 text-green-800',
-            ready_for_installation: 'bg-teal-100 text-teal-800',
-            installation_completed: 'bg-emerald-100 text-emerald-800',
+            pending: 'bg-yellow-100 text-yellow-800',
+            approved: 'bg-blue-100 text-blue-800',
+            contacted: 'bg-purple-100 text-purple-800',
+            sent_to_operations: 'bg-indigo-100 text-indigo-800',
+            assigned_to_company: 'bg-pink-100 text-pink-800',
+            financing_pending: 'bg-orange-100 text-orange-800',
             completed: 'bg-green-100 text-green-800',
-            rejected: 'bg-red-100 text-red-800'
+            cancelled: 'bg-red-100 text-red-800'
         };
         
         const texts = {
-            new: 'جديد',
-            approved_by_admin: 'تمت الموافقة',
-            assigned_to_executive: 'مرسل لمدير تنفيذي',
-            assigned_to_call_center: 'مرسل لمركز الاتصال',
-            documents_received: 'تم استلام المستندات',
-            devis_ready: 'devis جاهز',
+            pending: 'قيد المراجعة',
+            approved: 'تمت الموافقة',
+            contacted: 'تم التواصل',
+            sent_to_operations: 'مرسل لعمليات',
+            assigned_to_company: 'مرسل لشركة',
             financing_pending: 'في انتظار التمويل',
-            financing_approved: 'تمت الموافقة المالية',
-            ready_for_installation: 'جاهز للتركيب',
-            installation_completed: 'تم التركيب',
             completed: 'مكتمل',
-            rejected: 'مرفوض'
+            cancelled: 'ملغي'
         };
         
         return (
@@ -206,7 +435,30 @@ const GeneralManagerDashboard = () => {
             </span>
         );
     };
-    
+
+    const getRoleIcon = (role) => {
+        switch(role) {
+            case 'executive_manager': return <FaUserTie className="text-green-600" />;
+            case 'call_center': return <FaHeadset className="text-indigo-600" />;
+            case 'bank_manager': return <FaUniversity className="text-pink-600" />;
+            case 'leasing_manager': return <FaCar className="text-teal-600" />;
+            default: return <FaUser className="text-gray-600" />;
+        }
+    };
+
+    const getRoleName = (role) => {
+        const roles = {
+            owner: 'مالك',
+            general_manager: 'مدير عام',
+            executive_manager: 'مدير تنفيذي',
+            operations_manager: 'مدير عمليات',
+            call_center: 'مركز اتصال',
+            bank_manager: 'مدير بنك',
+            leasing_manager: 'مدير تأجير'
+        };
+        return roles[role] || role;
+    };
+
     const getPropertyIcon = (type) => {
         switch(type) {
             case 'house': return <FaHome className="text-blue-500" />;
@@ -217,12 +469,29 @@ const GeneralManagerDashboard = () => {
             default: return <FaCity className="text-gray-400" />;
         }
     };
-    
+
     const formatCurrency = (amount) => {
         if (!amount && amount !== 0) return '0';
         return amount.toLocaleString();
     };
-    
+
+    const renderStars = (rating) => {
+        const stars = [];
+        const fullStars = Math.floor(rating || 0);
+        for (let i = 0; i < fullStars; i++) {
+            stars.push(<FaStar key={i} className="text-yellow-500" />);
+        }
+        return stars;
+    };
+
+    // حساب الإحصائيات المتقدمة
+    const advancedStats = {
+        totalLeads: filteredLeads.length,
+        hotLeads: filteredLeads.filter(l => isHotLead(l)).length,
+        avgSystemSize: (filteredLeads.reduce((acc, l) => acc + (l.required_kw || 0), 0) / filteredLeads.length || 0).toFixed(1),
+        conversionRate: ((filteredLeads.filter(l => l.status === 'completed').length / filteredLeads.length) * 100 || 0).toFixed(0)
+    };
+
     // =============================================
     // Render
     // =============================================
@@ -233,9 +502,16 @@ const GeneralManagerDashboard = () => {
             </div>
         );
     }
-    
+
     return (
         <div className="min-h-screen bg-gray-100">
+            {/* Notification */}
+            {showNotification && (
+                <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-pulse">
+                    <FaBell className="inline ml-2" /> {notificationMessage}
+                </div>
+            )}
+            
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-green-700 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-6">
@@ -245,20 +521,26 @@ const GeneralManagerDashboard = () => {
                                 <FaUsers className="text-yellow-300" />
                                 لوحة تحكم المدير العام
                             </h1>
-                            <p className="text-green-100 mt-1">إدارة الطلبات والمستخدمين وإحصائيات المنصة</p>
+                            <p className="text-green-100 mt-1">إدارة الطلبات والمستخدمين والشركات والإحصائيات</p>
                         </div>
                         <div className="flex gap-2 mt-3 sm:mt-0">
                             <button
-                                onClick={() => { setActiveTab('leads'); setFilter('all'); }}
+                                onClick={() => { setActiveTab('leads'); setFilter('all'); setSearchTerm(''); setCityFilter('all'); setPriorityFilter('all'); }}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'leads' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
                             >
                                 الطلبات
                             </button>
                             <button
-                                onClick={() => setActiveTab('users')}
+                                onClick={() => { setActiveTab('users'); setSearchTerm(''); }}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'users' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
                             >
                                 المستخدمين
+                            </button>
+                            <button
+                                onClick={() => { setActiveTab('companies'); setSearchTerm(''); }}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'companies' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+                            >
+                                الشركات
                             </button>
                             <button
                                 onClick={() => setActiveTab('stats')}
@@ -270,48 +552,145 @@ const GeneralManagerDashboard = () => {
                     </div>
                 </div>
             </div>
-            
-            {/* Stats Cards (Always visible) */}
-            {stats && activeTab !== 'stats' && (
+
+            {/* Advanced Stats Cards */}
+            {activeTab === 'leads' && (
                 <div className="max-w-7xl mx-auto px-4 py-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-white rounded-lg shadow p-4">
-                            <div className="text-2xl font-bold text-blue-600">{stats.total || 0}</div>
-                            <div className="text-sm text-gray-500">إجمالي الطلبات</div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">إجمالي الطلبات</p>
+                                    <p className="text-2xl font-bold text-blue-600">{advancedStats.totalLeads}</p>
+                                </div>
+                                <div className="bg-blue-100 p-3 rounded-full">
+                                    <FaChartLine className="text-blue-600" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="bg-white rounded-lg shadow p-4">
-                            <div className="text-2xl font-bold text-yellow-600">{stats.new || 0}</div>
-                            <div className="text-sm text-gray-500">جديدة</div>
+                        
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">طلبات ساخنة 🔥</p>
+                                    <p className="text-2xl font-bold text-red-600">{advancedStats.hotLeads}</p>
+                                </div>
+                                <div className="bg-red-100 p-3 rounded-full">
+                                    <FaFire className="text-red-600" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="bg-white rounded-lg shadow p-4">
-                            <div className="text-2xl font-bold text-green-600">{stats.completed || 0}</div>
-                            <div className="text-sm text-gray-500">مكتملة</div>
+                        
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">متوسط القدرة</p>
+                                    <p className="text-2xl font-bold text-orange-600">{advancedStats.avgSystemSize} kWp</p>
+                                </div>
+                                <div className="bg-orange-100 p-3 rounded-full">
+                                    <FaBolt className="text-orange-600" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="bg-white rounded-lg shadow p-4">
-                            <div className="text-2xl font-bold text-purple-600">{formatCurrency(stats.total_commission)} دينار</div>
-                            <div className="text-sm text-gray-500">الأرباح المتوقعة</div>
+                        
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">نسبة التحويل</p>
+                                    <p className="text-2xl font-bold text-purple-600">{advancedStats.conversionRate}%</p>
+                                </div>
+                                <div className="bg-purple-100 p-3 rounded-full">
+                                    <FaTrophy className="text-purple-600" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">الأرباح المتوقعة</p>
+                                    <p className="text-2xl font-bold text-green-600">{formatCurrency(stats?.total_commission)} دينار</p>
+                                </div>
+                                <div className="bg-green-100 p-3 rounded-full">
+                                    <FaMoneyBillWave className="text-green-600" />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
-            
+
             {/* ============================================= */}
             {/* TAB 1: LEADS */}
             {/* ============================================= */}
             {activeTab === 'leads' && (
                 <div className="max-w-7xl mx-auto px-4">
-                    {/* Filters */}
-                    <div className="flex flex-wrap gap-2 mb-6">
-                        <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'all' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 border'}`}>الكل</button>
-                        <button onClick={() => setFilter('new')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'new' ? 'bg-yellow-600 text-white' : 'bg-white text-gray-700 border'}`}>جديدة</button>
-                        <button onClick={() => setFilter('assigned_to_executive')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'assigned_to_executive' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 border'}`}>مرسل لمدير تنفيذي</button>
-                        <button onClick={() => setFilter('assigned_to_call_center')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'assigned_to_call_center' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'}`}>مرسل لمركز الاتصال</button>
-                        <button onClick={() => setFilter('devis_ready')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'devis_ready' ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 border'}`}>devis جاهز</button>
-                        <button onClick={() => setFilter('financing_pending')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'financing_pending' ? 'bg-pink-600 text-white' : 'bg-white text-gray-700 border'}`}>في انتظار التمويل</button>
-                        <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'completed' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 border'}`}>مكتملة</button>
-                        <button onClick={() => setFilter('rejected')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'rejected' ? 'bg-red-600 text-white' : 'bg-white text-gray-700 border'}`}>مرفوضة</button>
+                    {/* Search and Filters */}
+                    <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {/* Search */}
+                            <div className="relative">
+                                <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="🔍 بحث بالاسم / الهاتف / المدينة..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                            </div>
+                            
+                            {/* City Filter */}
+                            <div className="relative">
+                                <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
+                                <select
+                                    value={cityFilter}
+                                    onChange={(e) => setCityFilter(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                                >
+                                    <option value="all">جميع المدن</option>
+                                    {cities.map(city => (
+                                        <option key={city} value={city}>{city}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            {/* Priority Filter */}
+                            <div className="relative">
+                                <FaFire className="absolute right-3 top-3 text-gray-400" />
+                                <select
+                                    value={priorityFilter}
+                                    onChange={(e) => setPriorityFilter(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                                >
+                                    <option value="all">جميع الأولويات</option>
+                                    <option value="high">🔴 أولوية عالية</option>
+                                    <option value="medium">🟡 أولوية متوسطة</option>
+                                    <option value="low">🟢 أولوية منخفضة</option>
+                                </select>
+                            </div>
+                            
+                            {/* Status Filter */}
+                            <div className="relative">
+                                <FaFilter className="absolute right-3 top-3 text-gray-400" />
+                                <select
+                                    value={filter}
+                                    onChange={(e) => setFilter(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                                >
+                                    <option value="all">جميع الحالات</option>
+                                    <option value="pending">قيد المراجعة</option>
+                                    <option value="approved">موافق عليها</option>
+                                    <option value="contacted">تم التواصل</option>
+                                    <option value="sent_to_operations">مرسل لعمليات</option>
+                                    <option value="assigned_to_company">مرسل لشركة</option>
+                                    <option value="completed">مكتملة</option>
+                                    <option value="cancelled">ملغية</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    
+
                     {/* Leads Table */}
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="overflow-x-auto">
@@ -322,56 +701,85 @@ const GeneralManagerDashboard = () => {
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المدينة</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الفاتورة</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">القدرة</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">السعر</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">العمولة</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">طريقة الدفع</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأولوية</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">التقدم</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {leads.length === 0 ? (
+                                    {filteredLeads.length === 0 ? (
                                         <tr>
-                                            <td colSpan="9" className="px-4 py-8 text-center text-gray-500">لا توجد طلبات</td>
+                                            <td colSpan="8" className="px-4 py-8 text-center text-gray-500">لا توجد طلبات</td>
                                         </tr>
                                     ) : (
-                                        leads.map((lead) => (
+                                        filteredLeads.map((lead) => {
+                                            const priority = getLeadPriority(lead);
+                                            const hot = isHotLead(lead);
+                                            const progress = getProgressPercentage(lead.status);
+                                            return (
                                             <tr key={lead.id} className="hover:bg-gray-50">
                                                 <td className="px-4 py-3">
-                                                    <div className="font-medium text-gray-900">{lead.name}</div>
+                                                    <div className="font-medium text-gray-900 flex items-center gap-2">
+                                                        {lead.name}
+                                                        {hot && (
+                                                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                                <FaFire className="text-xs" /> HOT
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-sm text-gray-500">{lead.phone}</div>
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap">{lead.bill_value} دينار</td>
-                                                <td className="px-4 py-3 whitespace-nowrap">{lead.recommended_system} kW</td>
-                                                <td className="px-4 py-3 whitespace-nowrap">{formatCurrency(lead.estimated_price)} دينار</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
-                                                    <span className="text-green-600 font-semibold">{formatCurrency(lead.commission)} دينار</span>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                        priority.level === 'high' ? 'bg-red-100 text-red-800' :
+                                                        priority.level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-green-100 text-green-800'
+                                                    }`}>
+                                                        {priority.level === 'high' && '🔴 عالية'}
+                                                        {priority.level === 'medium' && '🟡 متوسطة'}
+                                                        {priority.level === 'low' && '🟢 منخفضة'}
+                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
-                                                    {lead.payment_method === 'cash' ? 'نقدي' : 
-                                                     lead.payment_method === 'steg' ? 'STEG' : 
-                                                     lead.payment_method === 'prosol' ? 'PROSOL' : 
-                                                     lead.payment_method === 'bank' ? 'بنكي' : 
-                                                     lead.payment_method === 'leasing' ? 'Leasing' : lead.payment_method}
+                                                    <div className="w-24">
+                                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                            <span>{progress}%</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                            <div 
+                                                                className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                                                                style={{ width: `${progress}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex gap-2">
-                                                        {lead.status === 'new' && (
+                                                        {lead.status === 'pending' && (
                                                             <>
                                                                 <button onClick={() => handleApprove(lead.id)} className="text-green-600 hover:text-green-800 p-1" title="موافقة"><FaCheck size={18} /></button>
-                                                                <button onClick={() => handleReject(lead.id)} className="text-red-600 hover:text-red-800 p-1" title="رفض"><FaTimes size={18} /></button>
+                                                                <button onClick={() => { setSelectedLead(lead); setShowRejectModal(true); }} className="text-red-600 hover:text-red-800 p-1" title="رفض"><FaTimes size={18} /></button>
                                                             </>
                                                         )}
-                                                        {lead.status === 'approved_by_admin' && (
-                                                            <button onClick={() => { setSelectedLead(lead); setShowAssignModal(true); }} className="text-blue-600 hover:text-blue-800 p-1" title="تعيين"><FaPaperPlane size={18} /></button>
+                                                        {lead.status === 'approved' && (
+                                                            <>
+                                                                <button onClick={() => { setSelectedLead(lead); setAssignType('executive'); setShowAssignModal(true); }} className="text-purple-600 hover:text-purple-800 p-1" title="إرسال لمدير تنفيذي"><FaUserTie size={18} /></button>
+                                                                <button onClick={() => { setSelectedLead(lead); setAssignType('callcenter'); setShowAssignModal(true); }} className="text-indigo-600 hover:text-indigo-800 p-1" title="إرسال لمركز الاتصال"><FaHeadset size={18} /></button>
+                                                                <button onClick={() => { setSelectedLead(lead); setAssignType('bank'); setShowAssignModal(true); }} className="text-pink-600 hover:text-pink-800 p-1" title="إرسال لمدير بنك"><FaUniversity size={18} /></button>
+                                                                <button onClick={() => { setSelectedLead(lead); setAssignType('leasing'); setShowAssignModal(true); }} className="text-teal-600 hover:text-teal-800 p-1" title="إرسال لمدير تأجير"><FaCar size={18} /></button>
+                                                            </>
                                                         )}
                                                         <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -379,19 +787,32 @@ const GeneralManagerDashboard = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* ============================================= */}
-            {/* TAB 2: USERS */}
+            {/* TAB 2: USERS MANAGEMENT */}
             {/* ============================================= */}
             {activeTab === 'users' && (
                 <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex justify-end mb-4">
-                        <button
-                            onClick={() => setShowUserModal(true)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-                        >
-                            <FaUserPlus /> إضافة مستخدم جديد
-                        </button>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-gray-800">إدارة المستخدمين</h2>
+                        <div className="flex gap-3">
+                            <div className="relative">
+                                <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="🔍 بحث بالاسم / البريد / الهاتف..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-64 pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setShowUserModal(true)}
+                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                            >
+                                <FaUserPlus /> إضافة مستخدم جديد
+                            </button>
+                        </div>
                     </div>
                     
                     <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -403,31 +824,38 @@ const GeneralManagerDashboard = () => {
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">البريد الإلكتروني</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الدور</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الهاتف</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">تاريخ التسجيل</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {users.length === 0 ? (
+                                    {filteredUsers.length === 0 ? (
                                         <tr>
                                             <td colSpan="6" className="px-4 py-8 text-center text-gray-500">لا يوجد مستخدمين</td>
                                         </tr>
                                     ) : (
-                                        users.map((user) => (
+                                        filteredUsers.map((user) => (
                                             <tr key={user.id} className="hover:bg-gray-50">
                                                 <td className="px-4 py-3">{user.name}</td>
                                                 <td className="px-4 py-3">{user.email}</td>
-                                                <td className="px-4 py-3">
-                                                    {user.role === 'owner' ? 'مالك' :
-                                                     user.role === 'general_manager' ? 'مدير عام' :
-                                                     user.role === 'executive_manager' ? 'مدير تنفيذي' :
-                                                     user.role === 'operations_manager' ? 'مدير عمليات' :
-                                                     user.role === 'call_center' ? 'مركز اتصال' : user.role}
+                                                <td className="px-4 py-3 flex items-center gap-2">
+                                                    {getRoleIcon(user.role)}
+                                                    {getRoleName(user.role)}
                                                 </td>
                                                 <td className="px-4 py-3">{user.phone || '-'}</td>
-                                                <td className="px-4 py-3">{new Date(user.created_at).toLocaleDateString('ar-TN')}</td>
                                                 <td className="px-4 py-3">
-                                                    <button onClick={() => handleDeleteUser(user.id)} className="text-red-600 hover:text-red-800 p-1" title="حذف"><FaTrash size={18} /></button>
+                                                    <span className={`px-2 py-1 rounded-full text-xs ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {user.is_active ? 'نشط' : 'غير نشط'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <button
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="text-red-600 hover:text-red-800 p-1"
+                                                        title="حذف"
+                                                    >
+                                                        <FaTrash size={18} />
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))
@@ -438,9 +866,106 @@ const GeneralManagerDashboard = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* ============================================= */}
-            {/* TAB 3: STATS */}
+            {/* TAB 3: COMPANIES MANAGEMENT */}
+            {/* ============================================= */}
+            {activeTab === 'companies' && (
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-gray-800">إدارة الشركات الشريكة</h2>
+                        <div className="flex gap-3">
+                            <div className="relative">
+                                <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="🔍 بحث باسم الشركة..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-64 pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setShowCompanyModal(true)}
+                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                            >
+                                <FaCompany /> إضافة شركة جديدة
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredCompanies.length === 0 ? (
+                            <div className="col-span-3 bg-white rounded-lg shadow p-12 text-center">
+                                <FaCompany className="text-6xl text-gray-300 mx-auto mb-4" />
+                                <p className="text-gray-500">لا توجد شركات</p>
+                                <p className="text-gray-400 text-sm">أضف شركات شريكة جديدة</p>
+                            </div>
+                        ) : (
+                            filteredCompanies.map((company) => (
+                                <div key={company.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition">
+                                    {company.logo && (
+                                        <div className="h-32 overflow-hidden bg-gray-100 flex items-center justify-center">
+                                            <img 
+                                                src={company.logo} 
+                                                alt={company.name}
+                                                className="h-full w-full object-cover"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(company.name);
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="p-4">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="font-bold text-lg text-gray-800">{company.name}</h3>
+                                            <div className="flex items-center gap-1">
+                                                {renderStars(company.rating)}
+                                                <span className="text-xs text-gray-500">({company.rating || 0})</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                                            {company.description || 'شركة متخصصة في تركيب أنظمة الطاقة الشمسية'}
+                                        </p>
+                                        <div className="space-y-1 text-sm">
+                                            <div className="flex items-center gap-2 text-gray-500">
+                                                <FaPhone className="text-green-500 text-xs" />
+                                                <span dir="ltr">{company.phone || 'غير متوفر'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-gray-500">
+                                                <FaEnvelope className="text-blue-500 text-xs" />
+                                                <span className="truncate">{company.email}</span>
+                                            </div>
+                                            {company.website && (
+                                                <div className="flex items-center gap-2 text-gray-500">
+                                                    <FaGlobe className="text-purple-500 text-xs" />
+                                                    <span className="truncate">{company.website}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex justify-between items-center mt-3 pt-3 border-t">
+                                            <span className="text-sm text-gray-500">
+                                                <strong>{company.projects_count || 0}</strong> مشروع
+                                            </span>
+                                            <button
+                                                onClick={() => handleDeleteCompany(company.id)}
+                                                className="text-red-500 hover:text-red-700 p-1"
+                                                title="حذف"
+                                            >
+                                                <FaTrash size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================= */}
+            {/* TAB 4: STATS */}
             {/* ============================================= */}
             {activeTab === 'stats' && stats && (
                 <div className="max-w-7xl mx-auto px-4">
@@ -458,34 +983,20 @@ const GeneralManagerDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* إحصائيات حسب طريقة الدفع */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaMoneyBillWave /> طريقة الدفع</h3>
-                            <div className="space-y-2">
-                                {stats.byPayment?.map((payment) => (
-                                    <div key={payment.payment_method} className="flex justify-between items-center">
-                                        <span>{payment.payment_method === 'cash' ? 'نقدي' : 
-                                                payment.payment_method === 'steg' ? 'STEG' : 
-                                                payment.payment_method === 'prosol' ? 'PROSOL' : 
-                                                payment.payment_method === 'bank' ? 'بنكي' : 
-                                                payment.payment_method === 'leasing' ? 'Leasing' : payment.payment_method}</span>
-                                        <span className="font-bold">{payment.count} طلب</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        
                         {/* إحصائيات حسب نوع العقار */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaBuilding /> نوع العقار</h3>
                             <div className="space-y-2">
                                 {stats.byProperty?.map((prop) => (
                                     <div key={prop.property_type} className="flex justify-between items-center">
-                                        <span>{prop.property_type === 'house' ? 'منزل' : 
-                                                prop.property_type === 'apartment' ? 'شقة' : 
-                                                prop.property_type === 'farm' ? 'مزرعة' : 
-                                                prop.property_type === 'commercial' ? 'محل تجاري' : 
-                                                prop.property_type === 'factory' ? 'مصنع' : prop.property_type}</span>
+                                        <span className="flex items-center gap-1">
+                                            {getPropertyIcon(prop.property_type)}
+                                            {prop.property_type === 'house' ? 'منزل' :
+                                             prop.property_type === 'apartment' ? 'شقة' :
+                                             prop.property_type === 'farm' ? 'مزرعة' :
+                                             prop.property_type === 'commercial' ? 'محل تجاري' :
+                                             prop.property_type === 'factory' ? 'مصنع' : prop.property_type}
+                                        </span>
                                         <span className="font-bold">{prop.count} طلب</span>
                                     </div>
                                 ))}
@@ -501,26 +1012,68 @@ const GeneralManagerDashboard = () => {
                                     <span className="font-bold text-green-600">{formatCurrency(stats.total_commission)} دينار</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span>إجمالي قيمة الطلبات:</span>
-                                    <span className="font-bold">{formatCurrency(stats.total_value)} دينار</span>
-                                </div>
-                                <div className="flex justify-between items-center">
                                     <span>إجمالي القدرة (kW):</span>
                                     <span className="font-bold">{stats.total_kw} kW</span>
                                 </div>
                             </div>
                         </div>
+                        
+                        {/* الإحصائيات الشهرية */}
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaCalendarAlt /> الطلبات الشهرية</h3>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {stats.byMonth?.map((month) => (
+                                    <div key={month.month} className="flex justify-between items-center">
+                                        <span>{month.month}</span>
+                                        <span className="font-bold">{month.count} طلب</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
-            
+
+            {/* ============================================= */}
+            {/* Reject Modal */}
+            {/* ============================================= */}
+            {showRejectModal && selectedLead && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-600">
+                            <FaTimesCircle /> رفض الطلب
+                        </h3>
+                        <p className="text-gray-600 mb-4">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
+                        
+                        <label className="block text-gray-700 mb-2">سبب الرفض:</label>
+                        <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            rows="3"
+                            placeholder="أدخل سبب الرفض..."
+                        />
+                        
+                        <div className="flex gap-3">
+                            <button onClick={handleReject} className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">تأكيد الرفض</button>
+                            <button onClick={() => { setShowRejectModal(false); setSelectedLead(null); setRejectReason(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ============================================= */}
             {/* Assign Modal */}
             {/* ============================================= */}
             {showAssignModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold mb-4">📨 تعيين الطلب</h3>
+                        <h3 className="text-xl font-bold mb-4">
+                            {assignType === 'executive' && '📨 إرسال الطلب لمدير تنفيذي'}
+                            {assignType === 'callcenter' && '📞 إرسال الطلب لمركز الاتصال'}
+                            {assignType === 'bank' && '🏦 إرسال الطلب لمدير بنك'}
+                            {assignType === 'leasing' && '🚗 إرسال الطلب لمدير تأجير'}
+                        </h3>
                         <p className="text-gray-600 mb-4">العميل: <span className="font-semibold">{selectedLead?.name}</span></p>
                         
                         <label className="block text-gray-700 mb-2">اختر المستخدم:</label>
@@ -529,62 +1082,276 @@ const GeneralManagerDashboard = () => {
                             className="w-full px-4 py-2 border rounded-lg mb-4"
                             value={selectedUserId}
                         >
-                            <option value="">-- اختر مستخدم --</option>
-                            {users.filter(u => u.role === 'executive_manager' || u.role === 'call_center').map((user) => (
-                                <option key={user.id} value={user.id}>
-                                    {user.name} - {user.role === 'executive_manager' ? 'مدير تنفيذي' : 'مركز اتصال'}
-                                </option>
-                            ))}
+                            <option value="">-- اختر --</option>
+                            {users
+                                .filter(u => {
+                                    if (assignType === 'executive') return u.role === 'executive_manager';
+                                    if (assignType === 'callcenter') return u.role === 'call_center';
+                                    if (assignType === 'bank') return u.role === 'bank_manager';
+                                    if (assignType === 'leasing') return u.role === 'leasing_manager';
+                                    return false;
+                                })
+                                .map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name} - {user.phone || 'لا يوجد هاتف'} ({user.email})
+                                    </option>
+                                ))}
                         </select>
                         
                         <div className="flex gap-3">
-                            <button onClick={handleAssign} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">تعيين</button>
+                            <button onClick={handleAssign} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">إرسال</button>
                             <button onClick={() => { setShowAssignModal(false); setSelectedLead(null); setSelectedUserId(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
                         </div>
                     </div>
                 </div>
             )}
-            
+
             {/* ============================================= */}
             {/* Add User Modal */}
             {/* ============================================= */}
             {showUserModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold mb-4">➕ إضافة مستخدم جديد</h3>
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <FaUserPlus className="text-green-600" /> إضافة مستخدم جديد
+                        </h3>
                         
                         <div className="space-y-3">
                             <div>
-                                <label className="block text-gray-700 mb-1">الاسم *</label>
-                                <input type="text" value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                <label className="block text-gray-700 mb-1">الاسم الكامل *</label>
+                                <input
+                                    type="text"
+                                    value={newUser.name}
+                                    onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="أدخل الاسم"
+                                />
                             </div>
+                            
                             <div>
                                 <label className="block text-gray-700 mb-1">البريد الإلكتروني *</label>
-                                <input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                <input
+                                    type="email"
+                                    value={newUser.email}
+                                    onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="example@shamsi.tn"
+                                />
                             </div>
+                            
                             <div>
                                 <label className="block text-gray-700 mb-1">كلمة المرور *</label>
-                                <input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                <input
+                                    type="password"
+                                    value={newUser.password}
+                                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="********"
+                                />
                             </div>
+                            
                             <div>
                                 <label className="block text-gray-700 mb-1">الدور</label>
-                                <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} className="w-full px-3 py-2 border rounded-lg">
-                                    <option value="owner">مالك</option>
-                                    <option value="general_manager">مدير عام</option>
+                                <select
+                                    value={newUser.role}
+                                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                >
                                     <option value="executive_manager">مدير تنفيذي</option>
-                                    <option value="operations_manager">مدير عمليات</option>
                                     <option value="call_center">مركز اتصال</option>
+                                    <option value="bank_manager">مدير بنك</option>
+                                    <option value="leasing_manager">مدير تأجير</option>
+                                    <option value="operations_manager">مدير عمليات</option>
+                                    <option value="general_manager">مدير عام</option>
                                 </select>
                             </div>
+                            
                             <div>
                                 <label className="block text-gray-700 mb-1">رقم الهاتف (اختياري)</label>
-                                <input type="tel" value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                <input
+                                    type="tel"
+                                    value={newUser.phone}
+                                    onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="أدخل رقم الهاتف"
+                                />
                             </div>
                         </div>
                         
                         <div className="flex gap-3 mt-6">
-                            <button onClick={handleAddUser} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">إضافة</button>
-                            <button onClick={() => setShowUserModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
+                            <button
+                                onClick={handleAddUser}
+                                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                            >
+                                إضافة
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowUserModal(false);
+                                    setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
+                                }}
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                            >
+                                إلغاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================= */}
+            {/* Add Company Modal */}
+            {/* ============================================= */}
+            {showCompanyModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <FaCompany className="text-green-600" /> إضافة شركة جديدة
+                        </h3>
+                        
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-gray-700 mb-1">اسم الشركة *</label>
+                                <input
+                                    type="text"
+                                    value={newCompany.name}
+                                    onChange={(e) => setNewCompany({...newCompany, name: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="أدخل اسم الشركة"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">البريد الإلكتروني *</label>
+                                <input
+                                    type="email"
+                                    value={newCompany.email}
+                                    onChange={(e) => setNewCompany({...newCompany, email: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="company@example.com"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">رقم الهاتف</label>
+                                <input
+                                    type="tel"
+                                    value={newCompany.phone}
+                                    onChange={(e) => setNewCompany({...newCompany, phone: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="أدخل رقم الهاتف"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">العنوان</label>
+                                <input
+                                    type="text"
+                                    value={newCompany.address}
+                                    onChange={(e) => setNewCompany({...newCompany, address: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="أدخل العنوان"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">شخص الاتصال</label>
+                                <input
+                                    type="text"
+                                    value={newCompany.contact_person}
+                                    onChange={(e) => setNewCompany({...newCompany, contact_person: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="اسم الشخص المسؤول"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">الوصف</label>
+                                <textarea
+                                    value={newCompany.description}
+                                    onChange={(e) => setNewCompany({...newCompany, description: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    rows="3"
+                                    placeholder="وصف الشركة وخدماتها"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">عدد المشاريع المنجزة</label>
+                                <input
+                                    type="number"
+                                    value={newCompany.projects_count}
+                                    onChange={(e) => setNewCompany({...newCompany, projects_count: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="مثال: 120"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">سنة التأسيس</label>
+                                <input
+                                    type="number"
+                                    value={newCompany.established_year}
+                                    onChange={(e) => setNewCompany({...newCompany, established_year: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="مثال: 2015"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">رقم الترخيص</label>
+                                <input
+                                    type="text"
+                                    value={newCompany.license_number}
+                                    onChange={(e) => setNewCompany({...newCompany, license_number: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="رقم الترخيص المهني"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">الموقع الإلكتروني</label>
+                                <input
+                                    type="text"
+                                    value={newCompany.website}
+                                    onChange={(e) => setNewCompany({...newCompany, website: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="www.company.com"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-gray-700 mb-1">رابط الشعار (logo)</label>
+                                <input
+                                    type="text"
+                                    value={newCompany.logo}
+                                    onChange={(e) => setNewCompany({...newCompany, logo: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                    placeholder="https://example.com/logo.png"
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={handleAddCompany}
+                                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                            >
+                                إضافة
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowCompanyModal(false);
+                                    setNewCompany({
+                                        name: '', email: '', phone: '', address: '', contact_person: '',
+                                        description: '', rating: 0, projects_count: 0, established_year: '',
+                                        license_number: '', website: '', logo: ''
+                                    });
+                                }}
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                            >
+                                إلغاء
+                            </button>
                         </div>
                     </div>
                 </div>

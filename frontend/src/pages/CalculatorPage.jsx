@@ -5,11 +5,15 @@ import {
     FaSun, FaHome, FaBuilding, FaIndustry, FaTractor, FaStore,
     FaRuler, FaMoneyBillWave, 
     FaArrowLeft, FaWhatsapp, FaBolt,
-    FaUser, FaPhone, FaMapMarkerAlt, FaPlug, FaCalculator,
-    FaPaperPlane, FaCalendarAlt, FaLeaf, FaIdCard
+    FaUser, FaPhone, FaMapMarkerAlt, FaCalculator,
+    FaCalendarAlt, FaLeaf, FaIdCard, FaClock,
+    FaInfoCircle, FaUniversity, FaHandHoldingHeart, FaSolarPanel,
+    FaPaperPlane
 } from 'react-icons/fa';
 
+// ============================================
 // قائمة الولايات التونسية
+// ============================================
 const tunisianCities = [
     'تونس', 'أريانة', 'بن عروس', 'منوبة', 'نابل', 'بنزرت', 'باجة', 'جندوبة',
     'الكاف', 'سليانة', 'زغوان', 'سوسة', 'المنستير', 'المهدية', 'القيروان',
@@ -17,88 +21,186 @@ const tunisianCities = [
     'توزر', 'قفصة'
 ];
 
+// ============================================
+// قائمة البنوك المتعاقدة مع PROSOL
+// ============================================
+const prosolBanks = [
+    { id: 1, name: 'بنك الزيتونة', logo: '🏦' },
+    { id: 2, name: 'التجاري بنك', logo: '🏦' },
+    { id: 3, name: 'البنك الوطني الفلاحي', logo: '🌾' },
+    { id: 4, name: 'البنك التونسي للتضامن', logo: '🤝' },
+    { id: 5, name: 'البنك التونسي', logo: '🏦' },
+    { id: 6, name: 'البنك العربي الدولي لتونس', logo: '🌍' }
+];
+
+// ============================================
+// أنواع الألواح المتوفرة في تونس
+// ============================================
+const panelTypes = {
+    residential: [
+        { value: 'jinko_445', name: 'Jinko Tiger Neo 445W', power: 0.445, brand: 'Jinko', use: 'منازل - محلات' },
+        { value: 'jinko_480', name: 'Jinko Tiger Neo 480W', power: 0.480, brand: 'Jinko', use: 'منازل - محلات' },
+        { value: 'longi_475', name: 'LONGi Hi-MO 5 475W', power: 0.475, brand: 'LONGi', use: 'منازل - محلات' },
+        { value: 'longi_550', name: 'LONGi Hi-MO 5 550W', power: 0.550, brand: 'LONGi', use: 'منازل - محلات' },
+        { value: 'canadian_475', name: 'Canadian Solar 475W', power: 0.475, brand: 'Canadian Solar', use: 'منازل - محلات' }
+    ],
+    agricultural: [
+        { value: 'jinko_620', name: 'Jinko Tiger Neo 620W', power: 0.620, brand: 'Jinko', use: 'مضخات زراعية - مزارع' },
+        { value: 'jinko_650', name: 'Jinko Tiger Neo 650W', power: 0.650, brand: 'Jinko', use: 'مضخات زراعية - مزارع' },
+        { value: 'jinko_715', name: 'Jinko Tiger Neo 715W', power: 0.715, brand: 'Jinko', use: 'مضخات زراعية - مزارع' },
+        { value: 'longi_650', name: 'LONGi Hi-MO 6 650W', power: 0.650, brand: 'LONGi', use: 'مضخات زراعية - مزارع' },
+        { value: 'longi_715', name: 'LONGi Hi-MO 6 715W', power: 0.715, brand: 'LONGi', use: 'مضخات زراعية - مزارع' }
+    ]
+};
+
+// ============================================
 // أنواع العقار
+// ============================================
 const propertyTypes = [
-    { value: 'house', label: 'منزل', icon: FaHome, desc: 'دار مستقلة' },
-    { value: 'apartment', label: 'شقة', icon: FaBuilding, desc: 'في عمارة' },
-    { value: 'farm', label: 'مزرعة', icon: FaTractor, desc: 'أرض فلاحية' },
-    { value: 'commercial', label: 'محل تجاري', icon: FaStore, desc: 'محل / مكتب' },
-    { value: 'factory', label: 'مصنع', icon: FaIndustry, desc: 'منشأة صناعية' }
+    { value: 'house', label: 'منزل', icon: FaHome, desc: 'دار مستقلة', period: 60, type: 'residential', panelCategory: 'residential' },
+    { value: 'apartment', label: 'شقة', icon: FaBuilding, desc: 'في عمارة', period: 60, type: 'residential', panelCategory: 'residential' },
+    { value: 'farm', label: 'مزرعة', icon: FaTractor, desc: 'أرض فلاحية', period: 60, type: 'agricultural', panelCategory: 'agricultural' },
+    { value: 'commercial', label: 'محل تجاري', icon: FaStore, desc: 'محل / مكتب', period: 30, type: 'commercial', panelCategory: 'residential' },
+    { value: 'factory', label: 'مصنع', icon: FaIndustry, desc: 'منشأة صناعية', period: 30, type: 'commercial', panelCategory: 'residential' }
 ];
 
-// فترة الفاتورة
-const billPeriods = [
-    { value: 30, label: 'فاتورة شهرية (30 يوم)', desc: 'للمحلات والمصانع' },
-    { value: 60, label: 'فاتورة كل شهرين (60 يوم)', desc: 'للمنازل والشقق والمزارع' }
-];
-
+// ============================================
 // مواسم الفاتورة
+// ============================================
 const billSeasons = [
-    { value: 'summer', label: 'صيف (جوان - أوت)', desc: 'استهلاك مرتفع بسبب التكييف', factor: 1.25 },
-    { value: 'winter', label: 'شتاء (نوفمبر - مارس)', desc: 'استهلاك مرتفع بسبب التدفئة', factor: 1.10 },
-    { value: 'spring', label: 'ربيع (أفريل - ماي)', desc: 'استهلاك معتدل', factor: 1.00 },
-    { value: 'autumn', label: 'خريف (سبتمبر - أكتوبر)', desc: 'استهلاك معتدل', factor: 1.00 }
+    { value: 'spring', label: 'الربيع', months: 'أفريل - ماي', icon: '🌸', desc: 'استهلاك معتدل', factor: 1.00 },
+    { value: 'summer', label: 'الصيف', months: 'جوان - أوت', icon: '☀️', desc: 'استهلاك مرتفع (تكييف)', factor: 1.25 },
+    { value: 'autumn', label: 'الخريف', months: 'سبتمبر - أكتوبر', icon: '🍂', desc: 'استهلاك معتدل', factor: 1.00 },
+    { value: 'winter', label: 'الشتاء', months: 'نوفمبر - مارس', icon: '❄️', desc: 'استهلاك مرتفع (تدفئة)', factor: 1.10 }
 ];
 
+// ============================================
+// بيانات الإشعاع الشمسي حسب الولاية
+// ============================================
+const solarRadiation = {
+    'تونس': 4.8, 'أريانة': 4.8, 'بن عروس': 4.8, 'منوبة': 4.8,
+    'نابل': 5.0, 'بنزرت': 4.7, 'باجة': 4.6, 'جندوبة': 4.5,
+    'الكاف': 4.6, 'سليانة': 4.7, 'زغوان': 4.8, 'سوسة': 5.0,
+    'المنستير': 5.0, 'المهدية': 5.1, 'القيروان': 5.2, 'سيدي بوزيد': 5.3,
+    'القصرين': 5.1, 'صفاقس': 5.3, 'قابس': 5.5, 'مدنين': 5.6,
+    'تطاوين': 5.7, 'قبلي': 5.8, 'توزر': 5.7, 'قفصة': 5.4
+};
+
+// ============================================
+// شرائح الكهرباء STEG
+// ============================================
+const electricityTiers = [
+    { max: 100, rate: 0.181, name: 'الشريحة الأولى (0-100 kWh)' },
+    { max: 300, rate: 0.223, name: 'الشريحة الثانية (101-300 kWh)' },
+    { max: 500, rate: 0.338, name: 'الشريحة الثالثة (301-500 kWh)' },
+    { max: Infinity, rate: 0.419, name: 'الشريحة الرابعة (501+ kWh)' }
+];
+
+// ============================================
+// حساب الاستهلاك من الفاتورة حسب شرائح STEG
+// ============================================
+const calculateConsumption = (billAmount) => {
+    let remaining = billAmount;
+    let totalKwh = 0;
+    let usedTiers = [];
+    
+    for (const tier of electricityTiers) {
+        const tierMaxKwh = tier.max;
+        const tierCost = tierMaxKwh * tier.rate;
+        
+        if (remaining <= tierCost) {
+            const kwh = remaining / tier.rate;
+            totalKwh += kwh;
+            usedTiers.push({ tier: tier.name, kwh: Math.round(kwh), cost: remaining });
+            break;
+        } else {
+            totalKwh += tierMaxKwh;
+            usedTiers.push({ tier: tier.name, kwh: tierMaxKwh, cost: tierCost });
+            remaining -= tierCost;
+        }
+    }
+    return { totalKwh: Math.round(totalKwh), usedTiers };
+};
+
+// ============================================
+// حساب النظام الشمسي
+// ============================================
+const calculateSolarSystemAccurate = (billAmount, billDays, season, city, roofArea, panelPower) => {
+    const consumption = calculateConsumption(billAmount);
+    const dailyKwh = consumption.totalKwh / billDays;
+    const annualKwh = dailyKwh * 365;
+    const seasonFactor = billSeasons.find(s => s.value === season)?.factor || 1.00;
+    const adjustedAnnualKwh = annualKwh * seasonFactor;
+    const radiation = solarRadiation[city] || 4.8;
+    const systemEfficiency = 0.85;
+    const requiredKw = adjustedAnnualKwh / (radiation * 365 * systemEfficiency);
+    const roundedKw = Math.round(requiredKw * 10) / 10;
+    const panelsCount = Math.ceil(roundedKw / panelPower);
+    const annualProduction = Math.round(roundedKw * radiation * 365 * systemEfficiency);
+    const annualSavings = Math.round(annualProduction * 0.25);
+    const monthlySavings = Math.round(annualSavings / 12);
+    const requiredRoofArea = Math.round(panelsCount * 2.2);
+    const co2Saved = Math.round(annualProduction * 0.4);
+    const roofAreaAvailable = roofArea || 0;
+    const roofAreaValid = roofAreaAvailable >= requiredRoofArea;
+    
+    return {
+        required_kw: roundedKw,
+        panels_count: panelsCount,
+        annual_production: annualProduction,
+        annual_savings: annualSavings,
+        monthly_savings: monthlySavings,
+        required_roof_area: requiredRoofArea,
+        co2_saved: co2Saved,
+        radiation: radiation,
+        monthly_consumption: consumption.totalKwh,
+        bill_analysis: consumption.usedTiers,
+        roof_area_valid: roofAreaValid,
+        roof_area_available: roofAreaAvailable
+    };
+};
+
+// ============================================
 // خيارات الدفع حسب نوع العقار
+// ============================================
 const getPaymentOptions = (propertyType) => {
-    const isResidential = ['house', 'apartment', 'farm'].includes(propertyType);
+    const isResidential = ['house', 'apartment'].includes(propertyType);
+    const isAgricultural = propertyType === 'farm';
+    
     if (isResidential) {
         return [
-            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'دفع كامل المبلغ مرة واحدة' },
-            { value: 'steg', label: 'تمويل STEG', icon: FaBolt, description: 'تقسيط عبر فاتورة الكهرباء حتى 7 سنوات' },
-            { value: 'prosol', label: 'قرض PROSOL', icon: FaBuilding, description: 'قرض مدعوم من الدولة' },
-            { value: 'leasing', label: 'إيجار تمويلي (Leasing)', icon: FaBuilding, description: 'تأجير النظام مع أحقية التمليك' }
+            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'الدفع الكامل للمبلغ عند التركيب', pros: ['خصم 5-10%', 'تركيب سريع'] },
+            { value: 'steg', label: 'تمويل STEG', icon: FaBolt, description: 'تقسيط عبر فاتورة الكهرباء حتى 7 سنوات', pros: ['بدون فوائد', 'تقسيط شهري'] },
+            { value: 'prosol', label: 'قرض PROSOL', icon: FaHandHoldingHeart, description: 'قرض مدعوم من الدولة', pros: ['فائدة 3% فقط', 'ضمان الدولة', 'حتى 7 سنوات'], needsBank: true }
+        ];
+    } else if (isAgricultural) {
+        return [
+            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'الدفع الكامل للمبلغ عند التركيب', pros: ['خصم 5-10%', 'تركيب سريع'] },
+            { value: 'bank', label: 'قرض بنكي', icon: FaUniversity, description: 'تمويل للأنظمة الزراعية', pros: ['فائدة مخفضة', 'حتى 10 سنوات'], needsBank: true },
+            { value: 'leasing', label: 'إيجار تمويلي', icon: FaBuilding, description: 'تأجير النظام مع أحقية التمليك', pros: ['لا يشترط ملكية العقار', 'دفعة أولى 10-20%'] }
         ];
     } else {
         return [
-            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'دفع كامل المبلغ مرة واحدة' },
-            { value: 'bank', label: 'قرض بنكي', icon: FaBuilding, description: 'تمويل بنكي بفائدة مخفضة' },
-            { value: 'leasing', label: 'إيجار تمويلي (Leasing)', icon: FaBuilding, description: 'تأجير النظام مع أحقية التمليك' }
+            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'الدفع الكامل للمبلغ عند التركيب', pros: ['خصم 5-10%', 'تركيب سريع'] },
+            { value: 'bank', label: 'قرض بنكي', icon: FaUniversity, description: 'تمويل بنكي بفائدة مخفضة', pros: ['حتى 10 سنوات', 'مرونة في السداد'], needsBank: true },
+            { value: 'leasing', label: 'إيجار تمويلي', icon: FaBuilding, description: 'تأجير النظام مع أحقية التمليك', pros: ['لا يشترط ملكية العقار', 'دفعة أولى 10-20%'] }
         ];
     }
 };
 
-// محتوى الإجراءات القانونية لكل طريقة دفع
-const getLegalContent = (paymentMethod, propertyType) => {
-    const legalTexts = {
-        cash: {
-            title: 'الدفع النقدي',
-            content: 'يتم دفع كامل قيمة النظام مرة واحدة عند التركيب. لا توجد إجراءات إضافية.',
-            requirements: ['دفع المبلغ بالكامل', 'توقيع عقد التركيب']
-        },
-        steg: {
-            title: 'تمويل STEG',
-            content: 'يتم تقسيط قيمة النظام عبر فاتورة الكهرباء لمدة تصل إلى 7 سنوات. المنحة تُحتسب للشركة وليس للعميل مباشرة.',
-            requirements: ['العداد باسم العميل', 'موافقة STEG', 'تقديم ملف تقني']
-        },
-        prosol: {
-            title: 'قرض PROSOL',
-            content: 'قرض مدعوم من الدولة عبر البنوك المشاركة. يتم دفع 20% من قيمة النظام كمساهمة شخصية، والباقي قرض بنكي.',
-            requirements: ['ملكية العقار', 'تقديم ملف لدى ANME', 'موافقة البنك']
-        },
-        bank: {
-            title: 'قرض بنكي',
-            content: 'تمويل بنكي بفائدة مخفضة. يتم دراسة ملف العميل من قبل البنك لتحديد نسبة التغطية والمدة.',
-            requirements: ['حساب بنكي نشط', 'إثبات دخل', 'دراسة الجدوى الفنية']
-        },
-        leasing: {
-            title: 'الإيجار التمويلي (Leasing)',
-            content: 'تأجير النظام الشمسي مع أحقية التمليك بنهاية العقد. لا يشترط ملكية العقار.',
-            requirements: ['عقد إيجار طويل الأجل (إن لم يكن مالكاً)', 'دفع دفعة أولى (10-20%)', 'دراسة الجدوى']
-        }
-    };
-    
-    return legalTexts[paymentMethod] || legalTexts.cash;
-};
-
+// ============================================
+// المكون الرئيسي
+// ============================================
 const CalculatorPage = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
     const [result, setResult] = useState(null);
     const [showLegalModal, setShowLegalModal] = useState(false);
+    const [showBankModal, setShowBankModal] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState(null);
+    const [selectedBank, setSelectedBank] = useState(null);
+    const [selectedPanel, setSelectedPanel] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
@@ -120,27 +222,59 @@ const CalculatorPage = () => {
         e.preventDefault();
         setLoading(true);
         
-        if (!formData.name || !formData.phone || !formData.city || !formData.bill_value) {
+        if (!formData.name || !formData.phone || !formData.city || !formData.bill_value || !formData.roof_area) {
             toast.error('يرجى إكمال جميع البيانات المطلوبة');
             setLoading(false);
             return;
         }
         
-        try {
-            const response = await leadsAPI.calculate(formData);
-            setResult(response.data.solarData);
-            setStep(3);
-            toast.success('✅ تم حساب نظامك الشمسي بنجاح!');
-        } catch (error) {
-            console.error('❌ Error:', error.response?.data || error.message);
-            toast.error(error.response?.data?.message || 'حدث خطأ في الاتصال بالخادم');
-        } finally {
-            setLoading(false);
+        setStep(3);
+        setLoading(false);
+    };
+    
+    const handlePanelSelect = (panel) => {
+        setSelectedPanel(panel);
+        
+        const property = propertyTypes.find(p => p.value === formData.property_type);
+        const billDays = property.period;
+        
+        const solarData = calculateSolarSystemAccurate(
+            parseFloat(formData.bill_value),
+            billDays,
+            formData.bill_season,
+            formData.city,
+            parseFloat(formData.roof_area),
+            panel.power
+        );
+        
+        setResult(solarData);
+        setStep(4);
+        
+        if (!solarData.roof_area_valid) {
+            toast.warning(`⚠️ المساحة المتوفرة (${formData.roof_area} م²) أقل من المساحة المطلوبة (${solarData.required_roof_area} م²)`);
+        } else {
+            toast.success('✅ تم حساب النظام الشمسي بنجاح!');
         }
+        
+        setLoading(false);
     };
     
     const handlePaymentClick = (paymentMethod) => {
-        setSelectedPayment(paymentMethod);
+        const isResidential = ['house', 'apartment'].includes(formData.property_type);
+        const isAgricultural = formData.property_type === 'farm';
+        
+        if ((paymentMethod === 'prosol' && isResidential) || (paymentMethod === 'bank' && (isAgricultural || !isResidential))) {
+            setSelectedPayment(paymentMethod);
+            setShowBankModal(true);
+        } else {
+            setSelectedPayment(paymentMethod);
+            setShowLegalModal(true);
+        }
+    };
+    
+    const handleBankSelect = (bank) => {
+        setSelectedBank(bank);
+        setShowBankModal(false);
         setShowLegalModal(true);
     };
     
@@ -148,8 +282,27 @@ const CalculatorPage = () => {
         setSending(true);
         setShowLegalModal(false);
         
+        const property = propertyTypes.find(p => p.value === formData.property_type);
+        const billDays = property.period;
+        
+        const sendData = {
+            name: formData.name,
+            phone: formData.phone,
+            city: formData.city,
+            property_type: formData.property_type,
+            bill_amount: parseFloat(formData.bill_value),
+            bill_period_months: billDays,
+            bill_season: formData.bill_season,
+            roof_availability: true,
+            meter_number: formData.meter_number,
+            payment_method: selectedPayment,
+            preferred_bank: selectedBank?.name || null,
+            panel_type: selectedPanel?.name || null,
+            additional_info: `مساحة السطح: ${formData.roof_area} م²`
+        };
+
         try {
-            await leadsAPI.create({ ...formData, payment_method: selectedPayment });
+            await leadsAPI.create(sendData);
             toast.success('✅ تم إرسال طلبك بنجاح! سنتواصل معك قريباً');
             setStep(1);
             setResult(null);
@@ -158,8 +311,10 @@ const CalculatorPage = () => {
                 bill_period: 60, bill_season: 'spring', meter_number: '', bill_value: '',
                 roof_area: '', payment_method: 'cash'
             });
+            setSelectedBank(null);
+            setSelectedPayment(null);
+            setSelectedPanel(null);
         } catch (error) {
-            console.error('Error sending request:', error);
             toast.error('❌ حدث خطأ في إرسال الطلب');
         } finally {
             setSending(false);
@@ -169,76 +324,62 @@ const CalculatorPage = () => {
     const nextStep = () => setStep(step + 1);
     const prevStep = () => setStep(step - 1);
 
-    // Step 1: معلومات العميل
+    // ==================== STEP 1 ====================
     const renderStep1 = () => (
         <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <FaUser className="text-yellow-500" /> معلومات العميل
-            </h2>
+            <div className="text-center mb-6">
+                <div className="inline-block p-4 bg-orange-100 rounded-full mb-3">
+                    <FaUser className="text-4xl text-orange-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">معلومات العميل</h2>
+                <p className="text-gray-500 text-sm">أدخل بياناتك لتحصل على دراسة مجانية</p>
+            </div>
             
             <div>
                 <label className="block text-gray-700 mb-2">الاسم الكامل *</label>
-                <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    placeholder="أدخل اسمك"
-                />
+                <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none" placeholder="أدخل اسمك" />
             </div>
             
             <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaPhone className="text-green-500" /> رقم الهاتف *
-                </label>
-                <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    placeholder="أدخل رقم هاتفك"
-                />
+                <label className="block text-gray-700 mb-2 flex items-center gap-2"><FaPhone className="text-green-500" /> رقم الهاتف *</label>
+                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none" placeholder="أدخل رقم هاتفك" />
             </div>
             
             <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaMapMarkerAlt className="text-red-500" /> الولاية *
-                </label>
-                <select
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                >
+                <label className="block text-gray-700 mb-2 flex items-center gap-2"><FaMapMarkerAlt className="text-red-500" /> الولاية *</label>
+                <select name="city" value={formData.city} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none bg-white">
                     <option value="">اختر الولاية</option>
-                    {tunisianCities.map(city => (
-                        <option key={city} value={city}>{city}</option>
-                    ))}
+                    {tunisianCities.map(city => <option key={city}>{city}</option>)}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">تختلف كمية الإشعاع الشمسي حسب الولاية</p>
+                <p className="text-xs text-gray-500 mt-1">☀️ تختلف كمية الإشعاع الشمسي حسب الولاية</p>
             </div>
             
-            <div>
-                <label className="block text-gray-700 mb-2">نوع العقار *</label>
-                <div className="grid grid-cols-2 gap-3">
+            <button onClick={nextStep} className="w-full bg-orange-500 text-white py-3 rounded-xl font-semibold hover:bg-orange-600 transition flex items-center justify-center gap-2">
+                التالي <FaArrowLeft />
+            </button>
+        </div>
+    );
+
+    // ==================== STEP 2 ====================
+    const renderStep2 = () => {
+        const selectedProperty = propertyTypes.find(p => p.value === formData.property_type);
+        const isResidential = ['house', 'apartment'].includes(formData.property_type);
+        
+        return (
+            <div className="space-y-4">
+                <div className="text-center mb-6">
+                    <div className="inline-block p-4 bg-green-100 rounded-full mb-3">
+                        <FaHome className="text-4xl text-green-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800">معلومات العقار والكهرباء</h2>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
                     {propertyTypes.map((type) => {
                         const Icon = type.icon;
                         return (
-                            <button
-                                key={type.value}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, property_type: type.value })}
-                                className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition ${
-                                    formData.property_type === type.value
-                                        ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                                        : 'border-gray-300 text-gray-600'
-                                }`}
-                            >
+                            <button key={type.value} type="button" onClick={() => setFormData({ ...formData, property_type: type.value })}
+                                className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition ${formData.property_type === type.value ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}>
                                 <Icon className="text-2xl" />
                                 <span className="font-semibold text-sm">{type.label}</span>
                                 <span className="text-xs opacity-75">{type.desc}</span>
@@ -246,296 +387,200 @@ const CalculatorPage = () => {
                         );
                     })}
                 </div>
-            </div>
-            
-            <button
-                type="button"
-                onClick={nextStep}
-                className="w-full bg-yellow-500 text-white py-3 rounded-lg font-semibold hover:bg-yellow-600 transition flex items-center justify-center gap-2"
-            >
-                التالي <FaArrowLeft />
-            </button>
-        </div>
-    );
-
-    // Step 2: معلومات الكهرباء والسطح
-    const renderStep2 = () => (
-        <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <FaPlug className="text-yellow-600" /> معلومات الكهرباء والسطح
-            </h2>
-            
-            <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaCalendarAlt /> فترة الفاتورة *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                    {billPeriods.map((period) => (
-                        <button
-                            key={period.value}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, bill_period: period.value })}
-                            className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition ${
-                                formData.bill_period === period.value
-                                    ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                                    : 'border-gray-300 text-gray-600'
-                            }`}
-                        >
-                            <span className="font-semibold">{period.label}</span>
-                            <span className="text-xs opacity-75">{period.desc}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-            
-            <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaLeaf /> موسم الفاتورة *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+                <p className="text-xs text-gray-500 text-center">📅 فترة الفاتورة: {selectedProperty.period === 60 ? 'شهرين (60 يوم)' : 'شهر (30 يوم)'}</p>
+                
+                <div className="grid grid-cols-2 gap-2">
                     {billSeasons.map((season) => (
-                        <button
-                            key={season.value}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, bill_season: season.value })}
-                            className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition ${
-                                formData.bill_season === season.value
-                                    ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                                    : 'border-gray-300 text-gray-600'
-                            }`}
-                        >
-                            <span className="font-semibold">{season.label}</span>
-                            <span className="text-xs opacity-75">{season.desc}</span>
+                        <button key={season.value} type="button" onClick={() => setFormData({ ...formData, bill_season: season.value })}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition ${formData.bill_season === season.value ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}>
+                            <span className="text-xl">{season.icon}</span>
+                            <span className="font-semibold text-sm">{season.label}</span>
+                            <span className="text-xs text-gray-500">{season.months}</span>
                         </button>
                     ))}
                 </div>
-            </div>
-            
-            <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaIdCard /> رقم العداد (اختياري)
-                </label>
-                <input
-                    type="text"
-                    name="meter_number"
-                    value={formData.meter_number}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    placeholder="أدخل رقم العداد لتسهيل حساب الاستهلاك"
-                />
-                <p className="text-xs text-gray-500 mt-1">إذا أدخلت رقم العداد، سنتمكن من حساب استهلاكك بدقة أكبر</p>
-            </div>
-            
-            <div>
-                <label className="block text-gray-700 mb-2">
-                    {['house', 'apartment', 'farm'].includes(formData.property_type) 
-                        ? 'متوسط قيمة فاتورة الكهرباء (شهرين) *' 
-                        : 'قيمة فاتورة الكهرباء الشهرية *'}
-                </label>
-                <input
-                    type="number"
-                    name="bill_value"
-                    value={formData.bill_value}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    placeholder="مثال: 200"
-                />
-            </div>
-            
-            <div>
-                <label className="block text-gray-700 mb-2 flex items-center gap-2">
-                    <FaRuler /> مساحة السطح (متر مربع) *
-                </label>
-                <input
-                    type="number"
-                    name="roof_area"
-                    value={formData.roof_area}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    placeholder="مثال: 100"
-                />
-                <p className="text-xs text-gray-500 mt-1">كل لوح شمسي يحتاج حوالي 2 متر مربع</p>
-            </div>
-            
-            <div className="flex gap-3 mt-4">
-                <button
-                    type="button"
-                    onClick={prevStep}
-                    className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-400 transition"
-                >
-                    رجوع
-                </button>
-                <button
-                    type="button"
-                    onClick={handleCalculate}
-                    disabled={loading}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                    {loading ? (
-                        <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            جاري الحساب...
-                        </>
-                    ) : (
-                        <>
-                            <FaCalculator /> احسب نظامي الشمسي
-                        </>
-                    )}
-                </button>
-            </div>
-        </div>
-    );
-
-    // Step 3: النتائج واختيار طريقة الدفع
-    const renderResult = () => {
-        const paymentOptions = getPaymentOptions(formData.property_type);
-        
-        return (
-            <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <FaSun className="text-yellow-500" /> نتائج الدراسة الشمسية
-                </h2>
                 
-                <div className="bg-gradient-to-r from-yellow-50 to-green-50 p-6 rounded-xl text-center">
-                    <div className="text-5xl font-bold text-yellow-600 mb-2">{result.recommendedKw} kWp</div>
-                    <p className="text-gray-600">القدرة الموصى بها</p>
-                </div>
+                <input type="text" name="bill_value" value={formData.bill_value} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none" placeholder={`قيمة الفاتورة (دينار) - ${selectedProperty.period === 60 ? 'شهرين' : 'شهر'} *`} />
+                <p className="text-xs text-gray-500 mt-1">📊 سيتم تحليل فاتورتك حسب شرائح STEG</p>
                 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-4 rounded-lg shadow text-center">
-                        <div className="text-2xl font-bold text-green-600">{result.panels}</div>
-                        <p className="text-gray-500 text-sm">عدد الألواح</p>
+                <input type="text" name="roof_area" value={formData.roof_area} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none" placeholder="مساحة السطح (متر مربع) *" />
+                <p className="text-xs text-gray-500 text-center">📐 كل لوح شمسي يحتاج حوالي 2.2 متر مربع</p>
+                
+                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4 mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="bg-orange-500 text-white p-2 rounded-full shadow-md"><FaIdCard className="text-xl" /></div>
+                        <div><span className="font-semibold text-gray-700">رقم العداد الكهربائي</span><span className="text-orange-500 text-sm mr-2">(مهم جداً)</span></div>
                     </div>
-                    <div className="bg-white p-4 rounded-lg shadow text-center">
-                        <div className="text-2xl font-bold text-green-600">{result.annualProduction?.toLocaleString() || '0'} kWh</div>
-                        <p className="text-gray-500 text-sm">الإنتاج السنوي</p>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow text-center">
-                        <div className="text-2xl font-bold text-green-600">{result.annualSavings?.toLocaleString() || '0'} دينار</div>
-                        <p className="text-gray-500 text-sm">التوفير السنوي</p>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow text-center">
-                        <div className="text-2xl font-bold text-green-600">{result.paybackYears || '0'} سنة</div>
-                        <p className="text-gray-500 text-sm">مدة استرجاع المال</p>
+                    <input type="text" name="meter_number" value={formData.meter_number} onChange={handleChange} className="w-full p-3 border-2 border-orange-200 rounded-xl focus:outline-none bg-white" placeholder="أدخل رقم العداد (موجود في أعلى يسار الفاتورة)" />
+                    <div className="mt-3 text-sm bg-orange-100 p-3 rounded-lg">
+                        <p className="font-semibold text-orange-800 mb-1">🔢 لماذا رقم العداد مهم؟</p>
+                        <ul className="text-xs text-orange-700 space-y-1 list-disc list-inside">
+                            <li>يساعدنا في تحليل استهلاكك بدقة أكبر</li>
+                            <li>يسرع معاملاتك مع STEG</li>
+                            <li>يمكننا من حساب الاستهلاك الفعلي لآخر 12 شهر</li>
+                        </ul>
                     </div>
                 </div>
                 
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-700 text-center">
-                        💡 <strong>ملاحظة مهمة:</strong> هذه تقديرات أولية. العرض النهائي والدراسة الدقيقة سيتم إعدادها من قبل فريقنا بعد التواصل معك.
-                    </p>
+                <div className="flex gap-3 mt-4">
+                    <button onClick={prevStep} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-400 transition">رجوع</button>
+                    <button onClick={handleCalculate} disabled={loading} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                        {loading ? 'جاري الحساب...' : <><FaCalculator /> احسب نظامي الشمسي</>}
+                    </button>
                 </div>
-                
-                <div className="border-t pt-4">
-                    <h3 className="text-lg font-bold text-gray-800 mb-3">اختر طريقة الدفع المناسبة لك</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {paymentOptions.map((option) => {
-                            const Icon = option.icon;
-                            return (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => handlePaymentClick(option.value)}
-                                    className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 hover:border-yellow-500 hover:bg-yellow-50 transition"
-                                >
-                                    <Icon className="text-3xl text-green-600" />
-                                    <span className="font-bold">{option.label}</span>
-                                    <span className="text-xs text-gray-500">{option.description}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-                
-                <button
-                    onClick={() => { setStep(2); setResult(null); }}
-                    className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
-                >
-                    تعديل البيانات
-                </button>
             </div>
         );
     };
-    
-    // النافذة المنبثقة للإجراءات القانونية
+
+    // ==================== STEP 3 ====================
+    const renderStep3 = () => {
+        const isAgricultural = formData.property_type === 'farm';
+        const panelCategory = isAgricultural ? 'agricultural' : 'residential';
+        const panels = panelTypes[panelCategory];
+        
+        return (
+            <div className="space-y-4">
+                <div className="text-center mb-6">
+                    <div className="inline-block p-4 bg-blue-100 rounded-full mb-3"><FaSolarPanel className="text-4xl text-blue-600" /></div>
+                    <h2 className="text-2xl font-bold text-gray-800">اختر نوع اللوح الشمسي</h2>
+                    <p className="text-gray-500 text-sm">{isAgricultural ? 'اختر اللوح المناسب لمضختك الزراعية - قدرات عالية للضخ' : 'اختر اللوح المناسب لمنزلك أو محلك'}</p>
+                </div>
+                
+                <div className="space-y-3">
+                    {panels.map((panel) => (
+                        <button key={panel.value} type="button" onClick={() => handlePanelSelect(panel)} className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 transition text-right">
+                            <div className="flex items-center gap-3"><FaSolarPanel className="text-2xl text-green-600" /><div className="text-right"><div className="font-semibold">{panel.name}</div><div className="text-xs text-gray-500">{panel.use}</div></div></div>
+                            <div className="text-left"><div className="font-bold text-green-600">{panel.power * 1000} Wp</div><div className="text-xs text-gray-500">{panel.brand}</div></div>
+                        </button>
+                    ))}
+                </div>
+                
+                <div className="flex gap-3 mt-4"><button onClick={prevStep} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-400 transition">رجوع</button></div>
+            </div>
+        );
+    };
+
+    // ==================== STEP 4 ====================
+    const renderResult = () => {
+        const property = propertyTypes.find(p => p.value === formData.property_type);
+        const paymentOptions = getPaymentOptions(formData.property_type);
+        const isResidential = ['house', 'apartment'].includes(formData.property_type);
+        const isAgricultural = formData.property_type === 'farm';
+        
+        return (
+            <div className="space-y-4">
+                <div className="text-center mb-6"><div className="inline-block p-4 bg-orange-100 rounded-full mb-3"><FaSun className="text-4xl text-orange-500" /></div><h2 className="text-2xl font-bold text-gray-800">نتائج الدراسة الشمسية</h2><p className="text-gray-500">{formData.city} - {formData.name}</p></div>
+                
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-2xl text-center text-white"><div className="text-5xl font-bold mb-2">{result.required_kw} kWp</div><p className="text-orange-100">القدرة المطلوبة للنظام الشمسي</p></div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-green-50 p-3 rounded-xl text-center"><div className="text-xl font-bold text-green-700">{result.panels_count}</div><p className="text-sm text-gray-600">عدد الألواح</p><p className="text-xs text-gray-400">{selectedPanel?.power * 1000} Wp لكل لوح</p></div>
+                    <div className="bg-blue-50 p-3 rounded-xl text-center"><div className="text-xl font-bold text-blue-700">{result.annual_production.toLocaleString()} kWh</div><p className="text-sm text-gray-600">الإنتاج السنوي</p></div>
+                    <div className="bg-yellow-50 p-3 rounded-xl text-center"><div className="text-xl font-bold text-yellow-700">{result.annual_savings.toLocaleString()} دينار</div><p className="text-sm text-gray-600">التوفير السنوي</p><p className="text-xs text-gray-400">{result.monthly_savings.toLocaleString()} دينار/شهر</p></div>
+                    <div className="bg-purple-50 p-3 rounded-xl text-center"><div className="text-xl font-bold text-purple-700">{result.required_roof_area} م²</div><p className="text-sm text-gray-600">المساحة المطلوبة</p>{!result.roof_area_valid && <p className="text-xs text-red-500">⚠️ المتوفرة: {result.roof_area_available} م²</p>}</div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-xl text-sm"><div className="flex items-center gap-2 mb-2"><FaSolarPanel className="text-green-600" /><span className="font-semibold">اللوح المختار:</span><span>{selectedPanel?.name}</span><span className="text-xs text-gray-500">({selectedPanel?.brand})</span></div></div>
+                
+                <div className="bg-gray-50 p-3 rounded-xl text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div><FaLeaf className="inline text-green-500 ml-1" /> توفير CO₂: <strong>{result.co2_saved.toLocaleString()} كغ/سنة</strong></div>
+                        <div><FaSun className="inline text-orange-500 ml-1" /> الإشعاع الشمسي: <strong>{result.radiation} kWh/m²/يوم</strong></div>
+                        <div><FaClock className="inline text-blue-500 ml-1" /> فترة الفاتورة: <strong>{property.period === 60 ? 'شهرين' : 'شهر'}</strong></div>
+                        <div><FaCalendarAlt className="inline text-purple-500 ml-1" /> موسم الفاتورة: <strong>{billSeasons.find(s => s.value === formData.bill_season)?.label}</strong></div>
+                    </div>
+                    {formData.meter_number && <div className="mt-2 pt-2 border-t"><FaIdCard className="inline text-blue-500 ml-1" /> رقم العداد: <strong>{formData.meter_number}</strong></div>}
+                </div>
+                
+                <div className="bg-blue-50 p-3 rounded-xl text-sm border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2"><FaInfoCircle className="text-blue-500" /><span className="font-semibold">تحليل فاتورتك حسب شرائح STEG:</span></div>
+                    {result.bill_analysis?.map((tier, i) => (<div key={i} className="flex justify-between text-xs py-1"><span>{tier.tier}</span><span>{tier.kwh} kWh</span><span>{tier.cost.toFixed(2)} دينار</span></div>))}
+                    <div className="flex justify-between font-semibold mt-2 pt-2 border-t"><span>الإجمالي</span><span>{result.monthly_consumption} kWh</span><span>{formData.bill_value} دينار</span></div>
+                </div>
+                
+                <div className="space-y-2">
+                    <button onClick={() => handlePaymentClick('cash')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right"><FaMoneyBillWave className="text-2xl text-green-600" /><div className="flex-1"><div className="font-semibold">دفع نقدي</div><div className="text-xs text-gray-500">الدفع الكامل للمبلغ عند التركيب</div></div><div className="text-green-600">✓</div></button>
+                    <button onClick={() => handlePaymentClick('steg')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right"><FaBolt className="text-2xl text-green-600" /><div className="flex-1"><div className="font-semibold">تمويل STEG</div><div className="text-xs text-gray-500">تقسيط عبر فاتورة الكهرباء حتى 7 سنوات</div></div><div className="text-green-600">✓</div></button>
+                    {isResidential && <button onClick={() => handlePaymentClick('prosol')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right"><FaHandHoldingHeart className="text-2xl text-green-600" /><div className="flex-1"><div className="font-semibold">قرض PROSOL</div><div className="text-xs text-gray-500">قرض مدعوم من الدولة بفائدة 3%</div></div><div className="text-green-600">✓</div></button>}
+                    {!isResidential && !isAgricultural && <button onClick={() => handlePaymentClick('bank')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right"><FaUniversity className="text-2xl text-green-600" /><div className="flex-1"><div className="font-semibold">قرض بنكي</div><div className="text-xs text-gray-500">تمويل بنكي بفائدة مخفضة</div></div><div className="text-green-600">✓</div></button>}
+                    {!isResidential && <button onClick={() => handlePaymentClick('leasing')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right"><FaBuilding className="text-2xl text-green-600" /><div className="flex-1"><div className="font-semibold">إيجار تمويلي</div><div className="text-xs text-gray-500">تأجير النظام مع أحقية التمليك</div></div><div className="text-green-600">✓</div></button>}
+                </div>
+                
+                {isResidential && <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-200"><p className="text-xs text-yellow-800">💡 <strong>برنامج PROSOL:</strong> قرض مدعوم من الدولة بفائدة 3% فقط. البنوك المتعاقدة: بنك الزيتونة، التجاري بنك، BNA، BTS، STB، BIAT.</p></div>}
+                {isAgricultural && <div className="bg-green-50 p-3 rounded-xl border border-green-200"><p className="text-xs text-green-800">💡 <strong>تمويل للمشاريع الزراعية:</strong> يمكنك الاستفادة من قروض بنكية بفائدة مخفضة أو الإيجار التمويلي (Leasing).</p></div>}
+                {!isResidential && !isAgricultural && <div className="bg-blue-50 p-3 rounded-xl border border-blue-200"><p className="text-xs text-blue-800">💡 <strong>التمويل للمحلات والمصانع:</strong> يمكنك اختيار القرض البنكي أو الإيجار التمويلي (Leasing).</p></div>}
+                
+                {/* زر احصل على دراسة */}
+                <div className="mt-4 p-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg">
+                    <button onClick={handleConfirmAndSend} disabled={sending} className="w-full bg-white text-orange-600 py-4 rounded-xl font-bold text-xl flex items-center justify-center gap-3 hover:shadow-xl transition-all transform hover:scale-[1.02] disabled:opacity-50">
+                        {sending ? <><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div> جاري إرسال طلبك...</> : <><FaPaperPlane className="text-2xl" /> احصل على دراسة مجانية</>}
+                    </button>
+                    <p className="text-center text-white/90 text-sm mt-3 flex items-center justify-center gap-2"><span>✓ دراسة مجانية</span><span>✓ بدون أي التزام</span><span>✓ استشارة فنية</span></p>
+                </div>
+                
+                <a href="https://wa.me/21624661499?text=مرحباً، أريد استشارة مجانية حول الطاقة الشمسية" target="_blank" rel="noopener noreferrer" className="w-full bg-green-500 text-white py-3 rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-green-600 transition"><FaWhatsapp /> تواصل عبر واتساب</a>
+                <button onClick={() => { setStep(3); setResult(null); }} className="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300 transition">تعديل البيانات</button>
+            </div>
+        );
+    };
+
+    // ==================== النوافذ المنبثقة ====================
     const renderLegalModal = () => {
         if (!showLegalModal || !selectedPayment) return null;
-        const legal = getLegalContent(selectedPayment, formData.property_type);
+        const paymentOption = getPaymentOptions(formData.property_type).find(p => p.value === selectedPayment);
+        const isProsol = selectedPayment === 'prosol';
         
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                    <div className="sticky top-0 bg-white p-4 border-b">
-                        <h3 className="text-xl font-bold text-gray-800">{legal.title}</h3>
-                    </div>
+                    <div className="sticky top-0 bg-white p-4 border-b"><h3 className="text-xl font-bold text-gray-800">{paymentOption?.label}</h3></div>
                     <div className="p-6">
-                        <p className="text-gray-700 mb-4">{legal.content}</p>
-                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                            <h4 className="font-semibold text-gray-800 mb-2">📋 الإجراءات المطلوبة:</h4>
-                            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                                {legal.requirements.map((req, i) => (
-                                    <li key={i}>{req}</li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="bg-yellow-50 p-3 rounded-lg mb-6">
-                            <p className="text-xs text-yellow-800">
-                                ⚠️ ملاحظة: المنحة الخاصة بـ PROSOL تُصرف للشركة المعتمدة وليس للعميل مباشرة، ويتم خصمها من السعر النهائي.
-                            </p>
-                        </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleConfirmAndSend}
-                                disabled={sending}
-                                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                            >
-                                {sending ? 'جاري الإرسال...' : 'أوافق وأطلب الدراسة'}
-                            </button>
-                            <button
-                                onClick={() => setShowLegalModal(false)}
-                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
-                            >
-                                إلغاء
-                            </button>
-                        </div>
+                        <p className="text-gray-700 mb-4">{paymentOption?.description}</p>
+                        {isProsol && (
+                            <>
+                                <div className="bg-green-50 p-3 rounded-lg mb-4"><h4 className="font-semibold text-green-800 mb-2">✓ مزايا PROSOL:</h4><ul className="list-disc list-inside space-y-1 text-sm text-green-700"><li>فائدة مخفضة 3% فقط</li><li>ضمان الدولة</li><li>مدة سداد تصل إلى 7 سنوات</li><li>مساهمة شخصية 20%</li></ul></div>
+                                <div className="bg-yellow-50 p-3 rounded-lg mb-4"><p className="text-xs text-yellow-800">⚠️ ملاحظة: المنحة تُصرف للشركة المعتمدة وليس للعميل مباشرة، ويتم خصمها من السعر النهائي.</p></div>
+                                {selectedBank && <div className="bg-blue-50 p-3 rounded-lg mb-4"><p className="text-sm text-blue-800">🏦 البنك المختار: <strong>{selectedBank.name}</strong></p></div>}
+                            </>
+                        )}
+                        <div className="flex gap-3"><button onClick={handleConfirmAndSend} disabled={sending} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50">{sending ? 'جاري الإرسال...' : 'أوافق وأطلب الدراسة'}</button><button onClick={() => setShowLegalModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition">إلغاء</button></div>
                     </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderBankModal = () => {
+        if (!showBankModal) return null;
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+                    <div className="sticky top-0 bg-white p-4 border-b"><h3 className="text-xl font-bold text-gray-800">اختر البنك</h3><p className="text-sm text-gray-500 mt-1">اختر البنك الذي ترغب في التعامل معه</p></div>
+                    <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+                        {prosolBanks.map(bank => (<button key={bank.id} onClick={() => handleBankSelect(bank)} className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-orange-500 hover:bg-orange-50 transition text-right"><span className="text-2xl">{bank.logo}</span><div className="flex-1"><div className="font-semibold">{bank.name}</div><div className="text-xs text-gray-500">بنك معتمد</div></div><div className="text-gray-400">›</div></button>))}
+                    </div>
+                    <div className="p-4 border-t"><button onClick={() => setShowBankModal(false)} className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 transition">إلغاء</button></div>
                 </div>
             </div>
         );
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50 py-12 px-4">
             <div className="max-w-2xl mx-auto">
                 <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-                    {/* Progress Bar */}
-                    {step < 3 && (
-                        <div className="mb-8">
-                            <div className="flex justify-between mb-2">
-                                <span className="text-sm text-gray-500">
-                                    {step === 1 ? 'معلومات العميل' : 'معلومات الكهرباء والسطح'}
-                                </span>
-                                <span className="text-sm text-gray-500">{Math.round(step / 2 * 100)}%</span>
-                            </div>
-                            <div className="h-2 bg-gray-200 rounded-full">
-                                <div
-                                    className="h-2 bg-yellow-500 rounded-full transition-all duration-300"
-                                    style={{ width: `${step / 2 * 100}%` }}
-                                ></div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    <form onSubmit={(e) => e.preventDefault()}>
+                    {step < 4 && (<div className="mb-8"><div className="flex justify-between mb-2"><span className="text-sm text-gray-500">{step === 1 ? 'معلومات العميل' : step === 2 ? 'معلومات العقار' : 'اختر اللوح'}</span><span className="text-sm text-gray-500">{step === 1 ? '33%' : step === 2 ? '66%' : '100%'}</span></div><div className="h-2 bg-gray-200 rounded-full"><div className="h-2 bg-gradient-to-r from-orange-500 to-green-500 rounded-full transition-all duration-300" style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }}></div></div></div>)}
+                    <form onSubmit={e => e.preventDefault()}>
                         {step === 1 && renderStep1()}
                         {step === 2 && renderStep2()}
-                        {step === 3 && result && renderResult()}
+                        {step === 3 && renderStep3()}
+                        {step === 4 && result && renderResult()}
                     </form>
                 </div>
+                <div className="text-center mt-6 text-xs text-gray-400"><p>© 2024 Shamsi.tn - جميع الحقوق محفوظة</p><p>للتواصل: shamsi.tns@gmail.com | <span dir="ltr" className="inline-block">24 66 14 99</span></p></div>
             </div>
             {renderLegalModal()}
+            {renderBankModal()}
         </div>
     );
 };
