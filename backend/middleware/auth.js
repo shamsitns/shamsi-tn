@@ -25,7 +25,6 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
         }
         
-        // البحث في جدول users (جميع الأدوار)
         const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
         const user = getFirstRow(result);
         
@@ -34,20 +33,17 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
         }
         
-        // التحقق من صحة كلمة المرور
         const validPassword = bcrypt.compareSync(password, user.password);
         if (!validPassword) {
             console.log('❌ Invalid password for:', email);
             return res.status(401).json({ message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
         }
         
-        // التحقق من أن المستخدم نشط
         if (!user.is_active) {
             console.log('❌ Inactive user:', email);
             return res.status(401).json({ message: 'الحساب غير نشط. يرجى التواصل مع المدير' });
         }
         
-        // إنشاء التوكن
         const token = jwt.sign(
             { 
                 id: user.id, 
@@ -222,6 +218,27 @@ exports.isManager = (req, res, next) => {
 };
 
 // =============================================
+// ✅ مصادقة عامة حسب الصلاحيات (للاستخدام مع authorize(['role1', 'role2']))
+// =============================================
+const authorize = (roles = []) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ message: 'غير مصرح به - يرجى تسجيل الدخول' });
+        }
+        
+        if (roles.length && !roles.includes(req.user.role)) {
+            return res.status(403).json({ 
+                message: `غير مصرح به - هذه الصفحة مخصصة لـ: ${roles.join(' أو ')}`,
+                requiredRoles: roles,
+                yourRole: req.user.role
+            });
+        }
+        
+        next();
+    };
+};
+
+// =============================================
 // الحصول على معلومات المستخدم الحالي
 // =============================================
 exports.getCurrentUser = async (req, res) => {
@@ -242,4 +259,22 @@ exports.getCurrentUser = async (req, res) => {
         console.error('❌ Error getting current user:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب معلومات المستخدم', error: error.message });
     }
+};
+
+// =============================================
+// ✅ تصدير جميع الدوال
+// =============================================
+module.exports = {
+    login: exports.login,
+    authenticate: exports.authenticate,
+    isOwner: exports.isOwner,
+    isGeneralManager: exports.isGeneralManager,
+    isExecutiveManager: exports.isExecutiveManager,
+    isCallCenter: exports.isCallCenter,
+    isOperationsManager: exports.isOperationsManager,
+    isBankManager: exports.isBankManager,
+    isLeasingManager: exports.isLeasingManager,
+    isManager: exports.isManager,
+    authorize,  // ✅ تصدير الدالة الجديدة
+    getCurrentUser: exports.getCurrentUser
 };
