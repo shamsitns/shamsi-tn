@@ -70,7 +70,6 @@ exports.createLead = async (req, res) => {
         const {
             name,
             phone,
-            email,
             city,
             property_type,
             bill_period_months,
@@ -117,7 +116,7 @@ exports.createLead = async (req, res) => {
         // Insert lead
         const query = `
             INSERT INTO leads (
-                name, phone, email, city, property_type, 
+                name, phone, city, property_type, 
                 bill_amount, bill_period_months, bill_season,
                 roof_availability, additional_info,
                 required_kw, panels_count, commission_amount,
@@ -129,7 +128,6 @@ exports.createLead = async (req, res) => {
         const values = [
             name,
             phone,
-            email || null,
             city || null,
             property_type || 'house',
             parseFloat(bill_amount),
