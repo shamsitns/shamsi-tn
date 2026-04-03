@@ -1,6 +1,4 @@
 const { Pool } = require('pg');
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
@@ -13,8 +11,13 @@ const initDatabase = async () => {
   const isProduction = process.env.NODE_ENV === 'production';
   const databaseUrl = process.env.DATABASE_URL;
 
-  if (isProduction && databaseUrl && databaseUrl.includes('postgres')) {
+  // تحقق من وجود PostgreSQL في الإنتاج
+  const usePostgres = isProduction && databaseUrl && 
+    (databaseUrl.includes('postgres') || databaseUrl.includes('postgresql'));
+
+  if (usePostgres) {
     // PostgreSQL for production
+    console.log('✅ Using PostgreSQL for production');
     dbType = 'postgres';
     const pool = new Pool({
       connectionString: databaseUrl,
@@ -31,11 +34,17 @@ const initDatabase = async () => {
 
     db = pool;
     await createTablesPostgres(pool);
-    console.log('✅ PostgreSQL connected');
+    console.log('✅ PostgreSQL connected successfully');
     return db;
   } else {
-    // SQLite for development
+    // SQLite for development only
+    console.log('📦 Using SQLite for development');
     dbType = 'sqlite';
+    
+    // فقط ثبت sqlite3 في حالة التطوير المحلي
+    const sqlite3 = require('sqlite3').verbose();
+    const { open } = require('sqlite');
+    
     const sqliteDb = await open({
       filename: path.join(__dirname, '../../shamsi.db'),
       driver: sqlite3.Database
