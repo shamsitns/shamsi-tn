@@ -16,7 +16,7 @@ const Login = lazy(() => import('./components/Login'));
 // لوحات التحكم
 const OwnerDashboard = lazy(() => import('./components/OwnerDashboard'));
 const GeneralManagerDashboard = lazy(() => import('./components/GeneralManagerDashboard'));
-const ExecutiveManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
+const ExecutiveManagerDashboard = lazy(() => import('./components/ExecutiveManagerDashboard')); // ✅ موجود
 const OperationsManagerDashboard = lazy(() => import('./components/OperationsDashboard'));
 const CallCenterDashboard = lazy(() => import('./components/CallCenterDashboard'));
 const BankManagerDashboard = lazy(() => import('./components/BankManagerDashboard'));
@@ -38,7 +38,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     }
     
     if (allowedRoles && !allowedRoles.includes(user.role)) {
-        // التوجيه حسب الدور
         const roleRedirects = {
             'owner': '/owner',
             'general_manager': '/admin',
