@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: shamsi-tn-backend
+    runtime: docker
+    repo: https://github.com/shamsitns/shamsi-tn
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
