@@ -52,10 +52,8 @@ router.get('/stats', getDashboardStats);
 router.get('/commissions/stats', getCommissionStats);
 
 // =============================================
-// 📋 مسارات الطلبات (Leads)
+// 📋 مسارات الطلبات (Leads) - GET
 // =============================================
-
-// جلب جميع الطلبات مع Pagination
 router.get('/leads', [
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
@@ -64,56 +62,54 @@ router.get('/leads', [
     validate
 ], getAllLeads);
 
-// جلب تفاصيل طلب محدد
 router.get('/leads/:id', [
     param('id').isInt().withMessage('معرّف الطلب غير صالح'),
     validate
 ], getLeadById);
 
-// الموافقة على طلب
-router.patch('/leads/:leadId/approve', [
+// =============================================
+// 📋 مسارات الطلبات (Leads) - POST (للتطابق مع Frontend)
+// =============================================
+router.post('/leads/:leadId/approve', [
     param('leadId').isInt(),
     validate
 ], approveLead);
 
-// رفض طلب
-router.patch('/leads/:leadId/reject', [
+router.post('/leads/:leadId/reject', [
     param('leadId').isInt(),
     body('reason').optional().isString(),
     validate
 ], rejectLead);
 
-// تعيين طلب لمدير تنفيذي
-router.patch('/leads/:leadId/assign-executive', [
+router.post('/leads/:leadId/assign-executive', [
     param('leadId').isInt(),
     body('executiveId').optional().isInt(),
     body('notes').optional().isString(),
     validate
 ], assignToExecutive);
 
-// تعيين طلب لمركز الاتصال
-router.patch('/leads/:leadId/assign-callcenter', [
+router.post('/leads/:leadId/assign-callcenter', [
     param('leadId').isInt(),
     body('callCenterId').optional().isInt(),
     validate
 ], assignToCallCenter);
 
-// تعيين طلب لمدير بنك
-router.patch('/leads/:leadId/assign-bank', [
+router.post('/leads/:leadId/assign-bank', [
     param('leadId').isInt(),
     body('bankManagerId').optional().isInt(),
     body('bankId').optional().isInt(),
     validate
 ], assignToBankManager);
 
-// تعيين طلب لمدير تأجير
-router.patch('/leads/:leadId/assign-leasing', [
+router.post('/leads/:leadId/assign-leasing', [
     param('leadId').isInt(),
     body('leasingManagerId').optional().isInt(),
     validate
 ], assignToLeasingManager);
 
-// حذف طلب
+// =============================================
+// 🗑️ مسارات حذف الطلبات
+// =============================================
 router.delete('/leads/:leadId', [
     param('leadId').isInt(),
     validate
