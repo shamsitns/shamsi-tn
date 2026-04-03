@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticate, isGeneralManager } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const {
     getAllLeads,
     getDashboardStats,
@@ -14,8 +14,6 @@ const {
     assignToBankManager,
     assignToLeasingManager,
     deleteLead,
-    deleteAllLeads,
-    deleteRejectedLeads,
     getAllCompanies,
     addCompany,
     updateCompany,
@@ -29,7 +27,7 @@ const router = express.Router();
 // جميع المسارات تحتاج مصادقة وصلاحيات مدير عام أو مالك
 // =============================================
 router.use(authenticate);
-router.use(isGeneralManager);
+router.use(authorize(['general_manager', 'owner']));
 
 // =============================================
 // مسارات الطلبات والإحصائيات
@@ -47,8 +45,6 @@ router.post('/leads/:leadId/assign-leasing', assignToLeasingManager);
 // مسارات حذف الطلبات
 // =============================================
 router.delete('/leads/:leadId', deleteLead);
-router.delete('/leads/all', deleteAllLeads);
-router.delete('/leads/rejected', deleteRejectedLeads);
 
 // =============================================
 // مسارات إدارة المستخدمين

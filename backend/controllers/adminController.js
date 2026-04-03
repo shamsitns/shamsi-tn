@@ -19,7 +19,7 @@ const getFirstRow = (result) => {
 // الحصول على جميع الطلبات
 exports.getAllLeads = async (req, res) => {
     try {
-        const { status, page = 1, limit = 20, city, fromDate, toDate } = req.query;
+        const { status, page = 1, limit = 20, city } = req.query;
         const offset = (page - 1) * limit;
         
         console.log(`📊 Admin fetching leads - status: ${status}, page: ${page}`);
@@ -45,18 +45,6 @@ exports.getAllLeads = async (req, res) => {
         if (city) {
             query += ` AND l.city = $${paramIndex}`;
             queryParams.push(city);
-            paramIndex++;
-        }
-        
-        if (fromDate) {
-            query += ` AND DATE(l.created_at) >= $${paramIndex}`;
-            queryParams.push(fromDate);
-            paramIndex++;
-        }
-        
-        if (toDate) {
-            query += ` AND DATE(l.created_at) <= $${paramIndex}`;
-            queryParams.push(toDate);
             paramIndex++;
         }
         
@@ -101,7 +89,7 @@ exports.getAllLeads = async (req, res) => {
 };
 
 // =============================================
-// إحصائيات متقدمة (مع العمولة)
+// إحصائيات متقدمة
 // =============================================
 exports.getDashboardStats = async (req, res) => {
     try {
@@ -122,31 +110,29 @@ exports.getDashboardStats = async (req, res) => {
             FROM leads
         `);
         
-        const stats = getFirstRow(resultStats) || { 
-            total: 0, pending: 0, approved: 0, contacted: 0,
-            sent_to_operations: 0, assigned_to_company: 0,
-            completed: 0, cancelled: 0, total_commission: 0, total_kw: 0
-        };
+        const stats = getFirstRow(resultStats) || {};
         
-        const resultCityStats = await db.query(`
-            SELECT city, COUNT(*) as count, COALESCE(SUM(commission_amount), 0) as commission
+        // Leads by city
+        const cityResult = await db.query(`
+            SELECT city, COUNT(*) as count
             FROM leads
             WHERE city IS NOT NULL AND city != ''
             GROUP BY city
             ORDER BY count DESC
             LIMIT 10
         `);
-        const cityStats = getRows(resultCityStats);
+        const byCity = getRows(cityResult);
         
-        const resultPropertyStats = await db.query(`
-            SELECT property_type, COUNT(*) as count, COALESCE(SUM(commission_amount), 0) as commission
+        // Leads by property type
+        const propertyResult = await db.query(`
+            SELECT property_type, COUNT(*) as count
             FROM leads
             GROUP BY property_type
             ORDER BY count DESC
         `);
-        const propertyStats = getRows(resultPropertyStats);
+        const byProperty = getRows(propertyResult);
         
-        // استخدام date_trunc لـ PostgreSQL و strftime لـ SQLite
+        // Monthly stats
         const dbType = getDbType();
         let monthlyQuery;
         
@@ -154,8 +140,7 @@ exports.getDashboardStats = async (req, res) => {
             monthlyQuery = `
                 SELECT 
                     TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month,
-                    COUNT(*) as count,
-                    COALESCE(SUM(commission_amount), 0) as commission
+                    COUNT(*) as count
                 FROM leads
                 WHERE created_at >= NOW() - INTERVAL '6 months'
                 GROUP BY DATE_TRUNC('month', created_at)
@@ -165,8 +150,7 @@ exports.getDashboardStats = async (req, res) => {
             monthlyQuery = `
                 SELECT 
                     strftime('%Y-%m', created_at) as month,
-                    COUNT(*) as count,
-                    COALESCE(SUM(commission_amount), 0) as commission
+                    COUNT(*) as count
                 FROM leads
                 WHERE created_at >= datetime('now', '-6 months')
                 GROUP BY strftime('%Y-%m', created_at)
@@ -174,16 +158,14 @@ exports.getDashboardStats = async (req, res) => {
             `;
         }
         
-        const resultMonthlyStats = await db.query(monthlyQuery);
-        const monthlyStats = getRows(resultMonthlyStats);
-        
-        console.log(`📊 Stats: total=${stats.total}, commission=${stats.total_commission}`);
+        const monthlyResult = await db.query(monthlyQuery);
+        const byMonth = getRows(monthlyResult);
         
         res.json({
             ...stats,
-            byCity: cityStats || [],
-            byProperty: propertyStats || [],
-            byMonth: monthlyStats || []
+            byCity: byCity || [],
+            byProperty: byProperty || [],
+            byMonth: byMonth || []
         });
         
     } catch (error) {
@@ -214,7 +196,6 @@ exports.getAllUsers = async (req, res) => {
         const result = await db.query(query, params);
         const users = getRows(result);
         
-        console.log(`👥 Found ${users?.length || 0} users`);
         res.json(users || []);
         
     } catch (error) {
@@ -227,11 +208,8 @@ exports.addUser = async (req, res) => {
     try {
         const { name, email, password, role, phone } = req.body;
         
-        console.log(`👥 Adding new user: ${name}, ${email}, role: ${role}`);
-        
-        const resultExisting = await db.query('SELECT id FROM users WHERE email = $1', [email]);
-        const existing = getRows(resultExisting);
-        if (existing && existing.length > 0) {
+        const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (getRows(existing).length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
         }
         
@@ -243,11 +221,7 @@ exports.addUser = async (req, res) => {
             [name, email, hashedPassword, role, phone || null]
         );
         
-        console.log(`✅ User ${name} added successfully`);
-        res.status(201).json({ 
-            message: 'تم إضافة المستخدم بنجاح',
-            user: { name, email, role }
-        });
+        res.status(201).json({ message: 'تم إضافة المستخدم بنجاح' });
         
     } catch (error) {
         console.error('❌ Error adding user:', error);
@@ -260,8 +234,6 @@ exports.updateUser = async (req, res) => {
         const { id } = req.params;
         const { name, phone, role, is_active } = req.body;
         
-        console.log(`👥 Updating user ${id}`);
-        
         await db.query(
             `UPDATE users 
              SET name = $1, phone = $2, role = $3, is_active = $4, updated_at = CURRENT_TIMESTAMP 
@@ -269,7 +241,6 @@ exports.updateUser = async (req, res) => {
             [name, phone || null, role, is_active !== undefined ? is_active : true, id]
         );
         
-        console.log(`✅ User ${id} updated`);
         res.json({ message: 'تم تحديث المستخدم بنجاح' });
         
     } catch (error) {
@@ -282,21 +253,12 @@ exports.deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
         
-        console.log(`👥 Deleting user ${id}`);
-        
-        // التحقق من وجود طلبات مرتبطة
-        const resultLeads = await db.query('SELECT COUNT(*) as count FROM leads WHERE created_by = $1', [id]);
-        const leads = getRows(resultLeads);
-        if (leads[0]?.count > 0) {
-            return res.status(400).json({ 
-                message: `لا يمكن حذف المستخدم لأن لديه ${leads[0].count} طلبات مرتبطة`,
-                hasLeads: true
-            });
+        const leads = await db.query('SELECT COUNT(*) as count FROM leads WHERE created_by = $1', [id]);
+        if (getRows(leads)[0]?.count > 0) {
+            return res.status(400).json({ message: 'لا يمكن حذف المستخدم لأنه مرتبط بطلبات' });
         }
         
         await db.query('DELETE FROM users WHERE id = $1', [id]);
-        
-        console.log(`✅ User ${id} deleted`);
         res.json({ message: 'تم حذف المستخدم بنجاح' });
         
     } catch (error) {
@@ -313,14 +275,6 @@ exports.approveLead = async (req, res) => {
         const { leadId } = req.params;
         const adminId = req.user?.id;
         
-        console.log(`✅ Admin ${adminId} approving lead ${leadId}`);
-        
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const leads = getRows(resultLead);
-        if (!leads || leads.length === 0) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
-        }
-        
         await db.query(
             `UPDATE leads 
              SET status = 'approved', 
@@ -331,16 +285,11 @@ exports.approveLead = async (req, res) => {
             [adminId, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} approved`);
-        res.json({ 
-            message: 'تمت الموافقة على الطلب بنجاح',
-            leadId,
-            status: 'approved'
-        });
+        res.json({ message: 'تمت الموافقة على الطلب بنجاح' });
         
     } catch (error) {
         console.error('❌ Error approving lead:', error);
-        res.status(500).json({ message: 'حدث خطأ في الموافقة على الطلب', error: error.message });
+        res.status(500).json({ message: 'حدث خطأ في الموافقة', error: error.message });
     }
 };
 
@@ -348,15 +297,6 @@ exports.rejectLead = async (req, res) => {
     try {
         const { leadId } = req.params;
         const { reason } = req.body;
-        const adminId = req.user?.id;
-        
-        console.log(`❌ Admin ${adminId} rejecting lead ${leadId}`);
-        
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const leads = getRows(resultLead);
-        if (!leads || leads.length === 0) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
-        }
         
         await db.query(
             `UPDATE leads 
@@ -364,19 +304,85 @@ exports.rejectLead = async (req, res) => {
                  notes = COALESCE(notes, '') || '\n' || $1,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
-            [`[${new Date().toISOString()}] تم رفض الطلب من قبل المدير العام: ${reason || 'لا يوجد سبب'}`, leadId]
+            [`[${new Date().toISOString()}] تم الرفض: ${reason || 'لا يوجد سبب'}`, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} rejected`);
-        res.json({ 
-            message: 'تم رفض الطلب بنجاح',
-            leadId,
-            status: 'cancelled'
-        });
+        res.json({ message: 'تم رفض الطلب بنجاح' });
         
     } catch (error) {
         console.error('❌ Error rejecting lead:', error);
         res.status(500).json({ message: 'حدث خطأ في رفض الطلب', error: error.message });
+    }
+};
+
+// =============================================
+// تعيين الطلبات
+// =============================================
+exports.assignToExecutive = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        
+        await db.query(
+            `UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [leadId]
+        );
+        
+        res.json({ message: 'تم إرسال الطلب للمدير التنفيذي' });
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+    }
+};
+
+exports.assignToCallCenter = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        
+        await db.query(
+            `UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [leadId]
+        );
+        
+        res.json({ message: 'تم إرسال الطلب لمركز الاتصال' });
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+    }
+};
+
+exports.assignToBankManager = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        
+        await db.query(
+            `UPDATE leads SET financing_type = 'bank', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [leadId]
+        );
+        
+        res.json({ message: 'تم إرسال الطلب لمدير البنك' });
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+    }
+};
+
+exports.assignToLeasingManager = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        
+        await db.query(
+            `UPDATE leads SET financing_type = 'leasing', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [leadId]
+        );
+        
+        res.json({ message: 'تم إرسال الطلب لمدير التأجير' });
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
 
@@ -386,21 +392,11 @@ exports.rejectLead = async (req, res) => {
 exports.deleteLead = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const adminId = req.user?.id;
-        
-        console.log(`🗑️ Admin ${adminId} deleting lead ${leadId}`);
-        
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const leads = getRows(resultLead);
-        if (!leads || leads.length === 0) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
-        }
         
         await db.query('DELETE FROM lead_companies WHERE lead_id = $1', [leadId]);
         await db.query('DELETE FROM manager_assignments WHERE lead_id = $1', [leadId]);
         await db.query('DELETE FROM leads WHERE id = $1', [leadId]);
         
-        console.log(`✅ Lead ${leadId} deleted`);
         res.json({ message: 'تم حذف الطلب بنجاح' });
         
     } catch (error) {
@@ -412,22 +408,17 @@ exports.deleteLead = async (req, res) => {
 // =============================================
 // إدارة الشركات
 // =============================================
-
-// الحصول على جميع الشركات
 exports.getAllCompanies = async (req, res) => {
     try {
         const result = await db.query(`
             SELECT id, name, email, phone, address, contact_person, 
-                   description, rating, projects_count, established_year,
-                   license_number, website, logo, is_active, created_at
+                   rating, projects_count, is_active, created_at
             FROM companies
             WHERE is_active = 1
-            ORDER BY rating DESC, projects_count DESC
+            ORDER BY rating DESC
         `);
-        const companies = getRows(result);
         
-        console.log(`🏢 Found ${companies?.length || 0} companies`);
-        res.json(companies || []);
+        res.json(getRows(result));
         
     } catch (error) {
         console.error('❌ Error getting companies:', error);
@@ -435,33 +426,20 @@ exports.getAllCompanies = async (req, res) => {
     }
 };
 
-// إضافة شركة جديدة
 exports.addCompany = async (req, res) => {
     try {
-        const { name, email, phone, address, contact_person, description, projects_count } = req.body;
-        
-        console.log(`🏢 Adding new company: ${name}, ${email}`);
+        const { name, email, phone, address, contact_person, projects_count } = req.body;
         
         if (!name || !email) {
             return res.status(400).json({ message: 'الاسم والبريد الإلكتروني مطلوبان' });
         }
         
-        const resultExisting = await db.query('SELECT id FROM companies WHERE email = $1', [email]);
-        const existing = getRows(resultExisting);
-        if (existing && existing.length > 0) {
-            return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
-        }
-        
         await db.query(`
-            INSERT INTO companies (name, email, phone, address, contact_person, description, projects_count, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
-        `, [name, email, phone || null, address || null, contact_person || null, description || null, projects_count || 0]);
+            INSERT INTO companies (name, email, phone, address, contact_person, projects_count, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, 1)
+        `, [name, email, phone || null, address || null, contact_person || null, projects_count || 0]);
         
-        console.log(`✅ Company ${name} added successfully`);
-        res.status(201).json({ 
-            message: 'تم إضافة الشركة بنجاح',
-            company: { name, email }
-        });
+        res.status(201).json({ message: 'تم إضافة الشركة بنجاح' });
         
     } catch (error) {
         console.error('❌ Error adding company:', error);
@@ -469,25 +447,37 @@ exports.addCompany = async (req, res) => {
     }
 };
 
-// حذف شركة
+exports.updateCompany = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, phone, address, contact_person, rating, projects_count, is_active } = req.body;
+        
+        await db.query(`
+            UPDATE companies 
+            SET name = $1, phone = $2, address = $3, contact_person = $4,
+                rating = $5, projects_count = $6, is_active = $7,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $8
+        `, [name, phone || null, address || null, contact_person || null, rating || 0, projects_count || 0, is_active !== undefined ? is_active : true, id]);
+        
+        res.json({ message: 'تم تحديث الشركة بنجاح' });
+        
+    } catch (error) {
+        console.error('❌ Error updating company:', error);
+        res.status(500).json({ message: 'حدث خطأ في تحديث الشركة', error: error.message });
+    }
+};
+
 exports.deleteCompany = async (req, res) => {
     try {
         const { id } = req.params;
         
-        console.log(`🏢 Deleting company ${id}`);
-        
-        const resultLeads = await db.query('SELECT COUNT(*) as count FROM lead_companies WHERE company_id = $1', [id]);
-        const leads = getRows(resultLeads);
-        if (leads[0]?.count > 0) {
-            return res.status(400).json({ 
-                message: `لا يمكن حذف الشركة لأن لديها ${leads[0].count} طلبات مرتبطة`,
-                hasLeads: true
-            });
+        const leads = await db.query('SELECT COUNT(*) as count FROM lead_companies WHERE company_id = $1', [id]);
+        if (getRows(leads)[0]?.count > 0) {
+            return res.status(400).json({ message: 'لا يمكن حذف الشركة لأنها مرتبطة بطلبات' });
         }
         
         await db.query('DELETE FROM companies WHERE id = $1', [id]);
-        
-        console.log(`✅ Company ${id} deleted`);
         res.json({ message: 'تم حذف الشركة بنجاح' });
         
     } catch (error) {
@@ -497,27 +487,24 @@ exports.deleteCompany = async (req, res) => {
 };
 
 // =============================================
-// الإحصائيات للـ Dashboard
+// إحصائيات العمولات
 // =============================================
-exports.getStats = async (req, res) => {
+exports.getCommissionStats = async (req, res) => {
     try {
         const result = await db.query(`
             SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
                 COALESCE(SUM(commission_amount), 0) as total_commission,
-                COALESCE(SUM(required_kw), 0) as total_kw
+                COALESCE(SUM(commission_amount), 0) * 0.025 as zakat_amount
             FROM leads
+            WHERE status = 'completed'
         `);
         
-        const stats = getFirstRow(result) || {};
+        const stats = getFirstRow(result) || { total_commission: 0, zakat_amount: 0 };
         
         res.json(stats);
         
     } catch (error) {
-        console.error('❌ Error getting stats:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب الإحصائيات', error: error.message });
+        console.error('❌ Error getting commission stats:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب إحصائيات العمولات', error: error.message });
     }
 };
