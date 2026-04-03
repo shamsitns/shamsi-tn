@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { managerAPI } from '../services/api';
+import { adminAPI } from '../services/api'; // تغيير من managerAPI إلى adminAPI
 import toast from 'react-hot-toast';
 import { 
     FaCheck, FaTimes, FaChartLine, FaPhone, FaMoneyBillWave, 
@@ -31,7 +31,6 @@ const ExecutiveManagerDashboard = () => {
     const [sendNotes, setSendNotes] = useState('');
     const [showNotification, setShowNotification] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
     
     // =============================================
     // Fetch Data
@@ -49,12 +48,12 @@ const ExecutiveManagerDashboard = () => {
         setLoading(true);
         try {
             const params = filter !== 'all' ? { status: filter } : {};
-            const response = await managerAPI.getLeads(params);
+            // تغيير المسار إلى admin/leads
+            const response = await adminAPI.getLeads(params);
             console.log('📊 Leads data:', response.data);
             const leadsData = response.data.leads || [];
             setLeads(leadsData);
             
-            // استخراج المدن الفريدة
             const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
             setCities(uniqueCities);
         } catch (error) {
@@ -67,7 +66,8 @@ const ExecutiveManagerDashboard = () => {
     
     const fetchStats = async () => {
         try {
-            const response = await managerAPI.getStats();
+            // تغيير المسار إلى admin/stats
+            const response = await adminAPI.getStats();
             console.log('📊 Stats data:', response.data);
             setStats(response.data);
         } catch (error) {
@@ -82,17 +82,14 @@ const ExecutiveManagerDashboard = () => {
     const filterLeads = () => {
         let filtered = [...leads];
         
-        // فلتر حسب الحالة
         if (filter !== 'all') {
             filtered = filtered.filter(lead => lead.status === filter);
         }
         
-        // فلتر حسب المدينة
         if (cityFilter !== 'all') {
             filtered = filtered.filter(lead => lead.city === cityFilter);
         }
         
-        // فلتر حسب البحث
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(lead => 
@@ -112,8 +109,14 @@ const ExecutiveManagerDashboard = () => {
         const finalNotes = customNotes || notes;
         
         try {
-            await managerAPI.updateLeadStatus(leadId, newStatus, finalNotes);
-            toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
+            // تغيير المسار إلى admin/leads/:leadId/approve
+            if (newStatus === 'contacted') {
+                await adminAPI.approveLead(leadId);
+                toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
+            } else if (newStatus === 'cancelled') {
+                await adminAPI.rejectLead(leadId, finalNotes);
+                toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
+            }
             showNotificationMessage(`تم تحديث حالة الطلب #${leadId}`);
             fetchData();
             fetchStats();
@@ -130,7 +133,8 @@ const ExecutiveManagerDashboard = () => {
         if (!selectedLead) return;
         
         try {
-            await managerAPI.sendToOperationsManager(selectedLead.id, sendNotes);
+            // استخدام المسار الصحيح
+            await adminAPI.assignToExecutive(selectedLead.id, null, sendNotes);
             toast.success('✅ تم إرسال الطلب لمدير العمليات');
             showNotificationMessage('تم إرسال الطلب لمدير العمليات');
             fetchData();
@@ -144,26 +148,12 @@ const ExecutiveManagerDashboard = () => {
         }
     };
     
-    const handleAcceptAndSend = async (leadId) => {
-        const notes = prompt('أضف ملاحظات عن قبول الطلب (اختياري):');
-        
-        try {
-            await managerAPI.acceptLeadAndSend(leadId, notes);
-            toast.success('✅ تم قبول الطلب وإرساله لمدير العمليات');
-            showNotificationMessage('تم قبول الطلب وإرساله لمدير العمليات');
-            fetchData();
-            fetchStats();
-        } catch (error) {
-            console.error('Error accepting lead:', error);
-            toast.error('❌ حدث خطأ');
-        }
-    };
-    
     const handleAddNotes = async () => {
         if (!selectedLead) return;
         
         try {
-            await managerAPI.updateLeadStatus(selectedLead.id, selectedLead.status, notes);
+            // إضافة ملاحظات
+            await adminAPI.addLeadNote(selectedLead.id, notes);
             toast.success('✅ تم إضافة الملاحظات');
             showNotificationMessage('تم إضافة الملاحظات');
             setShowNotesModal(false);
@@ -195,17 +185,15 @@ const ExecutiveManagerDashboard = () => {
     };
     
     // =============================================
-    // Parse additional info (JSON format)
+    // Parse additional info
     // =============================================
     const parseAdditionalInfo = (info) => {
         if (!info) return {};
         
-        // محاولة parsing كـ JSON أولاً
         try {
             const parsed = JSON.parse(info);
             return parsed;
         } catch (e) {
-            // إذا لم يكن JSON، نستخدم الـ regex القديم
             const result = {
                 meter_number: null,
                 payment_method: null,
@@ -345,7 +333,6 @@ const ExecutiveManagerDashboard = () => {
         return <FaMoneyBillWave className="text-gray-600" />;
     };
     
-    // حساب الإحصائيات المتقدمة
     const advancedStats = {
         totalLeads: filteredLeads.length,
         hotLeads: filteredLeads.filter(l => isHotLead(l)).length,
@@ -353,9 +340,6 @@ const ExecutiveManagerDashboard = () => {
         conversionRate: ((filteredLeads.filter(l => l.status === 'completed').length / filteredLeads.length) * 100 || 0).toFixed(0)
     };
     
-    // =============================================
-    // Render
-    // =============================================
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -366,14 +350,12 @@ const ExecutiveManagerDashboard = () => {
     
     return (
         <div className="min-h-screen bg-gray-100">
-            {/* Notification */}
             {showNotification && (
                 <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-pulse">
                     <FaBell className="inline ml-2" /> {notificationMessage}
                 </div>
             )}
             
-            {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-green-700 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-6">
                     <div className="flex flex-wrap justify-between items-center">
@@ -382,13 +364,12 @@ const ExecutiveManagerDashboard = () => {
                                 <FaSun className="text-yellow-300" />
                                 لوحة تحكم المدير التنفيذي
                             </h1>
-                            <p className="text-green-100 mt-1">إدارة الطلبات والتواصل مع العملاء وإرسالها لمدير العمليات</p>
+                            <p className="text-green-100 mt-1">إدارة الطلبات والتواصل مع العملاء</p>
                         </div>
                     </div>
                 </div>
             </div>
             
-            {/* Advanced Stats Cards */}
             <div className="max-w-7xl mx-auto px-4 py-6">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                     <div className="bg-white rounded-lg shadow-md p-4">
@@ -453,11 +434,9 @@ const ExecutiveManagerDashboard = () => {
                 </div>
             </div>
             
-            {/* Search and Filters */}
             <div className="max-w-7xl mx-auto px-4">
                 <div className="bg-white rounded-lg shadow-md p-4 mb-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Search */}
                         <div className="relative">
                             <FaSearch className="absolute right-3 top-3 text-gray-400" />
                             <input
@@ -469,7 +448,6 @@ const ExecutiveManagerDashboard = () => {
                             />
                         </div>
                         
-                        {/* City Filter */}
                         <div className="relative">
                             <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
                             <select
@@ -484,7 +462,6 @@ const ExecutiveManagerDashboard = () => {
                             </select>
                         </div>
                         
-                        {/* Status Filter */}
                         <div className="relative">
                             <FaFilter className="absolute right-3 top-3 text-gray-400" />
                             <select
@@ -504,12 +481,11 @@ const ExecutiveManagerDashboard = () => {
                     </div>
                 </div>
                 
-                {/* Leads Cards */}
                 {filteredLeads.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-md p-12 text-center">
                         <FaSun className="text-6xl text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-500 text-lg">لا توجد طلبات حالياً</p>
-                        <p className="text-gray-400 text-sm">سيظهر هنا الطلبات المعينة لك من قبل المدير العام</p>
+                        <p className="text-gray-400 text-sm">سيظهر هنا الطلبات المعينة لك</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -521,7 +497,6 @@ const ExecutiveManagerDashboard = () => {
                             
                             return (
                             <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition border-t-4 border-t-yellow-500">
-                                {/* Header */}
                                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b">
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
@@ -547,7 +522,6 @@ const ExecutiveManagerDashboard = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Progress Bar */}
                                 <div className="px-4 pt-3">
                                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                                         <span>التقدم</span>
@@ -561,16 +535,13 @@ const ExecutiveManagerDashboard = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Body - All Collected Information */}
                                 <div className="p-4">
                                     <div className="space-y-2 mb-4">
-                                        {/* Phone */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">رقم الهاتف:</span>
                                             <span className="font-medium" dir="ltr">{lead.phone}</span>
                                         </div>
                                         
-                                        {/* Bill Amount */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
                                                 <FaMoneyBillWave className="text-green-600" />
@@ -578,13 +549,9 @@ const ExecutiveManagerDashboard = () => {
                                             </span>
                                             <span className="font-bold text-green-600">
                                                 {lead.bill_amount} دينار
-                                                <span className="text-xs text-gray-500 block">
-                                                    ({lead.bill_period_months === 60 ? 'شهرين' : 'شهر'})
-                                                </span>
                                             </span>
                                         </div>
                                         
-                                        {/* Required Power */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
                                                 <FaBolt className="text-yellow-600" />
@@ -593,7 +560,6 @@ const ExecutiveManagerDashboard = () => {
                                             <span className="font-medium">{lead.required_kw} kWp</span>
                                         </div>
                                         
-                                        {/* Property Type */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
                                             <span className="font-medium flex items-center gap-1">
@@ -602,7 +568,6 @@ const ExecutiveManagerDashboard = () => {
                                             </span>
                                         </div>
                                         
-                                        {/* Meter Number */}
                                         {additionalInfo.meter_number && (
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-500 flex items-center gap-1">
@@ -613,40 +578,6 @@ const ExecutiveManagerDashboard = () => {
                                             </div>
                                         )}
                                         
-                                        {/* Payment Method */}
-                                        {additionalInfo.payment_method && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-500 flex items-center gap-1">
-                                                    {getPaymentMethodIcon(additionalInfo.payment_method)}
-                                                    طريقة الدفع:
-                                                </span>
-                                                <span className="font-medium">{additionalInfo.payment_method}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Preferred Bank */}
-                                        {additionalInfo.preferred_bank && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-500 flex items-center gap-1">
-                                                    <FaUniversity className="text-purple-600" />
-                                                    البنك المختار:
-                                                </span>
-                                                <span className="font-medium">{additionalInfo.preferred_bank}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Roof Area */}
-                                        {additionalInfo.roof_area && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-500 flex items-center gap-1">
-                                                    <FaRuler className="text-blue-500" />
-                                                    مساحة السطح:
-                                                </span>
-                                                <span className="font-medium">{additionalInfo.roof_area}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Commission */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
                                                 <FaMoneyBillWave className="text-green-600" />
@@ -654,57 +585,11 @@ const ExecutiveManagerDashboard = () => {
                                             </span>
                                             <span className="font-bold text-green-600">
                                                 {formatCurrency(lead.commission_amount)} دينار
-                                                <span className="text-xs text-gray-400 mr-1">
-                                                    ({lead.required_kw} kW × 150)
-                                                </span>
-                                            </span>
-                                        </div>
-                                        
-                                        {/* Lead Score */}
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaTrophy className="text-orange-500" />
-                                                Lead Score:
-                                            </span>
-                                            <span className={`font-bold ${getLeadScore(lead) >= 60 ? 'text-red-600' : getLeadScore(lead) >= 40 ? 'text-yellow-600' : 'text-green-600'}`}>
-                                                {getLeadScore(lead)}
-                                            </span>
-                                        </div>
-                                        
-                                        {/* Date */}
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaCalendarAlt className="text-gray-400" />
-                                                تاريخ الطلب:
-                                            </span>
-                                            <span className="text-xs text-gray-500">
-                                                {new Date(lead.created_at).toLocaleDateString('ar-TN')}
                                             </span>
                                         </div>
                                     </div>
-                                    
-                                    {/* Additional Info Full */}
-                                    {lead.additional_info && (
-                                        <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm border-r-4 border-blue-400">
-                                            <p className="text-gray-600 font-semibold text-xs mb-1 flex items-center gap-1">
-                                                <FaInfoCircle className="text-blue-500" /> معلومات إضافية:
-                                            </p>
-                                            <p className="text-gray-600 text-xs whitespace-pre-wrap">{lead.additional_info}</p>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Previous Notes */}
-                                    {lead.notes && (
-                                        <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm border-r-4 border-gray-400">
-                                            <p className="text-gray-600 font-semibold text-xs mb-1 flex items-center gap-1">
-                                                📝 ملاحظات سابقة:
-                                            </p>
-                                            <p className="text-gray-600 text-xs">{lead.notes}</p>
-                                        </div>
-                                    )}
                                 </div>
                                 
-                                {/* Footer Actions */}
                                 <div className="bg-gray-50 px-4 py-3 border-t">
                                     <div className="flex gap-2 mb-2">
                                         <button
@@ -721,7 +606,6 @@ const ExecutiveManagerDashboard = () => {
                                         </button>
                                     </div>
                                     
-                                    {/* Status-based actions */}
                                     {lead.status === 'pending' && (
                                         <div className="flex gap-2">
                                             <button
@@ -739,7 +623,7 @@ const ExecutiveManagerDashboard = () => {
                                         </div>
                                     )}
                                     
-                                    {lead.status === 'contacted' && (
+                                    {(lead.status === 'contacted' || lead.status === 'approved') && (
                                         <button
                                             onClick={() => {
                                                 setSelectedLead(lead);
@@ -749,36 +633,6 @@ const ExecutiveManagerDashboard = () => {
                                         >
                                             <FaPaperPlane /> إرسال لمدير العمليات
                                         </button>
-                                    )}
-                                    
-                                    {lead.status === 'approved' && (
-                                        <button
-                                            onClick={() => {
-                                                setSelectedLead(lead);
-                                                setShowSendModal(true);
-                                            }}
-                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm"
-                                        >
-                                            <FaPaperPlane /> إرسال لمدير العمليات
-                                        </button>
-                                    )}
-                                    
-                                    {lead.status === 'completed' && (
-                                        <div className="text-center text-sm text-green-600 py-2">
-                                            <FaCheckCircle className="inline ml-1" /> تم إكمال التركيب
-                                        </div>
-                                    )}
-                                    
-                                    {lead.status === 'cancelled' && (
-                                        <div className="text-center text-sm text-red-600 py-2">
-                                            <FaTimesCircle className="inline ml-1" /> تم رفض الطلب
-                                        </div>
-                                    )}
-                                    
-                                    {lead.status === 'sent_to_operations' && (
-                                        <div className="text-center text-sm text-indigo-600 py-2">
-                                            <FaPaperPlane className="inline ml-1" /> تم الإرسال لمدير العمليات
-                                        </div>
                                     )}
                                     
                                     <button
@@ -799,13 +653,11 @@ const ExecutiveManagerDashboard = () => {
                 )}
             </div>
             
-            {/* Notes Modal */}
             {showNotesModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                         <h3 className="text-xl font-bold mb-4">📝 إضافة ملاحظات</h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-4">الحالة الحالية: {getStatusText(selectedLead.status)}</p>
                         
                         <textarea
                             placeholder="أضف ملاحظات عن العميل..."
@@ -823,7 +675,6 @@ const ExecutiveManagerDashboard = () => {
                 </div>
             )}
             
-            {/* Send to Operations Modal */}
             {showSendModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -831,7 +682,6 @@ const ExecutiveManagerDashboard = () => {
                             <FaPaperPlane className="text-indigo-600" /> إرسال الطلب لمدير العمليات
                         </h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-4">القدرة: {selectedLead.required_kw} kWp | المدينة: {selectedLead.city}</p>
                         
                         <label className="block text-gray-700 mb-2">ملاحظات إضافية (اختياري):</label>
                         <textarea
