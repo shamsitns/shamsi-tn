@@ -508,3 +508,37 @@ exports.getCommissionStats = async (req, res) => {
         res.status(500).json({ message: 'حدث خطأ في جلب إحصائيات العمولات', error: error.message });
     }
 };
+// =============================================
+// جلب تفاصيل طلب محدد
+// =============================================
+exports.getLeadById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const result = await db.query(`
+            SELECT l.*, 
+                   u.name as created_by_name,
+                   u2.name as approved_by_name,
+                   u3.name as contacted_by_name,
+                   c.name as company_name
+            FROM leads l
+            LEFT JOIN users u ON l.created_by = u.id
+            LEFT JOIN users u2 ON l.approved_by = u2.id
+            LEFT JOIN users u3 ON l.contacted_by = u3.id
+            LEFT JOIN companies c ON l.assigned_company_id = c.id
+            WHERE l.id = $1
+        `, [id]);
+        
+        const lead = getFirstRow(result);
+        
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        res.json(lead);
+        
+    } catch (error) {
+        console.error('❌ Error getting lead by id:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب الطلب', error: error.message });
+    }
+};
