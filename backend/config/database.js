@@ -61,6 +61,7 @@ const createTablesPostgres = async (pool) => {
   // 1. إضافة الأعمدة المفقودة إلى الجداول الموجودة
   // ============================================
   
+  // إضافة أعمدة users
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
@@ -69,18 +70,24 @@ const createTablesPostgres = async (pool) => {
     console.log('Note: users table update:', err.message);
   }
 
+  // إضافة جميع أعمدة leads المفقودة
   try {
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS preferred_bank VARCHAR(100);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS panel_type VARCHAR(100);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_source VARCHAR(50) DEFAULT 'website';`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_score INTEGER DEFAULT 0;`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS roof_area DECIMAL(10,2);`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS meter_number VARCHAR(50);`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS financing_type VARCHAR(20) DEFAULT 'cash';`);
-    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_score INTEGER DEFAULT 0;`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS installation_status VARCHAR(50) DEFAULT 'pending';`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
-    console.log('✅ Updated leads table');
+    console.log('✅ Updated leads table with all columns');
   } catch (err) {
     console.log('Note: leads table update:', err.message);
   }
 
+  // إضافة أعمدة companies
   try {
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating DECIMAL(2,1) DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reviews_count INTEGER DEFAULT 0;`);
@@ -163,7 +170,7 @@ const createTablesPostgres = async (pool) => {
   }
 
   // ============================================
-  // 4. إنشاء الجداول الرئيسية
+  // 4. إنشاء الجداول الرئيسية (إذا لم تكن موجودة)
   // ============================================
   
   const queries = [
@@ -208,6 +215,10 @@ const createTablesPostgres = async (pool) => {
       roof_availability BOOLEAN DEFAULT true,
       roof_area DECIMAL(10,2),
       meter_number VARCHAR(50),
+      payment_method VARCHAR(50),
+      preferred_bank VARCHAR(100),
+      panel_type VARCHAR(100),
+      lead_source VARCHAR(50) DEFAULT 'website',
       financing_type VARCHAR(20) DEFAULT 'cash' CHECK (financing_type IN ('cash', 'prosol', 'leasing')),
       lead_score INTEGER DEFAULT 0,
       additional_info TEXT,
@@ -323,6 +334,10 @@ const createTablesSQLite = async (db) => {
       roof_availability INTEGER DEFAULT 1,
       roof_area REAL,
       meter_number TEXT,
+      payment_method TEXT,
+      preferred_bank TEXT,
+      panel_type TEXT,
+      lead_source TEXT DEFAULT 'website',
       financing_type TEXT DEFAULT 'cash',
       lead_score INTEGER DEFAULT 0,
       additional_info TEXT,
