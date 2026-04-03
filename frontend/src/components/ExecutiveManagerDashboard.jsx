@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { adminAPI } from '../services/api'; // تغيير من managerAPI إلى adminAPI
+import { managerAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
     FaCheck, FaTimes, FaChartLine, FaPhone, FaMoneyBillWave, 
@@ -8,8 +8,7 @@ import {
     FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaBuilding,
     FaHome, FaIndustry, FaTractor, FaStore, FaIdCard,
     FaUniversity, FaHandHoldingHeart, FaInfoCircle, FaSearch,
-    FaFilter, FaFire, FaTrophy, FaBell, FaStar, FaEnvelope,
-    FaAddressCard, FaFileInvoice, FaChartBar
+    FaFilter, FaFire, FaTrophy, FaBell, FaStar
 } from 'react-icons/fa';
 
 const ExecutiveManagerDashboard = () => {
@@ -48,8 +47,7 @@ const ExecutiveManagerDashboard = () => {
         setLoading(true);
         try {
             const params = filter !== 'all' ? { status: filter } : {};
-            // تغيير المسار إلى admin/leads
-            const response = await adminAPI.getLeads(params);
+            const response = await managerAPI.getMyLeads(params);
             console.log('📊 Leads data:', response.data);
             const leadsData = response.data.leads || [];
             setLeads(leadsData);
@@ -66,8 +64,7 @@ const ExecutiveManagerDashboard = () => {
     
     const fetchStats = async () => {
         try {
-            // تغيير المسار إلى admin/stats
-            const response = await adminAPI.getStats();
+            const response = await managerAPI.getMyStats();
             console.log('📊 Stats data:', response.data);
             setStats(response.data);
         } catch (error) {
@@ -105,18 +102,10 @@ const ExecutiveManagerDashboard = () => {
     // =============================================
     // Lead Management
     // =============================================
-    const handleUpdateStatus = async (leadId, newStatus, customNotes = null) => {
-        const finalNotes = customNotes || notes;
-        
+    const handleUpdateStatus = async (leadId, newStatus) => {
         try {
-            // تغيير المسار إلى admin/leads/:leadId/approve
-            if (newStatus === 'contacted') {
-                await adminAPI.approveLead(leadId);
-                toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
-            } else if (newStatus === 'cancelled') {
-                await adminAPI.rejectLead(leadId, finalNotes);
-                toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
-            }
+            await managerAPI.updateLeadStatus(leadId, newStatus, notes);
+            toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
             showNotificationMessage(`تم تحديث حالة الطلب #${leadId}`);
             fetchData();
             fetchStats();
@@ -133,8 +122,7 @@ const ExecutiveManagerDashboard = () => {
         if (!selectedLead) return;
         
         try {
-            // استخدام المسار الصحيح
-            await adminAPI.assignToExecutive(selectedLead.id, null, sendNotes);
+            await managerAPI.sendToOperationsManager(selectedLead.id, sendNotes);
             toast.success('✅ تم إرسال الطلب لمدير العمليات');
             showNotificationMessage('تم إرسال الطلب لمدير العمليات');
             fetchData();
@@ -152,8 +140,7 @@ const ExecutiveManagerDashboard = () => {
         if (!selectedLead) return;
         
         try {
-            // إضافة ملاحظات
-            await adminAPI.addLeadNote(selectedLead.id, notes);
+            await managerAPI.addLeadNote(selectedLead.id, notes);
             toast.success('✅ تم إضافة الملاحظات');
             showNotificationMessage('تم إضافة الملاحظات');
             setShowNotesModal(false);
