@@ -61,7 +61,6 @@ const createTablesPostgres = async (pool) => {
   // 1. إضافة الأعمدة المفقودة إلى الجداول الموجودة
   // ============================================
   
-  // إضافة أعمدة users
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
@@ -70,7 +69,6 @@ const createTablesPostgres = async (pool) => {
     console.log('Note: users table update:', err.message);
   }
 
-  // إضافة أعمدة leads
   try {
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS roof_area DECIMAL(10,2);`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS meter_number VARCHAR(50);`);
@@ -83,7 +81,6 @@ const createTablesPostgres = async (pool) => {
     console.log('Note: leads table update:', err.message);
   }
 
-  // إضافة أعمدة companies
   try {
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating DECIMAL(2,1) DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reviews_count INTEGER DEFAULT 0;`);
@@ -166,29 +163,7 @@ const createTablesPostgres = async (pool) => {
   }
 
   // ============================================
-  // 4. إعادة إنشاء جدول leads إذا لزم الأمر
-  //    (اختياري - احذف هذا القسم إذا كنت تريد الاحتفاظ بالبيانات)
-  // ============================================
-  
-  // تحقق مما إذا كان عمود required_kw موجوداً
-  const checkColumn = await pool.query(`
-    SELECT column_name 
-    FROM information_schema.columns 
-    WHERE table_name = 'leads' AND column_name = 'required_kw'
-  `);
-  
-  if (checkColumn.rows.length === 0) {
-    console.log('⚠️ leads table is missing critical columns, recreating...');
-    try {
-      await pool.query(`DROP TABLE IF EXISTS leads CASCADE;`);
-      console.log('✅ Dropped old leads table');
-    } catch (err) {
-      console.log('Note: leads table might not exist');
-    }
-  }
-
-  // ============================================
-  // 5. إنشاء الجداول الرئيسية
+  // 4. إنشاء الجداول الرئيسية
   // ============================================
   
   const queries = [

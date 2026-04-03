@@ -113,15 +113,15 @@ exports.createLead = async (req, res) => {
         
         console.log('📋 Full additional info:', fullAdditionalInfo);
         
-        // Insert lead
+        // ✅ INSERT مع 13 قيمة فقط (بدون created_at)
         const query = `
             INSERT INTO leads (
                 name, phone, city, property_type, 
                 bill_amount, bill_period_months, bill_season,
                 roof_availability, additional_info,
                 required_kw, panels_count, commission_amount,
-                status, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+                status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id
         `;
         
@@ -184,7 +184,7 @@ exports.getLead = async (req, res) => {
                    u.role as assigned_role,
                    c.name as company_name
             FROM leads l
-            LEFT JOIN users u ON l.assigned_to = u.id
+            LEFT JOIN users u ON l.created_by = u.id
             LEFT JOIN companies c ON l.assigned_company_id = c.id
             WHERE l.id = $1
         `, [id]);
@@ -219,12 +219,14 @@ exports.updateLeadStatus = async (req, res) => {
         }
         
         // Check if lead exists
-        const existingResult = await db.query('SELECT id FROM leads WHERE id = $1', [id]);
-        const existing = getRows(existingResult);
+        const existingResult = await db.query('SELECT id, status FROM leads WHERE id = $1', [id]);
+        const existing = getFirstRow(existingResult);
         
-        if (!existing || existing.length === 0) {
+        if (!existing) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
+        
+        const oldStatus = existing.status;
         
         // Update lead status with appropriate fields
         let updateQuery = `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP`;
@@ -256,18 +258,22 @@ exports.updateLeadStatus = async (req, res) => {
         
         await db.query(updateQuery, params);
         
+        // Add to lead history
+        await db.addLeadHistory(id, 'status_updated', oldStatus, status, userId, notes);
+        
         // Log activity
         await db.query(
             `INSERT INTO activity_logs (user_id, action, details) 
              VALUES ($1, $2, $3)`,
-            [userId, 'lead_status_updated', `تم تحديث حالة الطلب ${id} إلى ${status}`]
+            [userId, 'lead_status_updated', `تم تحديث حالة الطلب ${id} من ${oldStatus} إلى ${status}`]
         );
         
-        console.log(`✅ Lead ${id} status updated to ${status}`);
+        console.log(`✅ Lead ${id} status updated from ${oldStatus} to ${status}`);
         res.json({ 
             message: 'تم تحديث حالة الطلب بنجاح',
             leadId: id,
-            status: status
+            status: status,
+            oldStatus: oldStatus
         });
         
     } catch (error) {
@@ -292,7 +298,7 @@ exports.getMyLeads = async (req, res) => {
         
         // Filter by role
         if (role === 'executive_manager' || role === 'call_center' || role === 'operations_manager') {
-            query += ` AND assigned_to = $${paramIndex}`;
+            query += ` AND created_by = $${paramIndex}`;
             params.push(userId);
             paramIndex++;
         }
@@ -315,7 +321,7 @@ exports.getMyLeads = async (req, res) => {
         let countIndex = 1;
         
         if (role === 'executive_manager' || role === 'call_center' || role === 'operations_manager') {
-            countQuery += ` AND assigned_to = $${countIndex}`;
+            countQuery += ` AND created_by = $${countIndex}`;
             countParams.push(userId);
             countIndex++;
         }
