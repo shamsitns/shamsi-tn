@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { calculateSolarSystem } = require('../utils/solarCalculator');
+const { COMMISSION_PER_KW, COMMISSION_TIERS } = require('../config/commission');
 
 // Helper function to handle both PostgreSQL and SQLite results
 const getRows = (result) => {
@@ -12,11 +13,68 @@ const getFirstRow = (result) => {
 };
 
 // =============================================
+// حساب lead score تلقائياً
+// =============================================
+const calculateLeadScore = (leadData) => {
+    let score = 0;
+    
+    // فاتورة عالية = عميل جيد
+    if (leadData.bill_amount > 500) score += 30;
+    else if (leadData.bill_amount > 300) score += 20;
+    else if (leadData.bill_amount > 150) score += 10;
+    else if (leadData.bill_amount > 100) score += 5;
+    
+    // مساحة سطح كبيرة
+    if (leadData.roof_area && leadData.roof_area > 100) score += 20;
+    else if (leadData.roof_area && leadData.roof_area > 50) score += 10;
+    else if (leadData.roof_area && leadData.roof_area > 30) score += 5;
+    
+    // مدينة كبيرة (إشعاع شمسي أفضل)
+    const highRadiationCities = ['قبلي', 'تطاوين', 'مدنين', 'قفصة', 'صفاقس', 'القيروان'];
+    if (highRadiationCities.includes(leadData.city)) score += 15;
+    
+    // المدن المتوسطة
+    const mediumRadiationCities = ['تونس', 'سوسة', 'المنستير', 'نابل', 'بنزرت'];
+    if (mediumRadiationCities.includes(leadData.city)) score += 10;
+    
+    // نوع العقار
+    if (leadData.property_type === 'farm') score += 15;
+    if (leadData.property_type === 'house') score += 10;
+    if (leadData.property_type === 'commercial') score += 8;
+    
+    // توفر السطح
+    if (leadData.roof_availability === true) score += 10;
+    
+    // رقم العداد موجود
+    if (leadData.meter_number) score += 5;
+    
+    return Math.min(score, 100); // كحد أقصى 100
+};
+
+// =============================================
+// حساب العمولة حسب القدرة (باستخدام tiers)
+// =============================================
+const calculateCommission = (requiredKw) => {
+    // البحث عن الـ tier المناسب
+    const tier = COMMISSION_TIERS.find(t => 
+        requiredKw >= t.minKw && requiredKw < t.maxKw
+    );
+    
+    if (tier) {
+        return requiredKw * tier.rate;
+    }
+    
+    // fallback إلى القيمة الافتراضية
+    return requiredKw * COMMISSION_PER_KW;
+};
+
+// =============================================
 // حساب النظام الشمسي فقط (بدون حفظ)
 // =============================================
 exports.calculateLead = async (req, res) => {
     try {
-        console.log('📝 Calculation request:', req.body);
+        // Log محدود للأمان (بدون بيانات حساسة)
+        console.log('📝 Calculation request received');
         
         const {
             name,
@@ -44,7 +102,7 @@ exports.calculateLead = async (req, res) => {
             property_type || 'house'
         );
         
-        console.log('✅ Calculation completed:', solarData);
+        console.log(`✅ Calculation completed: ${solarData.required_kw} kWp`);
         
         res.status(200).json({
             message: 'تم حساب النظام الشمسي بنجاح',
@@ -65,7 +123,8 @@ exports.calculateLead = async (req, res) => {
 // =============================================
 exports.createLead = async (req, res) => {
     try {
-        console.log('📝 Creating lead:', req.body);
+        // Log محدود للأمان
+        console.log('📝 Creating new lead');
         
         const {
             name,
@@ -76,12 +135,16 @@ exports.createLead = async (req, res) => {
             bill_season,
             bill_amount,
             roof_availability,
+            roof_area,
             meter_number,
             payment_method,
             preferred_bank,
             panel_type,
             additional_info
         } = req.body;
+        
+        // مصدر العميل (من header أو default)
+        const leadSource = req.headers['x-source'] || 'website';
         
         // Validation
         if (!name || !phone || !bill_amount) {
@@ -99,10 +162,20 @@ exports.createLead = async (req, res) => {
             property_type || 'house'
         );
         
-        // Calculate commission (150 DT per kW)
-        const commissionAmount = solarData.required_kw * 150;
+        // Calculate commission using tiers
+        const commissionAmount = calculateCommission(solarData.required_kw);
         
-        // جمع جميع المعلومات الإضافية في حقل واحد
+        // حساب lead score
+        const leadScore = calculateLeadScore({
+            bill_amount: parseFloat(bill_amount),
+            roof_area: roof_area ? parseFloat(roof_area) : 0,
+            city: city,
+            property_type: property_type,
+            roof_availability: roof_availability,
+            meter_number: meter_number
+        });
+        
+        // جمع المعلومات الإضافية بشكل منظم (للتخزين النصي)
         let fullAdditionalInfo = '';
         if (meter_number) fullAdditionalInfo += `🔢 رقم العداد: ${meter_number}\n`;
         if (payment_method) fullAdditionalInfo += `💰 طريقة الدفع: ${payment_method}\n`;
@@ -110,18 +183,21 @@ exports.createLead = async (req, res) => {
         if (panel_type) fullAdditionalInfo += `🔋 نوع اللوح: ${panel_type}\n`;
         if (additional_info) fullAdditionalInfo += `📋 معلومات إضافية: ${additional_info}\n`;
         if (roof_availability !== undefined) fullAdditionalInfo += `🏠 توفر السطح: ${roof_availability ? 'نعم' : 'لا'}\n`;
+        if (roof_area) fullAdditionalInfo += `📐 مساحة السطح: ${roof_area} م²\n`;
         
-        console.log('📋 Full additional info:', fullAdditionalInfo);
+        console.log(`📊 Lead data: ${name}, ${phone}, KW: ${solarData.required_kw}, Score: ${leadScore}`);
         
-        // ✅ INSERT مع 13 قيمة فقط (بدون created_at)
+        // INSERT مع جميع الحقول (بما فيها الجديدة)
         const query = `
             INSERT INTO leads (
                 name, phone, city, property_type, 
                 bill_amount, bill_period_months, bill_season,
-                roof_availability, additional_info,
+                roof_availability, roof_area, meter_number,
+                payment_method, preferred_bank, panel_type,
+                additional_info, lead_score, lead_source,
                 required_kw, panels_count, commission_amount,
-                status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                status, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP)
             RETURNING id
         `;
         
@@ -134,7 +210,14 @@ exports.createLead = async (req, res) => {
             parseInt(bill_period_months) || 60,
             bill_season || 'spring',
             roof_availability !== undefined ? roof_availability : true,
+            roof_area ? parseFloat(roof_area) : null,
+            meter_number || null,
+            payment_method || null,
+            preferred_bank || null,
+            panel_type || null,
             fullAdditionalInfo || null,
+            leadScore,
+            leadSource,
             solarData.required_kw,
             solarData.panels_count,
             commissionAmount,
@@ -144,14 +227,23 @@ exports.createLead = async (req, res) => {
         const result = await db.query(query, values);
         const leadId = getFirstRow(result)?.id;
         
+        // تسجيل في activity_logs
+        await db.query(
+            `INSERT INTO activity_logs (user_id, action, details, ip_address) 
+             VALUES ($1, $2, $3, $4)`,
+            [null, 'lead_created', `تم إنشاء طلب جديد من ${name} (رقم الهاتف: ${phone})`, req.ip]
+        );
+        
         console.log(`✅ Lead created successfully with ID: ${leadId}`);
         console.log(`   📊 Required KW: ${solarData.required_kw} kWp`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
-        console.log(`   📋 Info: ${fullAdditionalInfo}`);
+        console.log(`   ⭐ Lead Score: ${leadScore}`);
+        console.log(`   📍 Source: ${leadSource}`);
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
             leadId: leadId,
+            leadScore: leadScore,
             solarData: {
                 required_kw: solarData.required_kw,
                 panels_count: solarData.panels_count,
@@ -180,11 +272,14 @@ exports.getLead = async (req, res) => {
         
         const result = await db.query(`
             SELECT l.*, 
-                   u.name as assigned_to_name,
-                   u.role as assigned_role,
+                   u.name as created_by_name,
+                   u2.name as approved_by_name,
+                   u3.name as contacted_by_name,
                    c.name as company_name
             FROM leads l
             LEFT JOIN users u ON l.created_by = u.id
+            LEFT JOIN users u2 ON l.approved_by = u2.id
+            LEFT JOIN users u3 ON l.contacted_by = u3.id
             LEFT JOIN companies c ON l.assigned_company_id = c.id
             WHERE l.id = $1
         `, [id]);
@@ -195,7 +290,16 @@ exports.getLead = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        res.json(lead);
+        // إضافة تصنيف lead بناءً على الـ score
+        let leadQuality = 'weak';
+        if (lead.lead_score >= 70) leadQuality = 'hot';
+        else if (lead.lead_score >= 50) leadQuality = 'warm';
+        else if (lead.lead_score >= 30) leadQuality = 'medium';
+        
+        res.json({
+            ...lead,
+            lead_quality: leadQuality
+        });
         
     } catch (error) {
         console.error('❌ Error getting lead:', error);
@@ -219,7 +323,7 @@ exports.updateLeadStatus = async (req, res) => {
         }
         
         // Check if lead exists
-        const existingResult = await db.query('SELECT id, status FROM leads WHERE id = $1', [id]);
+        const existingResult = await db.query('SELECT id, status, lead_score FROM leads WHERE id = $1', [id]);
         const existing = getFirstRow(existingResult);
         
         if (!existing) {
@@ -245,11 +349,13 @@ exports.updateLeadStatus = async (req, res) => {
             updateQuery += `, sent_to_operations_by = $${paramIndex}, sent_to_operations_at = CURRENT_TIMESTAMP`;
             params.push(userId);
             paramIndex++;
+        } else if (status === 'completed') {
+            updateQuery += `, completed_at = CURRENT_TIMESTAMP`;
         }
         
         if (notes) {
-            updateQuery += `, notes = $${paramIndex}`;
-            params.push(notes);
+            updateQuery += `, notes = COALESCE(notes, '') || '\n' || $${paramIndex}`;
+            params.push(`[${new Date().toISOString()}] ${notes}`);
             paramIndex++;
         }
         
@@ -259,13 +365,21 @@ exports.updateLeadStatus = async (req, res) => {
         await db.query(updateQuery, params);
         
         // Add to lead history
-        await db.addLeadHistory(id, 'status_updated', oldStatus, status, userId, notes);
+        try {
+            await db.query(
+                `INSERT INTO lead_history (lead_id, action, old_status, new_status, changed_by, notes) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [id, 'status_updated', oldStatus, status, userId, notes]
+            );
+        } catch (err) {
+            console.log('Note: lead_history table might not exist yet');
+        }
         
         // Log activity
         await db.query(
-            `INSERT INTO activity_logs (user_id, action, details) 
-             VALUES ($1, $2, $3)`,
-            [userId, 'lead_status_updated', `تم تحديث حالة الطلب ${id} من ${oldStatus} إلى ${status}`]
+            `INSERT INTO activity_logs (user_id, action, details, ip_address) 
+             VALUES ($1, $2, $3, $4)`,
+            [userId, 'lead_status_updated', `تم تحديث حالة الطلب ${id} من ${oldStatus} إلى ${status}`, req.ip]
         );
         
         console.log(`✅ Lead ${id} status updated from ${oldStatus} to ${status}`);
@@ -290,7 +404,10 @@ exports.getMyLeads = async (req, res) => {
         const userId = req.user.id;
         const role = req.user.role;
         const { status, page = 1, limit = 20 } = req.query;
-        const offset = (page - 1) * limit;
+        
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const offset = (pageNum - 1) * limitNum;
         
         let query = `SELECT * FROM leads WHERE 1=1`;
         const params = [];
@@ -310,7 +427,7 @@ exports.getMyLeads = async (req, res) => {
         }
         
         query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-        params.push(parseInt(limit), parseInt(offset));
+        params.push(limitNum, offset);
         
         const result = await db.query(query, params);
         const leads = getRows(result);
@@ -338,8 +455,8 @@ exports.getMyLeads = async (req, res) => {
         res.json({
             leads: leads || [],
             total: total,
-            page: parseInt(page),
-            totalPages: Math.ceil(total / limit)
+            page: pageNum,
+            totalPages: Math.ceil(total / limitNum)
         });
         
     } catch (error) {
@@ -378,6 +495,17 @@ exports.addLeadNote = async (req, res) => {
             [`[${new Date().toISOString()}] المستخدم ${userId}: ${notes}`, id]
         );
         
+        // Add to lead history
+        try {
+            await db.query(
+                `INSERT INTO lead_history (lead_id, action, notes, changed_by) 
+                 VALUES ($1, $2, $3, $4)`,
+                [id, 'note_added', notes, userId]
+            );
+        } catch (err) {
+            console.log('Note: lead_history table might not exist yet');
+        }
+        
         console.log(`✅ Note added to lead ${id}`);
         res.json({ message: 'تم إضافة الملاحظة بنجاح' });
         
@@ -385,4 +513,47 @@ exports.addLeadNote = async (req, res) => {
         console.error('❌ Error adding lead note:', error);
         res.status(500).json({ message: 'حدث خطأ في إضافة الملاحظة', error: error.message });
     }
+};
+
+// =============================================
+// الحصول على إحصائيات الـ leads (للمدير)
+// =============================================
+exports.getLeadStats = async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = 'contacted' THEN 1 ELSE 0 END) as contacted,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+                AVG(lead_score) as avg_lead_score,
+                SUM(CASE WHEN lead_score >= 70 THEN 1 ELSE 0 END) as hot_leads,
+                SUM(CASE WHEN lead_score >= 50 AND lead_score < 70 THEN 1 ELSE 0 END) as warm_leads,
+                COALESCE(SUM(commission_amount), 0) as total_commission
+            FROM leads
+        `);
+        
+        const stats = getFirstRow(result) || {};
+        
+        res.json(stats);
+        
+    } catch (error) {
+        console.error('❌ Error getting lead stats:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب الإحصائيات', error: error.message });
+    }
+};
+
+// =============================================
+// تصدير الدوال
+// =============================================
+module.exports = {
+    calculateLead: exports.calculateLead,
+    createLead: exports.createLead,
+    getLead: exports.getLead,
+    updateLeadStatus: exports.updateLeadStatus,
+    getMyLeads: exports.getMyLeads,
+    addLeadNote: exports.addLeadNote,
+    getLeadStats: exports.getLeadStats
 };
