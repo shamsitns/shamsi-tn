@@ -56,17 +56,142 @@ const initDatabase = async () => {
 // PostgreSQL table creation
 const createTablesPostgres = async (pool) => {
   console.log('🔄 Creating all tables with correct structure...');
+
+  // ============================================
+  // 1. إضافة الأعمدة المفقودة إلى الجداول الموجودة
+  // ============================================
   
-  // Drop old leads table to ensure clean recreation
+  // إضافة أعمدة users
   try {
-    await pool.query(`DROP TABLE IF EXISTS leads CASCADE;`);
-    console.log('✅ Dropped old leads table');
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    console.log('✅ Updated users table');
   } catch (err) {
-    console.log('Note: leads table might not exist');
+    console.log('Note: users table update:', err.message);
   }
 
+  // إضافة أعمدة leads
+  try {
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS roof_area DECIMAL(10,2);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS meter_number VARCHAR(50);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS financing_type VARCHAR(20) DEFAULT 'cash';`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_score INTEGER DEFAULT 0;`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS installation_status VARCHAR(50) DEFAULT 'pending';`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    console.log('✅ Updated leads table');
+  } catch (err) {
+    console.log('Note: leads table update:', err.message);
+  }
+
+  // إضافة أعمدة companies
+  try {
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating DECIMAL(2,1) DEFAULT 0;`);
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reviews_count INTEGER DEFAULT 0;`);
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS projects_completed INTEGER DEFAULT 0;`);
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    console.log('✅ Updated companies table');
+  } catch (err) {
+    console.log('Note: companies table update:', err.message);
+  }
+
+  // ============================================
+  // 2. إنشاء الجداول الجديدة
+  // ============================================
+  
+  const newTables = [
+    `CREATE TABLE IF NOT EXISTS lead_history (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+      action VARCHAR(100) NOT NULL,
+      old_status VARCHAR(50),
+      new_status VARCHAR(50),
+      changed_by INTEGER REFERENCES users(id),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      lead_id INTEGER REFERENCES leads(id),
+      title VARCHAR(255) NOT NULL,
+      message TEXT NOT NULL,
+      type VARCHAR(50) DEFAULT 'info',
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    `CREATE TABLE IF NOT EXISTS solar_calculations (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER REFERENCES leads(id),
+      required_kw DECIMAL(10,2),
+      panels_count INTEGER,
+      annual_production DECIMAL(10,2),
+      annual_savings DECIMAL(10,2),
+      roof_needed DECIMAL(10,2),
+      co2_reduction DECIMAL(10,2),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`
+  ];
+
+  for (const query of newTables) {
+    try {
+      await pool.query(query);
+      console.log('✅ Created new table');
+    } catch (err) {
+      console.log('Note: could not create table:', err.message);
+    }
+  }
+
+  // ============================================
+  // 3. إنشاء الفهارس الجديدة
+  // ============================================
+  
+  const newIndexes = [
+    `CREATE INDEX IF NOT EXISTS idx_leads_city ON leads(city)`,
+    `CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone)`,
+    `CREATE INDEX IF NOT EXISTS idx_leads_assigned_company ON leads(assigned_company_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_leads_meter_number ON leads(meter_number)`,
+    `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)`,
+    `CREATE INDEX IF NOT EXISTS idx_lead_history_lead ON lead_history(lead_id)`
+  ];
+
+  for (const query of newIndexes) {
+    try {
+      await pool.query(query);
+    } catch (err) {
+      console.log('Note: could not create index:', err.message);
+    }
+  }
+
+  // ============================================
+  // 4. إعادة إنشاء جدول leads إذا لزم الأمر
+  //    (اختياري - احذف هذا القسم إذا كنت تريد الاحتفاظ بالبيانات)
+  // ============================================
+  
+  // تحقق مما إذا كان عمود required_kw موجوداً
+  const checkColumn = await pool.query(`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = 'leads' AND column_name = 'required_kw'
+  `);
+  
+  if (checkColumn.rows.length === 0) {
+    console.log('⚠️ leads table is missing critical columns, recreating...');
+    try {
+      await pool.query(`DROP TABLE IF EXISTS leads CASCADE;`);
+      console.log('✅ Dropped old leads table');
+    } catch (err) {
+      console.log('Note: leads table might not exist');
+    }
+  }
+
+  // ============================================
+  // 5. إنشاء الجداول الرئيسية
+  // ============================================
+  
   const queries = [
-    // Users table
     `CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email VARCHAR(255) UNIQUE NOT NULL,
@@ -80,7 +205,6 @@ const createTablesPostgres = async (pool) => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     
-    // Companies table (created BEFORE leads)
     `CREATE TABLE IF NOT EXISTS companies (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -96,7 +220,6 @@ const createTablesPostgres = async (pool) => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     
-    // Leads table with all required columns
     `CREATE TABLE IF NOT EXISTS leads (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -130,30 +253,6 @@ const createTablesPostgres = async (pool) => {
       notes TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-    
-    // Lead history for tracking changes
-    `CREATE TABLE IF NOT EXISTS lead_history (
-      id SERIAL PRIMARY KEY,
-      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
-      action VARCHAR(100) NOT NULL,
-      old_status VARCHAR(50),
-      new_status VARCHAR(50),
-      changed_by INTEGER REFERENCES users(id),
-      notes TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-    
-    // Notifications table
-    `CREATE TABLE IF NOT EXISTS notifications (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id),
-      lead_id INTEGER REFERENCES leads(id),
-      title VARCHAR(255) NOT NULL,
-      message TEXT NOT NULL,
-      type VARCHAR(50) DEFAULT 'info',
-      is_read BOOLEAN DEFAULT false,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     
     `CREATE TABLE IF NOT EXISTS lead_companies (
@@ -191,28 +290,9 @@ const createTablesPostgres = async (pool) => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     
-    `CREATE TABLE IF NOT EXISTS solar_calculations (
-      id SERIAL PRIMARY KEY,
-      lead_id INTEGER REFERENCES leads(id),
-      required_kw DECIMAL(10,2),
-      panels_count INTEGER,
-      annual_production DECIMAL(10,2),
-      annual_savings DECIMAL(10,2),
-      roof_needed DECIMAL(10,2),
-      co2_reduction DECIMAL(10,2),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-    
-        // Indexes for performance
     `CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)`,
     `CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_leads_city ON leads(city)`,
-    `CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone)`,
-    `CREATE INDEX IF NOT EXISTS idx_leads_assigned_company ON leads(assigned_company_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_leads_meter_number ON leads(meter_number)`,
-    `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`,
-    `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)`
+    `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`
   ];
   
   for (const query of queries) {
@@ -392,7 +472,6 @@ const query = async (text, params = []) => {
   if (dbType === 'postgres') {
     return db.query(text, params);
   } else {
-    // SQLite
     if (isSelectQuery) {
       const rows = await db.all(text, params);
       return { rows };
