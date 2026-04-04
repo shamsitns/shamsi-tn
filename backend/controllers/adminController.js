@@ -316,35 +316,101 @@ exports.rejectLead = async (req, res) => {
 };
 
 // =============================================
-// تعيين الطلبات
+// تعيين الطلبات (محدث مع assigned_to)
 // =============================================
+
+// تعيين طلب للمدير التنفيذي
 exports.assignToExecutive = async (req, res) => {
     try {
         const { leadId } = req.params;
+        const { executiveId, notes } = req.body;
+        const adminId = req.user.id;
         
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to executive ${executiveId}`);
+        
+        // التحقق من وجود المدير التنفيذي
+        const executiveResult = await db.query(
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            [executiveId, 'executive_manager']
+        );
+        const executive = getFirstRow(executiveResult);
+        
+        if (!executive) {
+            return res.status(404).json({ message: 'المدير التنفيذي غير موجود' });
+        }
+        
+        // تحديث lead مع تعيينه للمدير التنفيذي
         await db.query(
-            `UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            [leadId]
+            `UPDATE leads 
+             SET status = 'contacted', 
+                 assigned_to = $1,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [executiveId, leadId]
         );
         
-        res.json({ message: 'تم إرسال الطلب للمدير التنفيذي' });
+        // إضافة سجل في manager_assignments
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, executiveId, adminId, notes || `تم تعيين الطلب للمدير التنفيذي: ${executive.name}`]
+        );
+        
+        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name}`);
+        res.json({ 
+            message: `تم إرسال الطلب للمدير التنفيذي: ${executive.name}`,
+            leadId,
+            executiveId,
+            executiveName: executive.name
+        });
         
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Error assigning to executive:', error);
         res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
 
+// تعيين طلب لمركز الاتصال
 exports.assignToCallCenter = async (req, res) => {
     try {
         const { leadId } = req.params;
+        const { callCenterId, notes } = req.body;
+        const adminId = req.user.id;
+        
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to call center ${callCenterId}`);
+        
+        const callCenterResult = await db.query(
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            [callCenterId, 'call_center']
+        );
+        const callCenter = getFirstRow(callCenterResult);
+        
+        if (!callCenter) {
+            return res.status(404).json({ message: 'موظف مركز الاتصال غير موجود' });
+        }
         
         await db.query(
-            `UPDATE leads SET status = 'contacted', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            [leadId]
+            `UPDATE leads 
+             SET status = 'contacted', 
+                 assigned_to = $1,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [callCenterId, leadId]
         );
         
-        res.json({ message: 'تم إرسال الطلب لمركز الاتصال' });
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, callCenterId, adminId, notes || `تم تعيين الطلب لمركز الاتصال: ${callCenter.name}`]
+        );
+        
+        console.log(`✅ Lead ${leadId} assigned to call center ${callCenter.name}`);
+        res.json({ 
+            message: `تم إرسال الطلب لمركز الاتصال: ${callCenter.name}`,
+            leadId,
+            callCenterId,
+            callCenterName: callCenter.name
+        });
         
     } catch (error) {
         console.error('❌ Error:', error);
@@ -352,16 +418,47 @@ exports.assignToCallCenter = async (req, res) => {
     }
 };
 
+// تعيين طلب لمدير البنك
 exports.assignToBankManager = async (req, res) => {
     try {
         const { leadId } = req.params;
+        const { bankManagerId, notes } = req.body;
+        const adminId = req.user.id;
+        
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
+        
+        const bankResult = await db.query(
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            [bankManagerId, 'bank_manager']
+        );
+        const bankManager = getFirstRow(bankResult);
+        
+        if (!bankManager) {
+            return res.status(404).json({ message: 'مدير البنك غير موجود' });
+        }
         
         await db.query(
-            `UPDATE leads SET financing_type = 'bank', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            [leadId]
+            `UPDATE leads 
+             SET financing_type = 'bank', 
+                 assigned_to = $1,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [bankManagerId, leadId]
         );
         
-        res.json({ message: 'تم إرسال الطلب لمدير البنك' });
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, bankManagerId, adminId, notes || `تم تعيين الطلب لمدير البنك: ${bankManager.name}`]
+        );
+        
+        console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
+        res.json({ 
+            message: `تم إرسال الطلب لمدير البنك: ${bankManager.name}`,
+            leadId,
+            bankManagerId,
+            bankManagerName: bankManager.name
+        });
         
     } catch (error) {
         console.error('❌ Error:', error);
@@ -369,16 +466,47 @@ exports.assignToBankManager = async (req, res) => {
     }
 };
 
+// تعيين طلب لمدير التأجير
 exports.assignToLeasingManager = async (req, res) => {
     try {
         const { leadId } = req.params;
+        const { leasingManagerId, notes } = req.body;
+        const adminId = req.user.id;
+        
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to leasing manager ${leasingManagerId}`);
+        
+        const leasingResult = await db.query(
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            [leasingManagerId, 'leasing_manager']
+        );
+        const leasingManager = getFirstRow(leasingResult);
+        
+        if (!leasingManager) {
+            return res.status(404).json({ message: 'مدير التأجير غير موجود' });
+        }
         
         await db.query(
-            `UPDATE leads SET financing_type = 'leasing', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            [leadId]
+            `UPDATE leads 
+             SET financing_type = 'leasing', 
+                 assigned_to = $1,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [leasingManagerId, leadId]
         );
         
-        res.json({ message: 'تم إرسال الطلب لمدير التأجير' });
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, leasingManagerId, adminId, notes || `تم تعيين الطلب لمدير التأجير: ${leasingManager.name}`]
+        );
+        
+        console.log(`✅ Lead ${leadId} assigned to leasing manager ${leasingManager.name}`);
+        res.json({ 
+            message: `تم إرسال الطلب لمدير التأجير: ${leasingManager.name}`,
+            leadId,
+            leasingManagerId,
+            leasingManagerName: leasingManager.name
+        });
         
     } catch (error) {
         console.error('❌ Error:', error);
@@ -508,6 +636,7 @@ exports.getCommissionStats = async (req, res) => {
         res.status(500).json({ message: 'حدث خطأ في جلب إحصائيات العمولات', error: error.message });
     }
 };
+
 // =============================================
 // جلب تفاصيل طلب محدد
 // =============================================
