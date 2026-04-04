@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process'); // ✅ أضف هذا السطر
 
 dotenv.config();
 
@@ -147,6 +148,36 @@ app.get('/api/db-stats', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error getting db stats:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// ✅ TEMPORARY: مسار لتشغيل seed.js وإصلاح قاعدة البيانات
+// =============================================
+app.get('/api/run-seed', async (req, res) => {
+    try {
+        console.log('🌱 Running seed to fix database...');
+        
+        // تشغيل seed.js
+        exec('node backend/seed.js', { cwd: __dirname }, (error, stdout, stderr) => {
+            if (error) {
+                console.error('❌ Seed error:', error);
+                return res.status(500).json({ 
+                    message: 'Seed failed', 
+                    error: error.message,
+                    stderr: stderr 
+                });
+            }
+            console.log('✅ Seed completed successfully');
+            res.json({ 
+                message: 'Seed completed successfully', 
+                output: stdout,
+                note: 'Users and companies have been added to the database'
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error running seed:', error);
         res.status(500).json({ error: error.message });
     }
 });
