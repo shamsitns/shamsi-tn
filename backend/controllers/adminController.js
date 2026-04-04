@@ -316,27 +316,39 @@ exports.rejectLead = async (req, res) => {
 };
 
 // =============================================
-// تعيين الطلبات (محدث مع assigned_to)
+// تعيين الطلبات
 // =============================================
 
-// تعيين طلب للمدير التنفيذي
+// تعيين طلب للمدير التنفيذي (نسخة معدلة - تبحث عن المدير التنفيذي تلقائياً)
 exports.assignToExecutive = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const { executiveId, notes } = req.body;
+        const { notes } = req.body;
         const adminId = req.user.id;
         
-        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to executive ${executiveId}`);
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId}`);
         
-        // التحقق من وجود المدير التنفيذي
+        // ✅ البحث عن المدير التنفيذي الفعلي من قاعدة البيانات
         const executiveResult = await db.query(
-            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
-            [executiveId, 'executive_manager']
+            "SELECT id, name FROM users WHERE role = 'executive_manager' AND is_active = true LIMIT 1"
         );
         const executive = getFirstRow(executiveResult);
         
         if (!executive) {
-            return res.status(404).json({ message: 'المدير التنفيذي غير موجود' });
+            return res.status(404).json({ 
+                message: 'لا يوجد مدير تنفيذي في النظام. يرجى إضافة مستخدم بدور executive_manager' 
+            });
+        }
+        
+        const executiveId = executive.id;
+        
+        console.log(`✅ Found executive: ${executive.name} (ID: ${executiveId})`);
+        
+        // التحقق من وجود الطلب
+        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(leadResult);
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // تحديث lead مع تعيينه للمدير التنفيذي
@@ -349,6 +361,14 @@ exports.assignToExecutive = async (req, res) => {
             [executiveId, leadId]
         );
         
+        // التحقق من وجود manager_id قبل الإدراج
+        const checkManager = await db.query('SELECT id FROM users WHERE id = $1', [executiveId]);
+        const managerExists = getFirstRow(checkManager);
+        
+        if (!managerExists) {
+            return res.status(400).json({ message: 'المدير التنفيذي غير موجود في النظام' });
+        }
+        
         // إضافة سجل في manager_assignments
         await db.query(
             `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
@@ -356,7 +376,8 @@ exports.assignToExecutive = async (req, res) => {
             [leadId, executiveId, adminId, notes || `تم تعيين الطلب للمدير التنفيذي: ${executive.name}`]
         );
         
-        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name}`);
+        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
+        
         res.json({ 
             message: `تم إرسال الطلب للمدير التنفيذي: ${executive.name}`,
             leadId,
