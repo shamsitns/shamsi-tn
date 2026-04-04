@@ -116,8 +116,8 @@ exports.updateLeadStatus = async (req, res) => {
         }
         
         if (notes) {
-            updateQuery += `, notes = $${paramIndex}`;
-            updateParams.push(notes);
+            updateQuery += `, notes = COALESCE(notes, '') || '\n' || $${paramIndex}`;
+            updateParams.push(`[${new Date().toISOString()}] ${notes}`);
             paramIndex++;
         }
         
@@ -521,7 +521,10 @@ ${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
     } catch (error) {
         console.error('❌ Error accepting lead:', error);
         res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
-     // =============================================
+    }
+};
+
+// =============================================
 // ✅ الدوال الجديدة المضافة (لتوافق مع routes)
 // =============================================
 
@@ -601,7 +604,5 @@ exports.acceptLeadAndSend = async (req, res) => {
     } catch (error) {
         console.error('❌ Error accepting lead:', error);
         res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
-    }
-};
     }
 };
