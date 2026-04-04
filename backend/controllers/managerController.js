@@ -30,9 +30,9 @@ exports.getMyLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
-        // ✅ استخدام created_by بدلاً من assigned_to
+        // ✅ التعديل: استخدام assigned_to للمديرين (بالإضافة إلى created_by)
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            query += ` AND l.created_by = $${paramIndex}`;
+            query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
             queryParams.push(managerId);
             paramIndex++;
         }
@@ -55,7 +55,7 @@ exports.getMyLeads = async (req, res) => {
         let countIndex = 1;
         
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            countQuery += ` AND created_by = $${countIndex}`;
+            countQuery += ` AND (assigned_to = $${countIndex} OR created_by = $${countIndex})`;
             countParams.push(managerId);
             countIndex++;
         }
@@ -149,6 +149,7 @@ exports.getManagerStats = async (req, res) => {
         
         console.log(`📈 Getting stats for manager ${managerId} (${role})`);
         
+        // ✅ التعديل: استخدام assigned_to أو created_by
         let query = `
             SELECT 
                 COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
@@ -160,7 +161,7 @@ exports.getManagerStats = async (req, res) => {
                 COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled,
                 COALESCE(SUM(CASE WHEN status = 'completed' THEN commission_amount ELSE 0 END), 0) as total_commission
             FROM leads
-            WHERE created_by = $1
+            WHERE created_by = $1 OR assigned_to = $1
         `;
         
         const result = await db.query(query, [managerId]);
@@ -403,8 +404,9 @@ exports.addLeadNote = async (req, res) => {
             return res.status(400).json({ message: 'الملاحظات مطلوبة' });
         }
         
+        // ✅ التعديل: استخدام assigned_to أو created_by
         const existingResult = await db.query(
-            'SELECT id FROM leads WHERE id = $1 AND created_by = $2',
+            'SELECT id FROM leads WHERE id = $1 AND (created_by = $2 OR assigned_to = $2)',
             [leadId, managerId]
         );
         const existing = getRows(existingResult);
@@ -539,8 +541,9 @@ exports.exportLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
+        // ✅ التعديل: استخدام assigned_to أو created_by
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            query += ` AND l.created_by = $${paramIndex}`;
+            query += ` AND (l.created_by = $${paramIndex} OR l.assigned_to = $${paramIndex})`;
             queryParams.push(managerId);
             paramIndex++;
         }
