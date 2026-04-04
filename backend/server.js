@@ -159,7 +159,6 @@ app.get('/api/run-seed', async (req, res) => {
     try {
         console.log('🌱 Running seed to fix database...');
         
-        // المسار الصحيح (نحن بالفعل في مجلد backend)
         exec('node seed.js', { cwd: __dirname }, (error, stdout, stderr) => {
             if (error) {
                 console.error('❌ Seed error:', error);
@@ -178,6 +177,57 @@ app.get('/api/run-seed', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error running seed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// ✅ TEMPORARY: إضافة المستخدمين المفقودين
+// =============================================
+app.get('/api/fix-users', async (req, res) => {
+    try {
+        const bcrypt = require('bcryptjs');
+        const db = getDb();
+        
+        const usersToAdd = [
+            { name: 'Executive Manager', email: 'executive@shamsi.tn', password: 'manager123', role: 'executive_manager', phone: '29593641' },
+            { name: 'Operations Manager', email: 'operations@shamsi.tn', password: 'operations123', role: 'operations_manager', phone: '50575558' },
+            { name: 'Call Center', email: 'callcenter@shamsi.tn', password: 'call123', role: 'call_center', phone: '24661499' }
+        ];
+        
+        const results = [];
+        
+        for (const user of usersToAdd) {
+            const existing = await db.query("SELECT id FROM users WHERE email = $1", [user.email]);
+            const existingRows = existing.rows || existing;
+            
+            if (existingRows.length > 0) {
+                results.push({ email: user.email, status: 'already exists', id: existingRows[0].id });
+            } else {
+                const hashedPassword = await bcrypt.hash(user.password, 10);
+                const result = await db.query(
+                    `INSERT INTO users (name, email, password, role, phone, is_active, created_at) 
+                     VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP) 
+                     RETURNING id`,
+                    [user.name, user.email, hashedPassword, user.role, user.phone]
+                );
+                const newId = (result.rows || result)[0]?.id;
+                results.push({ email: user.email, status: 'created', id: newId, password: user.password });
+            }
+        }
+        
+        const allUsers = await db.query("SELECT id, name, email, role FROM users ORDER BY id");
+        const usersList = allUsers.rows || allUsers;
+        
+        res.json({
+            message: 'Users fixed',
+            results: results,
+            allUsers: usersList,
+            note: 'Use the ID from executive_manager when assigning leads'
+        });
+        
+    } catch (error) {
+        console.error('Error fixing users:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -208,7 +258,6 @@ app.use('*', (req, res) => {
 // =============================================
 const startServer = async () => {
     try {
-        // Initialize database
         await initDatabase();
         
         app.listen(PORT, () => {
@@ -231,16 +280,5 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
-    process.exit(0);
-});
-
-process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
-    process.exit(0);
-});
 
 startServer();
