@@ -82,6 +82,8 @@ const createTablesPostgres = async (pool) => {
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS financing_type VARCHAR(20) DEFAULT 'cash';`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS installation_status VARCHAR(50) DEFAULT 'pending';`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    // ✅ إضافة عمود assigned_to
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);`);
     console.log('✅ Updated leads table with all columns');
   } catch (err) {
     console.log('Note: leads table update:', err.message);
