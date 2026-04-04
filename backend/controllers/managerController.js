@@ -605,4 +605,112 @@ exports.acceptLeadAndSend = async (req, res) => {
         console.error('❌ Error accepting lead:', error);
         res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
     }
+    // =============================================
+// تسجيل التواصل مع العميل (لمركز الاتصال)
+// =============================================
+exports.markAsContacted = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { notes } = req.body;
+        const userId = req.user.id;
+        
+        console.log(`📞 User ${userId} marking lead ${id} as contacted`);
+        
+        const resultLead = await db.query(
+            'SELECT * FROM leads WHERE id = $1',
+            [id]
+        );
+        const lead = getFirstRow(resultLead);
+        
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        await db.query(
+            `UPDATE leads 
+             SET status = 'contacted', 
+                 contacted_by = $1,
+                 contacted_at = CURRENT_TIMESTAMP,
+                 notes = COALESCE(notes, '') || '\n' || $2,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $3`,
+            [userId, `[${new Date().toISOString()}] تم التواصل مع العميل: ${notes || 'تم التواصل بنجاح'}`, id]
+        );
+        
+        console.log(`✅ Lead ${id} marked as contacted by user ${userId}`);
+        res.json({ 
+            message: 'تم تسجيل التواصل مع العميل بنجاح',
+            leadId: id,
+            status: 'contacted'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error marking as contacted:', error);
+        res.status(500).json({ message: 'حدث خطأ في تسجيل التواصل', error: error.message });
+    }
 };
+
+// =============================================
+// تصدير الطلبات إلى CSV
+// =============================================
+exports.exportLeads = async (req, res) => {
+    try {
+        const managerId = req.user.id;
+        const role = req.user.role;
+        
+        console.log(`📊 Exporting leads by manager ${managerId}`);
+        
+        let query = `
+            SELECT 
+                l.id, l.name, l.phone, l.city, l.property_type,
+                l.bill_amount, l.required_kw, l.panels_count,
+                l.status, l.created_at, l.assigned_company_id,
+                c.name as company_name
+            FROM leads l
+            LEFT JOIN companies c ON l.assigned_company_id = c.id
+            WHERE 1=1
+        `;
+        const queryParams = [];
+        let paramIndex = 1;
+        
+        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
+            query += ` AND l.assigned_to = $${paramIndex}`;
+            queryParams.push(managerId);
+            paramIndex++;
+        }
+        
+        query += ` ORDER BY l.created_at DESC`;
+        
+        const result = await db.query(query, queryParams);
+        const leads = getRows(result);
+        
+        // إنشاء CSV
+        const csvHeaders = ['ID', 'الاسم', 'الهاتف', 'المدينة', 'نوع العقار', 'قيمة الفاتورة', 'القدرة (kWp)', 'عدد الألواح', 'الحالة', 'تاريخ الإنشاء', 'الشركة'];
+        const csvRows = leads.map(lead => [
+            lead.id,
+            lead.name,
+            lead.phone,
+            lead.city || '',
+            lead.property_type,
+            lead.bill_amount,
+            lead.required_kw || '',
+            lead.panels_count || '',
+            lead.status,
+            new Date(lead.created_at).toLocaleDateString('ar-TN'),
+            lead.company_name || ''
+        ]);
+        
+        const csvContent = [csvHeaders, ...csvRows].map(row => row.join(',')).join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=leads_${new Date().toISOString().split('T')[0]}.csv`);
+        res.send('\uFEFF' + csvContent);
+        
+        console.log(`✅ Leads exported successfully by manager ${managerId}`);
+        
+    } catch (error) {
+        console.error('❌ Error exporting leads:', error);
+        res.status(500).json({ message: 'حدث خطأ في تصدير الطلبات', error: error.message });
+    }
+};
+}; 
