@@ -34,8 +34,8 @@ const HomePage = () => {
                         </div>
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
-                        احسب الاحتياج التقريبي <br />
-                        <span className="text-yellow-400">للطاقة الشمسية لمنزلك</span>
+                        اكتشف كم تحتاج <br />
+                        <span className="text-yellow-400">من الطاقة الشمسية ووفر حتى 90% من فاتورة الكهرباء</span>
                     </h1>
                     <p className="text-lg md:text-xl mb-4 max-w-2xl mx-auto opacity-90">
                         احصل على دراسة تقريبية مجانية لمعرفة القدرة المطلوبة لمنزلك
