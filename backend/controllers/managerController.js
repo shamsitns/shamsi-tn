@@ -322,24 +322,46 @@ exports.sendToOperationsManager = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
+        // ✅ العثور على مدير عمليات متاح
+        const opsResult = await db.query(
+            'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
+            ['operations_manager']
+        );
+        const operationsManager = getFirstRow(opsResult);
+        
+        if (!operationsManager) {
+            return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
+        }
+        
         const commission = lead.commission_amount || (lead.required_kw * 150);
         
+        // ✅ تحديث lead مع تعيينه لمدير العمليات
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
-                 sent_to_operations_by = $1,
+                 assigned_to = $1,
+                 sent_to_operations_by = $2,
                  sent_to_operations_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [executiveId, leadId]
+             WHERE id = $3`,
+            [operationsManager.id, executiveId, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} sent to operations manager with commission ${commission}`);
+        // إضافة سجل في manager_assignments
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, operationsManager.id, executiveId, notes || `تم إرسال الطلب لمدير العمليات: ${operationsManager.name}`]
+        );
+        
+        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
         res.json({ 
             message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
-            commission: commission
+            commission: commission,
+            operationsManagerId: operationsManager.id,
+            operationsManagerName: operationsManager.name
         });
         
     } catch (error) {
@@ -365,24 +387,46 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
+        // ✅ العثور على مدير عمليات متاح
+        const opsResult = await db.query(
+            'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
+            ['operations_manager']
+        );
+        const operationsManager = getFirstRow(opsResult);
+        
+        if (!operationsManager) {
+            return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
+        }
+        
         const commission = lead.commission_amount || (lead.required_kw * 150);
         
+        // ✅ تحديث lead مع تعيينه لمدير العمليات
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
-                 contacted_by = $1,
+                 assigned_to = $1,
+                 contacted_by = $2,
                  contacted_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [executiveId, leadId]
+             WHERE id = $3`,
+            [operationsManager.id, executiveId, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} accepted and sent to operations manager with commission ${commission}`);
+        // إضافة سجل في manager_assignments
+        await db.query(
+            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, operationsManager.id, executiveId, notes || `تم قبول الطلب وإرساله لمدير العمليات: ${operationsManager.name}`]
+        );
+        
+        console.log(`✅ Lead ${leadId} accepted and sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
         res.json({ 
             message: `تم قبول الطلب وإرساله لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
-            commission: commission
+            commission: commission,
+            operationsManagerId: operationsManager.id,
+            operationsManagerName: operationsManager.name
         });
         
     } catch (error) {
