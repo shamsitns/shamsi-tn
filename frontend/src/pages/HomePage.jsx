@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { 
     FaSun, FaChartLine, FaHandshake, FaStar, FaWhatsapp, 
     FaShieldAlt, FaClock, FaThumbsUp,
-    FaCalculator, FaInfoCircle
+    FaCalculator, FaInfoCircle, FaMoneyBillWave, FaBuilding,
+    FaFileInvoice, FaTachometerAlt, FaSearch, FaHome,
+    FaCheckCircle, FaPlug
 } from 'react-icons/fa';
 
 const HomePage = () => {
