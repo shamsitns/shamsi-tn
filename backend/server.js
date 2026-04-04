@@ -6,7 +6,7 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process'); // ✅ أضف هذا السطر
+const { exec } = require('child_process');
 
 dotenv.config();
 
@@ -159,8 +159,8 @@ app.get('/api/run-seed', async (req, res) => {
     try {
         console.log('🌱 Running seed to fix database...');
         
-        // تشغيل seed.js
-        exec('node backend/seed.js', { cwd: __dirname }, (error, stdout, stderr) => {
+        // المسار الصحيح (نحن بالفعل في مجلد backend)
+        exec('node seed.js', { cwd: __dirname }, (error, stdout, stderr) => {
             if (error) {
                 console.error('❌ Seed error:', error);
                 return res.status(500).json({ 
