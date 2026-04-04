@@ -239,6 +239,7 @@ export const adminAPI = {
 
 // ==================== Manager API (للمديرين) ====================
 export const managerAPI = {
+    // الدوال الموجودة
     getLeads: (params) => {
         console.log('📊 Fetching my leads:', params);
         return api.get('/manager/leads', { params });
@@ -277,6 +278,22 @@ export const managerAPI = {
     assignToCompany: (leadId, companyId, notes) => {
         console.log('🏢 Assigning lead to company:', leadId, companyId);
         return api.post(`/manager/leads/${leadId}/assign-company`, { companyId, notes });
+    },
+    
+    // ✅ الدوال الجديدة المضافة (للتوافق مع ExecutiveManagerDashboard)
+    getMyLeads: (params) => {
+        console.log('📊 Fetching my leads (getMyLeads):', params);
+        return api.get('/manager/leads', { params });
+    },
+    
+    getMyStats: () => {
+        console.log('📈 Fetching my stats (getMyStats):');
+        return api.get('/manager/stats');
+    },
+    
+    addLeadNote: (leadId, notes) => {
+        console.log('📝 Adding note to lead:', leadId);
+        return api.post(`/manager/leads/${leadId}/notes`, { notes });
     }
 };
 
