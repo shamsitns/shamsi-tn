@@ -131,6 +131,9 @@ exports.createLead = async (req, res) => {
         
         const leadSource = req.headers['x-source'] || 'website';
         
+        // ✅ الحصول على ID المستخدم الحالي (تمت الإضافة)
+        const userId = req.user?.id || null;
+        
         if (!name || !phone || !bill_amount) {
             return res.status(400).json({ 
                 message: 'البيانات غير كاملة',
@@ -167,7 +170,7 @@ exports.createLead = async (req, res) => {
         
         console.log(`📊 Lead data: ${name}, ${phone}, KW: ${solarData.required_kw}, Score: ${leadScore}`);
         
-        // ✅ INSERT مع جميع الأعمدة
+        // ✅ INSERT مع جميع الأعمدة (تمت إضافة created_by)
         const query = `
             INSERT INTO leads (
                 name, phone, city, property_type, 
@@ -176,8 +179,8 @@ exports.createLead = async (req, res) => {
                 payment_method, preferred_bank, panel_type,
                 lead_source, lead_score,
                 additional_info, required_kw, panels_count, commission_amount,
-                status, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP)
+                status, created_by, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP)
             RETURNING id
         `;
         
@@ -201,7 +204,8 @@ exports.createLead = async (req, res) => {
             solarData.required_kw,
             solarData.panels_count,
             commissionAmount,
-            'pending'
+            'pending',
+            userId  // ✅ تمت إضافة created_by هنا
         ];
         
         const result = await db.query(query, values);
@@ -210,7 +214,7 @@ exports.createLead = async (req, res) => {
         await db.query(
             `INSERT INTO activity_logs (user_id, action, details, ip_address) 
              VALUES ($1, $2, $3, $4)`,
-            [null, 'lead_created', `تم إنشاء طلب جديد من ${name} (رقم الهاتف: ${phone})`, req.ip]
+            [userId, 'lead_created', `تم إنشاء طلب جديد من ${name} (رقم الهاتف: ${phone})`, req.ip]
         );
         
         console.log(`✅ Lead created successfully with ID: ${leadId}`);
@@ -218,6 +222,7 @@ exports.createLead = async (req, res) => {
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         console.log(`   ⭐ Lead Score: ${leadScore}`);
         console.log(`   📍 Source: ${leadSource}`);
+        console.log(`   👤 Created by: ${userId}`);
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
