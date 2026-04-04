@@ -605,7 +605,9 @@ exports.acceptLeadAndSend = async (req, res) => {
         console.error('❌ Error accepting lead:', error);
         res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
     }
-    // =============================================
+};
+
+// =============================================
 // تسجيل التواصل مع العميل (لمركز الاتصال)
 // =============================================
 exports.markAsContacted = async (req, res) => {
@@ -713,4 +715,3 @@ exports.exportLeads = async (req, res) => {
         res.status(500).json({ message: 'حدث خطأ في تصدير الطلبات', error: error.message });
     }
 };
-}; 
