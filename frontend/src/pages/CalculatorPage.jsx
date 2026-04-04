@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { leadsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
@@ -167,19 +167,13 @@ const getBestPanel = (requiredKw, propertyType, isAgricultural) => {
     const panelCategory = isAgricultural ? 'agricultural' : 'residential';
     const panels = panelTypes[panelCategory];
     
-    // إذا كانت القدرة المطلوبة أقل من 3 كيلو واط
     if (requiredKw < 3) {
-        // اختر أصغر لوح (أقل قدرة)
         return panels.reduce((prev, curr) => (prev.power < curr.power ? prev : curr));
     }
-    // إذا كانت القدرة المطلوبة أكثر من 10 كيلو واط
     else if (requiredKw > 10) {
-        // اختر أكبر لوح (أعلى قدرة)
         return panels.reduce((prev, curr) => (prev.power > curr.power ? prev : curr));
     }
-    // للقدرات المتوسطة، اختر اللوح الأمثل (الأكثر شيوعاً)
     else {
-        // ابحث عن لوح بقدرة حوالي 0.5 كيلو واط للمنازل أو 0.65 للمزارع
         const targetPower = isAgricultural ? 0.65 : 0.48;
         return panels.reduce((prev, curr) => {
             const prevDiff = Math.abs(prev.power - targetPower);
@@ -242,6 +236,14 @@ const CalculatorPage = () => {
         roof_area: '',
         payment_method: 'cash'
     });
+
+    // ✅ التمرير إلى الأعلى عند تغيير الخطوة (خاصة عند ظهور النتائج)
+    useEffect(() => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }, [step]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -334,10 +336,10 @@ const CalculatorPage = () => {
             bill_period_months: billDays,
             bill_season: formData.bill_season,
             roof_availability: true,
+            roof_area: formData.roof_area,
             meter_number: formData.meter_number,
             payment_method: selectedPayment,
             preferred_bank: selectedBank?.name || null,
-            panel_type: selectedPanel?.name || null,
             additional_info: `مساحة السطح: ${formData.roof_area} م²`
         };
 
@@ -471,13 +473,9 @@ const CalculatorPage = () => {
         );
     };
 
-    // ==================== STEP 3 (تمت إزالته) ====================
-    // لم يعد هناك حاجة لاختيار اللوح من قبل العميل
-
     // ==================== STEP 4 (النتائج) ====================
     const renderResult = () => {
         const property = propertyTypes.find(p => p.value === formData.property_type);
-        const paymentOptions = getPaymentOptions(formData.property_type);
         const isResidential = ['house', 'apartment'].includes(formData.property_type);
         const isAgricultural = formData.property_type === 'farm';
         
@@ -496,12 +494,7 @@ const CalculatorPage = () => {
                     <p className="text-orange-100">القدرة المطلوبة للنظام الشمسي</p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-green-50 p-3 rounded-xl text-center">
-                        <div className="text-xl font-bold text-green-700">{result.panels_count}</div>
-                        <p className="text-sm text-gray-600">عدد الألواح</p>
-                        <p className="text-xs text-gray-400">{selectedPanel?.power * 1000} Wp لكل لوح</p>
-                    </div>
+                <div className="grid grid-cols-3 gap-3">
                     <div className="bg-blue-50 p-3 rounded-xl text-center">
                         <div className="text-xl font-bold text-blue-700">{result.annual_production.toLocaleString()} kWh</div>
                         <p className="text-sm text-gray-600">الإنتاج السنوي</p>
@@ -515,15 +508,6 @@ const CalculatorPage = () => {
                         <div className="text-xl font-bold text-purple-700">{result.required_roof_area} م²</div>
                         <p className="text-sm text-gray-600">المساحة المطلوبة</p>
                         {!result.roof_area_valid && <p className="text-xs text-red-500">⚠️ المتوفرة: {result.roof_area_available} م²</p>}
-                    </div>
-                </div>
-                
-                <div className="bg-gray-50 p-3 rounded-xl text-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                        <FaSolarPanel className="text-green-600" />
-                        <span className="font-semibold">اللوح المختار تلقائياً:</span>
-                        <span>{selectedPanel?.name}</span>
-                        <span className="text-xs text-gray-500">({selectedPanel?.brand})</span>
                     </div>
                 </div>
                 
