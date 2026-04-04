@@ -30,9 +30,9 @@ exports.getMyLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
-        // Filter by assigned_to for managers
+        // ✅ استخدام created_by بدلاً من assigned_to
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            query += ` AND l.assigned_to = $${paramIndex}`;
+            query += ` AND l.created_by = $${paramIndex}`;
             queryParams.push(managerId);
             paramIndex++;
         }
@@ -55,7 +55,7 @@ exports.getMyLeads = async (req, res) => {
         let countIndex = 1;
         
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            countQuery += ` AND assigned_to = $${countIndex}`;
+            countQuery += ` AND created_by = $${countIndex}`;
             countParams.push(managerId);
             countIndex++;
         }
@@ -160,26 +160,10 @@ exports.getManagerStats = async (req, res) => {
                 COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled,
                 COALESCE(SUM(CASE WHEN status = 'completed' THEN commission_amount ELSE 0 END), 0) as total_commission
             FROM leads
+            WHERE created_by = $1
         `;
         
-        // If manager has assigned_to filter
-        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            query = `
-                SELECT 
-                    COUNT(CASE WHEN status = 'pending' AND assigned_to = $1 THEN 1 END) as pending,
-                    COUNT(CASE WHEN status = 'approved' AND assigned_to = $1 THEN 1 END) as approved,
-                    COUNT(CASE WHEN status = 'contacted' AND assigned_to = $1 THEN 1 END) as contacted,
-                    COUNT(CASE WHEN status = 'sent_to_operations' AND assigned_to = $1 THEN 1 END) as sent_to_operations,
-                    COUNT(CASE WHEN status = 'assigned_to_company' AND assigned_to = $1 THEN 1 END) as assigned_to_company,
-                    COUNT(CASE WHEN status = 'completed' AND assigned_to = $1 THEN 1 END) as completed,
-                    COUNT(CASE WHEN status = 'cancelled' AND assigned_to = $1 THEN 1 END) as cancelled,
-                    COALESCE(SUM(CASE WHEN status = 'completed' AND assigned_to = $1 THEN commission_amount ELSE 0 END), 0) as total_commission
-                FROM leads
-                WHERE assigned_to = $1
-            `;
-        }
-        
-        const result = await db.query(query, role === 'executive_manager' || role === 'operations_manager' || role === 'call_center' ? [managerId] : []);
+        const result = await db.query(query, [managerId]);
         const stats = getFirstRow(result) || { 
             pending: 0, approved: 0, contacted: 0,
             sent_to_operations: 0, assigned_to_company: 0,
@@ -321,7 +305,7 @@ exports.getAvailableCompanies = async (req, res) => {
 };
 
 // =============================================
-// إرسال الطلب لمدير العمليات (للمدير التنفيذي) - مع نقل جميع المعلومات
+// إرسال الطلب لمدير العمليات (للمدير التنفيذي)
 // =============================================
 exports.sendToOperationsManager = async (req, res) => {
     try {
@@ -331,72 +315,22 @@ exports.sendToOperationsManager = async (req, res) => {
         
         console.log(`📤 Executive ${executiveId} sending lead ${leadId} to operations manager`);
         
-        // Check if lead exists
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(resultLead);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // Calculate commission (150 DT per kW)
         const commission = lead.commission_amount || (lead.required_kw * 150);
         
-        console.log(`💰 Commission for lead ${leadId}: ${commission} TND (${lead.required_kw} kW × 150)`);
-        
-        // Find an operations manager
-        const resultOps = await db.query(`
-            SELECT id, name FROM users 
-            WHERE role = 'operations_manager' AND is_active = true
-            ORDER BY id ASC LIMIT 1
-        `);
-        const operationsManager = getFirstRow(resultOps);
-        
-        if (!operationsManager) {
-            return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
-        }
-        
-        // تجميع جميع المعلومات لنقلها لمدير العمليات
-        const fullNotes = `
-📋 معلومات الطلب الكاملة من المدير التنفيذي:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 معلومات العميل:
-   • الاسم: ${lead.name}
-   • الهاتف: ${lead.phone}
-   • المدينة: ${lead.city || 'غير مدخلة'}
-
-⚡ معلومات الكهرباء:
-   • قيمة الفاتورة: ${lead.bill_amount} دينار
-   • فترة الفاتورة: ${lead.bill_period_months === 60 ? 'شهرين' : 'شهر'}
-
-☀️ نتائج الدراسة:
-   • القدرة المطلوبة: ${lead.required_kw} kWp
-   • عدد الألواح: ${lead.panels_count}
-   • العمولة: ${commission} دينار
-
-📝 معلومات إضافية من العميل:
-${lead.additional_info || 'لا توجد معلومات إضافية'}
-
-${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        `;
-        
-        // Update lead status
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
-                 assigned_to = $1, 
-                 sent_to_operations_by = $2,
+                 sent_to_operations_by = $1,
                  sent_to_operations_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $3`,
-            [operationsManager.id, executiveId, leadId]
-        );
-        
-        // إضافة سجل التعيين مع جميع المعلومات
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes) 
-             VALUES ($1, $2, $3, $4)`,
-            [leadId, operationsManager.id, executiveId, fullNotes]
+             WHERE id = $2`,
+            [executiveId, leadId]
         );
         
         console.log(`✅ Lead ${leadId} sent to operations manager with commission ${commission}`);
@@ -404,16 +338,7 @@ ${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
         res.json({ 
             message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
-            commission: commission,
-            leadInfo: {
-                name: lead.name,
-                phone: lead.phone,
-                city: lead.city,
-                bill_amount: lead.bill_amount,
-                required_kw: lead.required_kw,
-                panels_count: lead.panels_count,
-                additional_info: lead.additional_info
-            }
+            commission: commission
         });
         
     } catch (error) {
@@ -433,72 +358,22 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
         
         console.log(`✅ Executive ${executiveId} accepting lead ${leadId} and sending to operations`);
         
-        // Check if lead exists
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(resultLead);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // Calculate commission (150 DT per kW)
         const commission = lead.commission_amount || (lead.required_kw * 150);
         
-        // Find an operations manager
-        const resultOps = await db.query(`
-            SELECT id, name FROM users 
-            WHERE role = 'operations_manager' AND is_active = true
-            ORDER BY id ASC LIMIT 1
-        `);
-        const operationsManager = getFirstRow(resultOps);
-        
-        if (!operationsManager) {
-            return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
-        }
-        
-        // تجميع جميع المعلومات لنقلها لمدير العمليات
-        const fullNotes = `
-📋 معلومات الطلب الكاملة (مقبول من المدير التنفيذي):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ تم قبول الطلب من قبل المدير التنفيذي
-
-👤 معلومات العميل:
-   • الاسم: ${lead.name}
-   • الهاتف: ${lead.phone}
-   • المدينة: ${lead.city || 'غير مدخلة'}
-
-⚡ معلومات الكهرباء:
-   • قيمة الفاتورة: ${lead.bill_amount} دينار
-   • فترة الفاتورة: ${lead.bill_period_months === 60 ? 'شهرين' : 'شهر'}
-
-☀️ نتائج الدراسة:
-   • القدرة المطلوبة: ${lead.required_kw} kWp
-   • عدد الألواح: ${lead.panels_count}
-   • العمولة: ${commission} دينار
-
-📝 معلومات إضافية من العميل:
-${lead.additional_info || 'لا توجد معلومات إضافية'}
-
-${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        `;
-        
-        // Update lead status
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
-                 assigned_to = $1, 
-                 contacted_by = $2,
+                 contacted_by = $1,
                  contacted_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $3`,
-            [operationsManager.id, executiveId, leadId]
-        );
-        
-        // إضافة سجل التعيين مع جميع المعلومات
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes) 
-             VALUES ($1, $2, $3, $4)`,
-            [leadId, operationsManager.id, executiveId, fullNotes]
+             WHERE id = $2`,
+            [executiveId, leadId]
         );
         
         console.log(`✅ Lead ${leadId} accepted and sent to operations manager with commission ${commission}`);
@@ -506,16 +381,7 @@ ${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
         res.json({ 
             message: `تم قبول الطلب وإرساله لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
-            commission: commission,
-            leadInfo: {
-                name: lead.name,
-                phone: lead.phone,
-                city: lead.city,
-                bill_amount: lead.bill_amount,
-                required_kw: lead.required_kw,
-                panels_count: lead.panels_count,
-                additional_info: lead.additional_info
-            }
+            commission: commission
         });
         
     } catch (error) {
@@ -525,10 +391,8 @@ ${notes ? `\n📌 ملاحظات المدير التنفيذي:\n${notes}` : ''}
 };
 
 // =============================================
-// ✅ الدوال الجديدة المضافة (لتوافق مع routes)
-// =============================================
-
 // إضافة ملاحظات للطلب
+// =============================================
 exports.addLeadNote = async (req, res) => {
     try {
         const { leadId } = req.params;
@@ -540,7 +404,7 @@ exports.addLeadNote = async (req, res) => {
         }
         
         const existingResult = await db.query(
-            'SELECT id FROM leads WHERE id = $1 AND assigned_to = $2',
+            'SELECT id FROM leads WHERE id = $1 AND created_by = $2',
             [leadId, managerId]
         );
         const existing = getRows(existingResult);
@@ -676,7 +540,7 @@ exports.exportLeads = async (req, res) => {
         let paramIndex = 1;
         
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
-            query += ` AND l.assigned_to = $${paramIndex}`;
+            query += ` AND l.created_by = $${paramIndex}`;
             queryParams.push(managerId);
             paramIndex++;
         }
@@ -686,7 +550,6 @@ exports.exportLeads = async (req, res) => {
         const result = await db.query(query, queryParams);
         const leads = getRows(result);
         
-        // إنشاء CSV
         const csvHeaders = ['ID', 'الاسم', 'الهاتف', 'المدينة', 'نوع العقار', 'قيمة الفاتورة', 'القدرة (kWp)', 'عدد الألواح', 'الحالة', 'تاريخ الإنشاء', 'الشركة'];
         const csvRows = leads.map(lead => [
             lead.id,
