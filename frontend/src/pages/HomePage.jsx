@@ -1,18 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
     FaSun, FaChartLine, FaHandshake, FaStar, FaWhatsapp, 
     FaShieldAlt, FaClock, FaThumbsUp,
-    FaCalculator, FaInfoCircle, FaMoneyBillWave, FaLandmark, 
-    FaBuilding, FaHome, FaFileInvoiceDollar, FaSearch,
-    FaCheckCircle, FaPercentage, FaBolt, FaPlug, FaTachometerAlt
+    FaCalculator, FaInfoCircle
 } from 'react-icons/fa';
 
 const HomePage = () => {
-    const [billAmount, setBillAmount] = useState(200);
-    const savings = (billAmount * 0.7).toFixed(0);
-    const twentyYearSavings = (billAmount * 12 * 20 * 0.7).toLocaleString();
-
     return (
         <div className="bg-white">
             {/* Top Bar */}
@@ -20,7 +14,7 @@ const HomePage = () => {
                 ⭐ أكثر من 5000 عميل مهتم بالطاقة الشمسية في تونس - احصل على دراستك التقريبية الآن مجاناً
             </div>
 
-            {/* Hero Section */}
+            {/* Hero Section مع صورة خلفية */}
             <section 
                 className="relative bg-cover bg-center bg-no-repeat min-h-[85vh] flex items-center"
                 style={{ 
@@ -38,11 +32,11 @@ const HomePage = () => {
                         </div>
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
-                        اكتشف كم تحتاج من الطاقة الشمسية <br />
-                        <span className="text-yellow-400">ووفر حتى 90٪ من فاتورة الكهرباء</span>
+                        احسب الاحتياج التقريبي <br />
+                        <span className="text-yellow-400">للطاقة الشمسية لمنزلك</span>
                     </h1>
                     <p className="text-lg md:text-xl mb-4 max-w-2xl mx-auto opacity-90">
-                        احصل على دراسة تقريبية مجانية لمعرفة عدد الألواح والقدرة المطلوبة لمنزلك
+                        احصل على دراسة تقريبية مجانية لمعرفة القدرة المطلوبة لمنزلك
                     </p>
                     <p className="text-md mb-8 max-w-2xl mx-auto opacity-80">
                         ⚡ هذا الحساب هو تقدير أولي - الدراسة النهائية والسعر يتم تقديمهما بعد التواصل مع فريقنا
@@ -54,6 +48,7 @@ const HomePage = () => {
                         ابدأ الحساب التقريبي الآن
                     </Link>
                     
+                    {/* إحصاءات سريعة */}
                     <div className="flex flex-wrap justify-center gap-6 mt-12">
                         <div className="text-center">
                             <div className="text-2xl font-bold text-yellow-400">+120</div>
@@ -107,42 +102,30 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Solar Savings Simulator */}
-            <section className="py-12 px-4 bg-gradient-to-r from-yellow-50 to-orange-50">
-                <div className="max-w-4xl mx-auto text-center">
-                    <h2 className="text-3xl font-bold text-gray-800 mb-4">☀️ اعرف كم ستوفر خلال 20 سنة</h2>
-                    <p className="text-gray-600 mb-8">حرك المؤشر لمعرفة التوفير المتوقع</p>
-                    
-                    <div className="bg-white rounded-2xl p-8 shadow-xl">
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-bold mb-3">
-                                فاتورتك الشهرية الحالية (دينار تونسي)
-                            </label>
-                            <input 
-                                type="range" 
-                                min="50" 
-                                max="500" 
-                                step="10"
-                                value={billAmount}
-                                onChange={(e) => setBillAmount(Number(e.target.value))}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                            />
-                            <div className="text-3xl font-bold text-yellow-600 mt-3">{billAmount} دينار</div>
-                        </div>
-                        
-                        <div className="grid md:grid-cols-2 gap-6 mt-8">
-                            <div className="bg-green-50 p-4 rounded-xl">
-                                <FaBolt className="text-green-600 text-2xl mx-auto mb-2" />
-                                <p className="text-gray-600">فاتورتك بعد الطاقة الشمسية</p>
-                                <p className="text-2xl font-bold text-green-600">{savings} دينار</p>
-                                <p className="text-sm text-gray-500">توفير شهري: {billAmount - savings} دينار</p>
+            {/* Why Choose Us */}
+            <section className="py-16 px-4 bg-gray-50">
+                <div className="max-w-6xl mx-auto">
+                    <h2 className="text-3xl font-bold text-center text-gray-800 mb-4">
+                        لماذا تختار Shamsi.tn؟
+                    </h2>
+                    <p className="text-center text-gray-600 mb-12">
+                        نقدم لك أفضل الخدمات لضمان راحتك وثقتك
+                    </p>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[
+                            { icon: FaShieldAlt, title: 'شركات معتمدة', desc: 'نعمل مع أفضل شركات الطاقة الشمسية المعتمدة في تونس', color: 'text-green-600' },
+                            { icon: FaStar, title: 'دراسة تقريبية مجانية', desc: 'احصل على تقدير أولي دون أي التزام', color: 'text-yellow-600' },
+                            { icon: FaThumbsUp, title: 'مقارنة العروض', desc: 'نقارن لك عروض عدة شركات للحصول على أفضل عرض', color: 'text-blue-600' },
+                            { icon: FaClock, title: 'دعم فني', desc: 'فريق متخصص للإجابة على استفساراتك طوال الوقت', color: 'text-purple-600' }
+                        ].map((item, i) => (
+                            <div key={i} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition text-center">
+                                <div className={`${item.color} text-4xl mb-3 flex justify-center`}>
+                                    <item.icon />
+                                </div>
+                                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                                <p className="text-gray-600 text-sm">{item.desc}</p>
                             </div>
-                            <div className="bg-blue-50 p-4 rounded-xl">
-                                <FaPercentage className="text-blue-600 text-2xl mx-auto mb-2" />
-                                <p className="text-gray-600">التوفير الإجمالي خلال 20 سنة</p>
-                                <p className="text-2xl font-bold text-blue-600">{twentyYearSavings} دينار</p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             </section>
@@ -161,7 +144,7 @@ const HomePage = () => {
                             <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <FaMoneyBillWave className="text-green-600 text-2xl" />
                             </div>
-                            <h3 className="text-xl font-bold text-center mb-3">💰 Cash</h3>
+                            <h3 className="text-xl font-bold text-center mb-3">💰 دفع نقدي</h3>
                             <p className="text-gray-600 text-center">
                                 الدفع نقداً هو الخيار الأسرع لتركيب النظام الشمسي. بعد الدراسة التقنية يتم تركيب النظام مباشرة خلال أيام.
                             </p>
@@ -169,16 +152,16 @@ const HomePage = () => {
 
                         <div className="bg-yellow-50 rounded-xl p-6 border border-yellow-200 hover:shadow-lg transition relative">
                             <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <FaLandmark className="text-yellow-600 text-2xl" />
+                                <FaHandshake className="text-yellow-600 text-2xl" />
                             </div>
-                            <h3 className="text-xl font-bold text-center mb-3">🏦 PROSOL</h3>
+                            <h3 className="text-xl font-bold text-center mb-3">🏦 تمويل STEG / PROSOL</h3>
                             <p className="text-gray-600 text-center mb-3">
                                 برنامج PROSOL هو برنامج تمويل من الدولة التونسية بالتعاون مع STEG والبنوك.
                                 يمكنك دفع النظام الشمسي بالتقسيط عبر فاتورة الكهرباء لمدة تصل إلى 7 سنوات.
                             </p>
                             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
                                 <p className="text-red-700 text-sm text-center">
-                                    ⚠️ بعض الشركات تضيف تكاليف إضافية على PROSOL، لذلك ننصح دائماً بمقارنة العروض قبل الاختيار.
+                                    ⚠️ بعض الشركات تضيف تكاليف إضافية، لذلك ننصح دائماً بمقارنة العروض قبل الاختيار.
                                 </p>
                             </div>
                         </div>
@@ -187,9 +170,9 @@ const HomePage = () => {
                             <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <FaBuilding className="text-blue-600 text-2xl" />
                             </div>
-                            <h3 className="text-xl font-bold text-center mb-3">🏢 Leasing</h3>
+                            <h3 className="text-xl font-bold text-center mb-3">🏢 إيجار تمويلي</h3>
                             <p className="text-gray-600 text-center">
-                                يمكن أيضاً تمويل المشروع عبر شركات Leasing، خاصة للمحلات التجارية والمصانع والشركات.
+                                يمكن أيضاً تمويل المشروع عبر شركات التأجير التمويلي (Leasing)، خاصة للمحلات التجارية والمصانع والشركات.
                             </p>
                         </div>
                     </div>
@@ -207,7 +190,7 @@ const HomePage = () => {
                     </p>
                     <div className="grid md:grid-cols-5 gap-4">
                         {[
-                            { icon: FaFileInvoiceDollar, step: '1', title: 'معرفة الاستهلاك', desc: 'نقوم أولاً بتحليل استهلاكك السنوي للكهرباء باستخدام رقم العداد' },
+                            { icon: FaFileInvoice, step: '1', title: 'معرفة الاستهلاك', desc: 'نقوم أولاً بتحليل استهلاكك السنوي للكهرباء باستخدام رقم العداد' },
                             { icon: FaTachometerAlt, step: '2', title: 'حساب القدرة', desc: 'نحسب القدرة المناسبة لمنزلك وعدد الألواح المطلوبة' },
                             { icon: FaSearch, step: '3', title: 'دراسة الشركة المعتمدة', desc: 'نقوم بالتواصل مع شركات معتمدة لدى STEG لتقديم عرض تقني ومالي' },
                             { icon: FaHome, step: '4', title: 'زيارة تقنية', desc: 'يقوم مهندس بزيارة المنزل للتأكد من المساحة والاتجاه' },
@@ -295,36 +278,8 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Why Choose Us */}
-            <section className="py-16 px-4 bg-gray-50">
-                <div className="max-w-6xl mx-auto">
-                    <h2 className="text-3xl font-bold text-center text-gray-800 mb-4">
-                        لماذا تختار Shamsi.tn؟
-                    </h2>
-                    <p className="text-center text-gray-600 mb-12">
-                        نقدم لك أفضل الخدمات لضمان راحتك وثقتك
-                    </p>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {[
-                            { icon: FaShieldAlt, title: 'شركات معتمدة', desc: 'نعمل مع أفضل شركات الطاقة الشمسية المعتمدة في تونس', color: 'text-green-600' },
-                            { icon: FaStar, title: 'دراسة تقريبية مجانية', desc: 'احصل على تقدير أولي دون أي التزام', color: 'text-yellow-600' },
-                            { icon: FaThumbsUp, title: 'مقارنة العروض', desc: 'نقارن لك عروض عدة شركات للحصول على أفضل عرض', color: 'text-blue-600' },
-                            { icon: FaClock, title: 'دعم فني', desc: 'فريق متخصص للإجابة على استفساراتك طوال الوقت', color: 'text-purple-600' }
-                        ].map((item, i) => (
-                            <div key={i} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition text-center">
-                                <div className={`${item.color} text-4xl mb-3 flex justify-center`}>
-                                    <item.icon />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                                <p className="text-gray-600 text-sm">{item.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
             {/* Real Projects Section */}
-            <section className="py-16 px-4 bg-white">
+            <section className="py-16 px-4 bg-gray-50">
                 <div className="max-w-6xl mx-auto">
                     <h2 className="text-3xl font-bold text-center text-gray-800 mb-4">
                         مشاريع حقيقية في تونس
@@ -336,9 +291,9 @@ const HomePage = () => {
                         {[
                             { city: 'صفاقس', kw: '5 kW', type: 'منزل', description: 'تركيب نظام 5 كيلوواط لمنزل في صفاقس' },
                             { city: 'سوسة', kw: '3 kW', type: 'محل تجاري', description: 'نظام شمسي لمحل تجاري في سوسة' },
-                            { city: 'تونس', kw: '6 kW', type: 'مصنع', description: 'تركيب نظام 6 كيلوواط لمصنع في تونس' }
+                            { city: 'تونس', kw: '30 kW', type: 'مصنع', description: 'تركيب نظام 30 كيلوواط لمصنع في تونس' }
                         ].map((project, i) => (
-                            <div key={i} className="bg-gray-50 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition p-6 text-center">
+                            <div key={i} className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition p-6 text-center">
                                 <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <FaSun className="text-yellow-600 text-2xl" />
                                 </div>
