@@ -384,14 +384,32 @@ const GeneralManagerDashboard = () => {
         return;
     }
     
-    // ✅ منع إنشاء مستخدم شركة بدون شركة مرتبطة
+    // ✅ إذا كان الدور شركة، نسمح بالإضافة بدون شركة مرتبطة
     if (newUser.role === 'company') {
-        toast.error('⚠️ لا يمكن إنشاء مستخدم شركة بشكل منفرد. الرجاء إضافة الشركة أولاً من تبويب "الشركات" ثم سيتم إنشاء المستخدم تلقائياً.', {
-            duration: 5000
-        });
+        // لا نمنع، نسمح بالإضافة مع تحذير
+        const confirmAdd = window.confirm(
+            '⚠️ هل أنت متأكد؟\n\n' +
+            'إضافة مستخدم شركة بدون شركة مرتبطة قد يسبب مشاكل.\n' +
+            'هل تريد المتابعة؟'
+        );
+        if (!confirmAdd) return;
+        
+        try {
+            await adminAPI.addUser(newUser);
+            toast.success('✅ تم إضافة مستخدم الشركة بنجاح');
+            toast.info('📌 ملاحظة: هذا المستخدم غير مرتبط بشركة حالياً', { duration: 5000 });
+            showNotificationMessage('تم إضافة مستخدم شركة جديد');
+            setShowUserModal(false);
+            setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
+            fetchUsers();
+        } catch (error) {
+            console.error('Error adding user:', error);
+            toast.error('❌ حدث خطأ في إضافة المستخدم');
+        }
         return;
     }
     
+    // للمستخدمين العاديين (غير شركة)
     try {
         await adminAPI.addUser(newUser);
         toast.success('✅ تم إضافة المستخدم بنجاح');
