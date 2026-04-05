@@ -37,6 +37,11 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // =============================================
+// Trust proxy (لـ rate limiting على Render)
+// =============================================
+app.set('trust proxy', 1);
+
+// =============================================
 // Request ID Middleware (للتتبع والتصحيح)
 // =============================================
 app.use((req, res, next) => {
@@ -55,7 +60,8 @@ const limiter = rateLimit({
         message: 'لقد تجاوزت الحد المسموح من الطلبات. يرجى المحاولة لاحقاً.'
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    validate: false // تعطيل التحقق من X-Forwarded-For مؤقتاً
 });
 app.use(`${API_PREFIX}/`, limiter);
 
@@ -171,6 +177,21 @@ app.get('/api/routes', (req, res) => {
     res.json({
         totalRoutes: apiRoutes.length,
         routes: apiRoutes
+    });
+});
+
+// =============================================
+// ✅ TEMPORARY: Test endpoint
+// =============================================
+app.post('/api/test-send/:leadId', (req, res) => {
+    console.log('🔍 Test endpoint reached');
+    console.log('📝 Lead ID:', req.params.leadId);
+    console.log('📦 Body:', req.body);
+    res.json({ 
+        success: true, 
+        message: 'Test endpoint works!', 
+        leadId: req.params.leadId,
+        receivedBody: req.body
     });
 });
 
