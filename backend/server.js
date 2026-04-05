@@ -208,11 +208,9 @@ app.get(`${API_PREFIX}/fix-manager-assignments`, async (req, res) => {
     try {
         const db = getDb();
         
-        // حذف الجدول القديم
         await db.query('DROP TABLE IF EXISTS manager_assignments CASCADE;');
         console.log('✅ Dropped old manager_assignments table');
         
-        // إعادة إنشاء الجدول بالشكل الصحيح
         await db.query(`
             CREATE TABLE IF NOT EXISTS manager_assignments (
                 id SERIAL PRIMARY KEY,
@@ -229,6 +227,39 @@ app.get(`${API_PREFIX}/fix-manager-assignments`, async (req, res) => {
         
     } catch (error) {
         console.error('Error fixing manager_assignments:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// ✅ FORCE FIX: Reset manager_assignments without foreign keys
+// =============================================
+app.get(`${API_PREFIX}/force-fix-assignments`, async (req, res) => {
+    try {
+        const db = getDb();
+        
+        await db.query('DROP TABLE IF EXISTS manager_assignments CASCADE;');
+        console.log('✅ Dropped old manager_assignments');
+        
+        await db.query(`
+            CREATE TABLE manager_assignments (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER NOT NULL,
+                manager_id INTEGER NOT NULL,
+                assigned_by INTEGER NOT NULL,
+                notes TEXT,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Created new manager_assignments without foreign keys');
+        
+        res.json({ 
+            message: 'manager_assignments table recreated successfully without foreign keys',
+            note: 'Now assignments should work'
+        });
+        
+    } catch (error) {
+        console.error('Error:', error);
         res.status(500).json({ error: error.message });
     }
 });
