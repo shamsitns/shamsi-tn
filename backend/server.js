@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
+const { exec } = require('child_process');
 
 dotenv.config();
 
@@ -137,6 +138,69 @@ app.get(`${API_PREFIX}/uptime`, (req, res) => {
         started_at: new Date(startTime),
         requestId: req.id
     });
+});
+
+// =============================================
+// ✅ TEMPORARY: Run seed to add executive manager
+// =============================================
+app.get(`${API_PREFIX}/run-seed`, async (req, res) => {
+    try {
+        console.log('🌱 Running seed...');
+        exec('node seed.js', { cwd: __dirname }, (error, stdout, stderr) => {
+            if (error) {
+                console.error('❌ Seed error:', error);
+                return res.status(500).json({ error: error.message, stderr });
+            }
+            console.log('✅ Seed completed');
+            res.json({ message: 'Seed completed successfully', output: stdout });
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// ✅ TEMPORARY: Add executive manager manually
+// =============================================
+app.get(`${API_PREFIX}/add-executive`, async (req, res) => {
+    try {
+        const bcrypt = require('bcryptjs');
+        const db = getDb();
+        const hashedPassword = await bcrypt.hash('manager123', 10);
+        
+        // Check if executive manager exists
+        const existing = await db.query("SELECT id FROM users WHERE role = 'executive_manager' LIMIT 1");
+        const existingRows = existing.rows || existing;
+        
+        if (existingRows.length > 0) {
+            return res.json({ 
+                message: 'Executive manager already exists', 
+                id: existingRows[0].id,
+                note: 'Use this ID when assigning leads'
+            });
+        }
+        
+        // Add executive manager
+        const result = await db.query(
+            `INSERT INTO users (name, email, password, role, is_active, created_at) 
+             VALUES ($1, $2, $3, $4, true, CURRENT_TIMESTAMP) 
+             RETURNING id`,
+            ['Executive Manager', 'executive@shamsi.tn', hashedPassword, 'executive_manager']
+        );
+        
+        const newId = (result.rows || result)[0]?.id;
+        res.json({ 
+            message: 'Executive manager created successfully', 
+            id: newId, 
+            email: 'executive@shamsi.tn',
+            password: 'manager123',
+            note: 'Use this ID when assigning leads'
+        });
+        
+    } catch (error) {
+        console.error('Error adding executive:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // =============================================
