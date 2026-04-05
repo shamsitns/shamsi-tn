@@ -388,11 +388,15 @@ export const handleApiError = (error) => {
         return { message: error.message || 'حدث خطأ في الطلب' };
     }
 };
+
 // ==================== Company API (للوحة تحكم الشركة) ====================
 export const companyAPI = {
     getMyLeads: () => api.get('/company/leads'),
     getMyStats: () => api.get('/company/stats'),
     getLeadDetails: (leadId) => api.get(`/company/leads/${leadId}`),
-    updateLeadStatus: (leadId, status, notes) => api.patch(`/company/leads/${leadId}/status`, { status, notes })
+    updateLeadStatus: (leadId, status, notes) => api.patch(`/company/leads/${leadId}/status`, { status, notes }),
+    // ✅ إضافة دالة تحديث العمولة
+    updateCommission: (leadId, commission_rate, notes) => api.patch(`/company/leads/${leadId}/commission`, { commission_rate, notes })
 };
+
 export default api;
