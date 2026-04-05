@@ -168,7 +168,6 @@ app.get(`${API_PREFIX}/add-executive`, async (req, res) => {
         const db = getDb();
         const hashedPassword = await bcrypt.hash('manager123', 10);
         
-        // Check if executive manager exists
         const existing = await db.query("SELECT id FROM users WHERE role = 'executive_manager' LIMIT 1");
         const existingRows = existing.rows || existing;
         
@@ -180,7 +179,6 @@ app.get(`${API_PREFIX}/add-executive`, async (req, res) => {
             });
         }
         
-        // Add executive manager
         const result = await db.query(
             `INSERT INTO users (name, email, password, role, is_active, created_at) 
              VALUES ($1, $2, $3, $4, true, CURRENT_TIMESTAMP) 
@@ -199,6 +197,38 @@ app.get(`${API_PREFIX}/add-executive`, async (req, res) => {
         
     } catch (error) {
         console.error('Error adding executive:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// ✅ TEMPORARY: Fix manager_assignments table
+// =============================================
+app.get(`${API_PREFIX}/fix-manager-assignments`, async (req, res) => {
+    try {
+        const db = getDb();
+        
+        // حذف الجدول القديم
+        await db.query('DROP TABLE IF EXISTS manager_assignments CASCADE;');
+        console.log('✅ Dropped old manager_assignments table');
+        
+        // إعادة إنشاء الجدول بالشكل الصحيح
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS manager_assignments (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+                manager_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                assigned_by INTEGER REFERENCES users(id),
+                notes TEXT,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Recreated manager_assignments table with correct foreign key');
+        
+        res.json({ message: 'manager_assignments table fixed successfully' });
+        
+    } catch (error) {
+        console.error('Error fixing manager_assignments:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -237,7 +267,6 @@ if (process.env.NODE_ENV !== 'production') {
         }
     });
 
-    // TEMPORARY: Fix users endpoint (development only)
     app.get(`${API_PREFIX}/fix-users`, async (req, res) => {
         try {
             const bcrypt = require('bcryptjs');
@@ -331,16 +360,5 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
-    process.exit(0);
-});
-
-process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
-    process.exit(0);
-});
 
 startServer();
