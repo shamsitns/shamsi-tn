@@ -37,7 +37,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // =============================================
-// Trust proxy (لـ rate limiting على Render)
+// Trust proxy (لـ Render)
 // =============================================
 app.set('trust proxy', 1);
 
@@ -51,19 +51,16 @@ app.use((req, res, next) => {
 });
 
 // =============================================
-// Rate Limiting (لمنع الإساءة)
+// Rate Limiting - معطل مؤقتاً للتجربة
 // =============================================
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 دقيقة
-    max: 200, // 200 طلب كحد أقصى
-    message: {
-        message: 'لقد تجاوزت الحد المسموح من الطلبات. يرجى المحاولة لاحقاً.'
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    validate: false // تعطيل التحقق من X-Forwarded-For مؤقتاً
-});
-app.use(`${API_PREFIX}/`, limiter);
+// const limiter = rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     max: 200,
+//     message: { message: 'لقد تجاوزت الحد المسموح من الطلبات. يرجى المحاولة لاحقاً.' },
+//     standardHeaders: true,
+//     legacyHeaders: false
+// });
+// app.use(`${API_PREFIX}/`, limiter);
 
 // =============================================
 // Middleware (مع تحسينات الأداء)
@@ -469,7 +466,7 @@ const startServer = async () => {
     🔧 Environment: ${process.env.NODE_ENV || 'development'}
     ⚡ Compression: Enabled
     🛡️  Helmet: Enabled
-    🔒 Rate Limiting: 200 requests / 15 minutes
+    🔒 Rate Limiting: Disabled (temporarily)
     📝 Request ID: Enabled
     ════════════════════════════════════════════════════════
             `);
