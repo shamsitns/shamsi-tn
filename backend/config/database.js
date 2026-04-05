@@ -65,7 +65,6 @@ const createTablesPostgres = async (pool) => {
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
-    // ✅ إضافة عمود company_id لربط المستخدم بالشركة
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);`);
     console.log('✅ Updated users table');
   } catch (err) {
@@ -103,6 +102,14 @@ const createTablesPostgres = async (pool) => {
     console.log('✅ Updated companies table with all columns');
   } catch (err) {
     console.log('Note: companies table update:', err.message);
+  }
+
+  // ✅ إضافة عمود commission_rate إلى lead_companies
+  try {
+    await pool.query(`ALTER TABLE lead_companies ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(10,2) DEFAULT 0;`);
+    console.log('✅ Added commission_rate column to lead_companies');
+  } catch (err) {
+    console.log('Note: could not add commission_rate column:', err.message);
   }
 
   // ============================================
@@ -255,7 +262,8 @@ const createTablesPostgres = async (pool) => {
       company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
       assigned_by INTEGER REFERENCES users(id),
       assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      status VARCHAR(50) DEFAULT 'pending'
+      status VARCHAR(50) DEFAULT 'pending',
+      commission_rate DECIMAL(10,2) DEFAULT 0
     )`,
     
     `CREATE TABLE IF NOT EXISTS manager_assignments (
