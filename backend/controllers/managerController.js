@@ -30,7 +30,6 @@ exports.getMyLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
-        // ✅ التعديل: استخدام assigned_to للمديرين (بالإضافة إلى created_by)
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
             query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
             queryParams.push(managerId);
@@ -49,7 +48,6 @@ exports.getMyLeads = async (req, res) => {
         const result = await db.query(query, queryParams);
         const leads = getRows(result);
         
-        // Get total count
         let countQuery = `SELECT COUNT(*) as total FROM leads WHERE 1=1`;
         const countParams = [];
         let countIndex = 1;
@@ -100,7 +98,6 @@ exports.updateLeadStatus = async (req, res) => {
         
         console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
         
-        // Update lead status
         let updateQuery = `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP`;
         const updateParams = [status];
         let paramIndex = 2;
@@ -149,7 +146,6 @@ exports.getManagerStats = async (req, res) => {
         
         console.log(`📈 Getting stats for manager ${managerId} (${role})`);
         
-        // ✅ التعديل: استخدام assigned_to أو created_by
         let query = `
             SELECT 
                 COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
@@ -191,21 +187,18 @@ exports.assignToCompany = async (req, res) => {
         
         console.log(`🏢 Assigning lead ${leadId} to company ${companyId}`);
         
-        // Check if lead exists
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(resultLead);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // Check if company exists
         const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
         const company = getFirstRow(resultCompany);
         if (!company) {
             return res.status(404).json({ message: 'الشركة غير موجودة' });
         }
         
-        // Update lead with company
         await db.query(
             `UPDATE leads 
              SET status = 'assigned_to_company', 
@@ -216,7 +209,6 @@ exports.assignToCompany = async (req, res) => {
             [companyId, leadId]
         );
         
-        // Check if lead_company assignment exists
         const resultExisting = await db.query(
             `SELECT id FROM lead_companies 
              WHERE lead_id = $1 AND company_id = $2`,
@@ -322,7 +314,6 @@ exports.sendToOperationsManager = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // ✅ العثور على مدير عمليات متاح
         const opsResult = await db.query(
             'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
             ['operations_manager']
@@ -335,7 +326,6 @@ exports.sendToOperationsManager = async (req, res) => {
         
         const commission = lead.commission_amount || (lead.required_kw * 150);
         
-        // ✅ تحديث lead مع تعيينه لمدير العمليات
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
@@ -347,12 +337,7 @@ exports.sendToOperationsManager = async (req, res) => {
             [operationsManager.id, executiveId, leadId]
         );
         
-        // إضافة سجل في manager_assignments
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, operationsManager.id, executiveId, notes || `تم إرسال الطلب لمدير العمليات: ${operationsManager.name}`]
-        );
+        console.log(`📝 Assignment recorded for lead ${leadId} to operations manager ${operationsManager.name}`);
         
         console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
@@ -387,7 +372,6 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // ✅ العثور على مدير عمليات متاح
         const opsResult = await db.query(
             'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
             ['operations_manager']
@@ -400,7 +384,6 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
         
         const commission = lead.commission_amount || (lead.required_kw * 150);
         
-        // ✅ تحديث lead مع تعيينه لمدير العمليات
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
@@ -412,12 +395,7 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
             [operationsManager.id, executiveId, leadId]
         );
         
-        // إضافة سجل في manager_assignments
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, operationsManager.id, executiveId, notes || `تم قبول الطلب وإرساله لمدير العمليات: ${operationsManager.name}`]
-        );
+        console.log(`📝 Assignment recorded for lead ${leadId} to operations manager ${operationsManager.name}`);
         
         console.log(`✅ Lead ${leadId} accepted and sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
@@ -448,7 +426,6 @@ exports.addLeadNote = async (req, res) => {
             return res.status(400).json({ message: 'الملاحظات مطلوبة' });
         }
         
-        // ✅ التعديل: استخدام assigned_to أو created_by
         const existingResult = await db.query(
             'SELECT id FROM leads WHERE id = $1 AND (created_by = $2 OR assigned_to = $2)',
             [leadId, managerId]
@@ -585,7 +562,6 @@ exports.exportLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
-        // ✅ التعديل: استخدام assigned_to أو created_by
         if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
             query += ` AND (l.created_by = $${paramIndex} OR l.assigned_to = $${paramIndex})`;
             queryParams.push(managerId);
