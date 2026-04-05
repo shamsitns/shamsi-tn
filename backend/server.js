@@ -265,6 +265,42 @@ app.get(`${API_PREFIX}/force-fix-assignments`, async (req, res) => {
 });
 
 // =============================================
+// ✅ Add test leads
+// =============================================
+app.get(`${API_PREFIX}/add-test-leads`, async (req, res) => {
+    try {
+        const db = getDb();
+        
+        // الحصول على ID المدير العام
+        const gmResult = await db.query("SELECT id FROM users WHERE email = 'gm@shamsi.tn' LIMIT 1");
+        const gmId = (gmResult.rows || gmResult)[0]?.id || 2;
+        
+        // إضافة leads تجريبية
+        const testLeads = [
+            { name: 'أحمد بن علي', phone: '12345678', city: 'تونس', property_type: 'house', bill_amount: 250, bill_period_months: 60, bill_season: 'summer', required_kw: 5.0, panels_count: 10, commission_amount: 750, status: 'pending', created_by: gmId },
+            { name: 'سارة بن سالم', phone: '87654321', city: 'صفاقس', property_type: 'apartment', bill_amount: 180, bill_period_months: 60, bill_season: 'spring', required_kw: 3.5, panels_count: 7, commission_amount: 525, status: 'approved', created_by: gmId },
+            { name: 'محمد الفاهم', phone: '11223344', city: 'سوسة', property_type: 'farm', bill_amount: 450, bill_period_months: 60, bill_season: 'summer', required_kw: 9.0, panels_count: 18, commission_amount: 1350, status: 'contacted', created_by: gmId }
+        ];
+        
+        let added = 0;
+        
+        for (const lead of testLeads) {
+            await db.query(`
+                INSERT INTO leads (name, phone, city, property_type, bill_amount, bill_period_months, bill_season, required_kw, panels_count, commission_amount, status, created_by, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
+            `, [lead.name, lead.phone, lead.city, lead.property_type, lead.bill_amount, lead.bill_period_months, lead.bill_season, lead.required_kw, lead.panels_count, lead.commission_amount, lead.status, lead.created_by]);
+            added++;
+        }
+        
+        res.json({ message: `Added ${added} test leads successfully` });
+        
+    } catch (error) {
+        console.error('Error adding test leads:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
 // Debug Routes (فقط في بيئة التطوير)
 // =============================================
 if (process.env.NODE_ENV !== 'production') {
