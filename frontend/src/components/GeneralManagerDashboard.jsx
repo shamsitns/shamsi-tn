@@ -48,9 +48,6 @@ const GeneralManagerDashboard = () => {
     const [notificationMessage, setNotificationMessage] = useState('');
     const [cities, setCities] = useState([]);
     
-    // ✅ New state for showing/hiding passwords in company accounts table
-    const [showPasswordForUser, setShowPasswordForUser] = useState({});
-    
     const [newUser, setNewUser] = useState({
         name: '',
         email: '',
@@ -94,8 +91,8 @@ const GeneralManagerDashboard = () => {
     }, [leads, searchTerm, cityFilter, priorityFilter, filter]);
 
     useEffect(() => {
-    filterUsers();
-}, [users, searchTerm, userRoleFilter]);
+        filterUsers();
+    }, [users, searchTerm, userRoleFilter]);
 
     useEffect(() => {
         filterCompanies();
@@ -155,30 +152,28 @@ const GeneralManagerDashboard = () => {
     };
 
     const fetchCompanyRequests = async () => {
-    try {
-        const response = await adminAPI.getCompanyRequests();
-        // ✅ تأكد أن البيانات مصفوفة بغض النظر عن شكل الاستجابة
-        let requestsData = [];
-        
-        if (response.data?.data && Array.isArray(response.data.data)) {
-            requestsData = response.data.data;
-        } else if (Array.isArray(response.data)) {
-            requestsData = response.data;
-        } else if (response.data && typeof response.data === 'object') {
-            // إذا كانت الاستجابة كائن ولكن ليس به data مصفوفة
-            requestsData = [];
+        try {
+            const response = await adminAPI.getCompanyRequests();
+            let requestsData = [];
+            
+            if (response.data?.data && Array.isArray(response.data.data)) {
+                requestsData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                requestsData = response.data;
+            } else {
+                requestsData = [];
+            }
+            
+            console.log('📋 Company requests loaded:', requestsData.length);
+            setCompanyRequests(requestsData);
+            setFilteredRequests(requestsData);
+        } catch (error) {
+            console.error('Error fetching company requests:', error);
+            toast.error('حدث خطأ في جلب طلبات الشركات');
+            setCompanyRequests([]);
+            setFilteredRequests([]);
         }
-        
-        console.log('📋 Company requests loaded:', requestsData.length);
-        setCompanyRequests(requestsData);
-        setFilteredRequests(requestsData);
-    } catch (error) {
-        console.error('Error fetching company requests:', error);
-        toast.error('حدث خطأ في جلب طلبات الشركات');
-        setCompanyRequests([]);
-        setFilteredRequests([]);
-    }
-};
+    };
 
     const fetchStats = async () => {
         try {
@@ -244,25 +239,23 @@ const GeneralManagerDashboard = () => {
     };
 
     const filterUsers = () => {
-    let filtered = [...users];
-    
-    // ✅ فلتر حسب الدور (role)
-    if (userRoleFilter !== 'all') {
-        filtered = filtered.filter(user => user.role === userRoleFilter);
-    }
-    
-    // ✅ فلتر حسب البحث
-    if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filtered = filtered.filter(user => 
-            user.name.toLowerCase().includes(term) ||
-            user.email.toLowerCase().includes(term) ||
-            (user.phone && user.phone.includes(term))
-        );
-    }
-    
-    setFilteredUsers(filtered);
-};
+        let filtered = [...users];
+        
+        if (userRoleFilter !== 'all') {
+            filtered = filtered.filter(user => user.role === userRoleFilter);
+        }
+        
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(user => 
+                user.name.toLowerCase().includes(term) ||
+                user.email.toLowerCase().includes(term) ||
+                (user.phone && user.phone.includes(term))
+            );
+        }
+        
+        setFilteredUsers(filtered);
+    };
 
     const filterCompanies = () => {
         let filtered = [...companies];
@@ -278,27 +271,25 @@ const GeneralManagerDashboard = () => {
     };
 
     const filterRequests = () => {
-    // ✅ تأكد أن companyRequests مصفوفة
-    const requestsArray = Array.isArray(companyRequests) ? companyRequests : [];
-    
-    // إذا كان لا يوجد مصطلح بحث، أظهر الكل
-    if (!searchTerm || searchTerm.trim() === '') {
-        setFilteredRequests(requestsArray);
-        return;
-    }
-    
-    const term = searchTerm.toLowerCase().trim();
-    const filtered = requestsArray.filter(request => 
-        request && (
-            (request.company_name && request.company_name.toLowerCase().includes(term)) ||
-            (request.contact_name && request.contact_name.toLowerCase().includes(term)) ||
-            (request.email && request.email.toLowerCase().includes(term)) ||
-            (request.phone && request.phone.includes(term))
-        )
-    );
-    
-    setFilteredRequests(filtered);
-};
+        const requestsArray = Array.isArray(companyRequests) ? companyRequests : [];
+        
+        if (!searchTerm || searchTerm.trim() === '') {
+            setFilteredRequests(requestsArray);
+            return;
+        }
+        
+        const term = searchTerm.toLowerCase().trim();
+        const filtered = requestsArray.filter(request => 
+            request && (
+                (request.company_name && request.company_name.toLowerCase().includes(term)) ||
+                (request.contact_name && request.contact_name.toLowerCase().includes(term)) ||
+                (request.email && request.email.toLowerCase().includes(term)) ||
+                (request.phone && request.phone.includes(term))
+            )
+        );
+        
+        setFilteredRequests(filtered);
+    };
 
     // =============================================
     // Lead Management
@@ -388,26 +379,38 @@ const GeneralManagerDashboard = () => {
     // User Management
     // =============================================
     const handleAddUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.password) {
-        toast.error('يرجى إكمال جميع البيانات المطلوبة');
-        return;
-    }
-    
-    // ✅ إذا كان الدور شركة، نسمح بالإضافة بدون شركة مرتبطة
-    if (newUser.role === 'company') {
-        // لا نمنع، نسمح بالإضافة مع تحذير
-        const confirmAdd = window.confirm(
-            '⚠️ هل أنت متأكد؟\n\n' +
-            'إضافة مستخدم شركة بدون شركة مرتبطة قد يسبب مشاكل.\n' +
-            'هل تريد المتابعة؟'
-        );
-        if (!confirmAdd) return;
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            toast.error('يرجى إكمال جميع البيانات المطلوبة');
+            return;
+        }
+        
+        if (newUser.role === 'company') {
+            const confirmAdd = window.confirm(
+                '⚠️ هل أنت متأكد؟\n\n' +
+                'إضافة مستخدم شركة بدون شركة مرتبطة قد يسبب مشاكل.\n' +
+                'هل تريد المتابعة؟'
+            );
+            if (!confirmAdd) return;
+            
+            try {
+                await adminAPI.addUser(newUser);
+                toast.success('✅ تم إضافة مستخدم الشركة بنجاح');
+                toast.info('📌 ملاحظة: هذا المستخدم غير مرتبط بشركة حالياً', { duration: 5000 });
+                showNotificationMessage('تم إضافة مستخدم شركة جديد');
+                setShowUserModal(false);
+                setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
+                fetchUsers();
+            } catch (error) {
+                console.error('Error adding user:', error);
+                toast.error('❌ حدث خطأ في إضافة المستخدم');
+            }
+            return;
+        }
         
         try {
             await adminAPI.addUser(newUser);
-            toast.success('✅ تم إضافة مستخدم الشركة بنجاح');
-            toast.info('📌 ملاحظة: هذا المستخدم غير مرتبط بشركة حالياً', { duration: 5000 });
-            showNotificationMessage('تم إضافة مستخدم شركة جديد');
+            toast.success('✅ تم إضافة المستخدم بنجاح');
+            showNotificationMessage('تم إضافة مستخدم جديد');
             setShowUserModal(false);
             setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
             fetchUsers();
@@ -415,22 +418,7 @@ const GeneralManagerDashboard = () => {
             console.error('Error adding user:', error);
             toast.error('❌ حدث خطأ في إضافة المستخدم');
         }
-        return;
-    }
-    
-    // للمستخدمين العاديين (غير شركة)
-    try {
-        await adminAPI.addUser(newUser);
-        toast.success('✅ تم إضافة المستخدم بنجاح');
-        showNotificationMessage('تم إضافة مستخدم جديد');
-        setShowUserModal(false);
-        setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
-        fetchUsers();
-    } catch (error) {
-        console.error('Error adding user:', error);
-        toast.error('❌ حدث خطأ في إضافة المستخدم');
-    }
-};
+    };
 
     const handleDeleteUser = async (userId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟')) {
@@ -496,88 +484,27 @@ const GeneralManagerDashboard = () => {
         }
     };
 
+    // ✅ قبول طلب شركة - فقط تغيير الحالة (بدون إنشاء)
     const handleApproveRequest = async (request) => {
-    try {
-        // ✅ أولاً: تحقق مما إذا كانت الشركة موجودة بالفعل
-        let companyId = null;
-        let existingCompany = null;
-        
         try {
-            // محاولة البحث عن شركة بنفس البريد
-            const companiesList = await adminAPI.getCompanies();
-            existingCompany = companiesList.data?.find(c => c.email === request.email);
-        } catch(e) {
-            console.log('Company check error:', e);
+            await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'تم قبول الطلب');
+            
+            toast.success(`✅ تم قبول طلب الشركة: ${request.company_name}`);
+            toast.info('📌 يمكنك الآن إضافة الشركة والمستخدم يدوياً من تبويب "الشركات" و "المستخدمين"', {
+                duration: 5000
+            });
+            
+            showNotificationMessage(`تم قبول طلب الشركة: ${request.company_name}`);
+            fetchCompanyRequests();
+            setShowRequestModal(false);
+            setSelectedRequest(null);
+            
+        } catch (error) {
+            console.error('Error approving request:', error);
+            const errorMsg = error.response?.data?.message || error.message;
+            toast.error(`❌ حدث خطأ: ${errorMsg}`);
         }
-        
-        if (existingCompany) {
-            // الشركة موجودة بالفعل، فقط قم بإنشاء المستخدم إذا لم يكن موجوداً
-            toast.info(`الشركة ${request.company_name} موجودة بالفعل. جاري إنشاء المستخدم...`);
-            
-            // التحقق من وجود مستخدم للشركة
-            const usersList = await adminAPI.getUsers();
-            const existingUser = usersList.data?.find(u => u.email === request.email && u.role === 'company');
-            
-            if (!existingUser) {
-                const generatedPassword = Math.random().toString(36).slice(-8);
-                await adminAPI.addUser({
-                    name: request.contact_name,
-                    email: request.email,
-                    password: generatedPassword,
-                    role: 'company',
-                    phone: request.phone,
-                    company_id: existingCompany.id
-                });
-                toast.success(`✅ تم إنشاء مستخدم للشركة: ${request.email} / كلمة المرور: ${generatedPassword}`);
-            } else {
-                toast.info('المستخدم موجود بالفعل');
-            }
-            
-            // تحديث حالة الطلب
-            await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'الشركة موجودة مسبقاً - تم إنشاء المستخدم');
-            
-        } else {
-            // الشركة غير موجودة، قم بإنشائها مع المستخدم
-            const companyData = {
-                name: request.company_name,
-                email: request.email,
-                phone: request.phone,
-                address: request.address || '',
-                contact_person: request.contact_name,
-                description: request.message || '',
-                auto_create_user: true
-            };
-            
-            const response = await adminAPI.addCompany(companyData);
-            
-            await adminAPI.updateCompanyRequestStatus(request.id, 'approved', `تم قبول الطلب وإنشاء حساب للشركة`);
-            
-            toast.success('✅ تم قبول الطلب وإنشاء الشركة والمستخدم');
-            
-            if (response.data?.companyUser) {
-    toast.success(`📧 البريد: ${response.data.companyUser.email} | 🔑 كلمة المرور: ${response.data.companyUser.password}`, {
-        duration: 10000
-    });
-    
-    // ✅ تخزين كلمة المرور في جدول company_passwords
-    await adminAPI.storeCompanyPassword(response.data.companyUser.id, response.data.companyUser.password);
-    console.log('✅ Password stored for user:', response.data.companyUser.id);
-}
-        }
-        
-        showNotificationMessage(`تم معالجة طلب الشركة: ${request.company_name}`);
-        fetchCompanyRequests();
-        fetchCompanies();
-        fetchUsers();
-        setShowRequestModal(false);
-        setSelectedRequest(null);
-        
-    } catch (error) {
-        console.error('Error approving request:', error);
-        const errorMsg = error.response?.data?.message || error.message;
-        toast.error(`❌ حدث خطأ: ${errorMsg}`);
-    }
-};
+    };
 
     const handleRejectRequest = async (request, reason) => {
         if (!reason) {
@@ -806,18 +733,6 @@ const GeneralManagerDashboard = () => {
                                     </span>
                                 )}
                             </button>
-                            {/* ✅ NEW: Company Accounts Tab Button */}
-                            <button
-                                onClick={() => { setActiveTab('companyAccounts'); setSearchTerm(''); }}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === 'companyAccounts' ? 'bg-white text-purple-700' : 'bg-purple-700 text-white hover:bg-purple-800'}`}
-                            >
-                                <FaUserCheck /> حسابات الشركات
-                                {users.filter(u => u.role === 'company').length > 0 && (
-                                    <span className="bg-yellow-400 text-purple-800 text-xs px-1.5 py-0.5 rounded-full">
-                                        {users.filter(u => u.role === 'company').length}
-                                    </span>
-                                )}
-                            </button>
                             <button
                                 onClick={() => setActiveTab('stats')}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'stats' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
@@ -844,7 +759,6 @@ const GeneralManagerDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                        
                         <div className="bg-white rounded-lg shadow-md p-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -856,7 +770,6 @@ const GeneralManagerDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                        
                         <div className="bg-white rounded-lg shadow-md p-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -868,7 +781,6 @@ const GeneralManagerDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                        
                         <div className="bg-white rounded-lg shadow-md p-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -880,7 +792,6 @@ const GeneralManagerDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                        
                         <div className="bg-white rounded-lg shadow-md p-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -914,7 +825,6 @@ const GeneralManagerDashboard = () => {
                                     className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
-                            
                             <div className="relative">
                                 <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
                                 <select
@@ -928,7 +838,6 @@ const GeneralManagerDashboard = () => {
                                     ))}
                                 </select>
                             </div>
-                            
                             <div className="relative">
                                 <FaFire className="absolute right-3 top-3 text-gray-400" />
                                 <select
@@ -942,7 +851,6 @@ const GeneralManagerDashboard = () => {
                                     <option value="low">🟢 أولوية منخفضة</option>
                                 </select>
                             </div>
-                            
                             <div className="relative">
                                 <FaFilter className="absolute right-3 top-3 text-gray-400" />
                                 <select
@@ -1001,7 +909,7 @@ const GeneralManagerDashboard = () => {
                                                         )}
                                                     </div>
                                                     <div className="text-sm text-gray-500">{lead.phone}</div>
-                                                  </td>
+                                                </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
@@ -1015,7 +923,7 @@ const GeneralManagerDashboard = () => {
                                                         {priority.level === 'medium' && '🟡 متوسطة'}
                                                         {priority.level === 'low' && '🟢 منخفضة'}
                                                     </span>
-                                                  </td>
+                                                </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="w-24">
                                                         <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -1028,7 +936,7 @@ const GeneralManagerDashboard = () => {
                                                             ></div>
                                                         </div>
                                                     </div>
-                                                  </td>
+                                                </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -1048,13 +956,13 @@ const GeneralManagerDashboard = () => {
                                                         )}
                                                         <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
                                                     </div>
-                                                  </td>
-                                              </tr>
+                                                </td>
+                                            </tr>
                                             );
                                         })
                                     )}
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1086,69 +994,71 @@ const GeneralManagerDashboard = () => {
                             </button>
                         </div>
                     </div>
-                    {/* ✅ فلتر الأدوار */}
-<div className="flex gap-2 mb-4">
-    <button
-        onClick={() => setUserRoleFilter('all')}
-        className={`px-3 py-1 rounded-full text-sm transition ${
-            userRoleFilter === 'all' 
-                ? 'bg-green-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-    >
-        الكل ({users.length})
-    </button>
-    <button
-        onClick={() => setUserRoleFilter('company')}
-        className={`px-3 py-1 rounded-full text-sm transition ${
-            userRoleFilter === 'company' 
-                ? 'bg-purple-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-    >
-        🏢 شركات ({users.filter(u => u.role === 'company').length})
-    </button>
-    <button
-        onClick={() => setUserRoleFilter('executive_manager')}
-        className={`px-3 py-1 rounded-full text-sm transition ${
-            userRoleFilter === 'executive_manager' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-    >
-        👔 مدير تنفيذي ({users.filter(u => u.role === 'executive_manager').length})
-    </button>
-    <button
-        onClick={() => setUserRoleFilter('call_center')}
-        className={`px-3 py-1 rounded-full text-sm transition ${
-            userRoleFilter === 'call_center' 
-                ? 'bg-indigo-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-    >
-        📞 مركز اتصال ({users.filter(u => u.role === 'call_center').length})
-    </button>
-    <button
-        onClick={() => setUserRoleFilter('bank_manager')}
-        className={`px-3 py-1 rounded-full text-sm transition ${
-            userRoleFilter === 'bank_manager' 
-                ? 'bg-pink-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-    >
-        🏦 مدير بنك ({users.filter(u => u.role === 'bank_manager').length})
-    </button>
-    <button
-        onClick={() => setUserRoleFilter('leasing_manager')}
-        className={`px-3 py-1 rounded-full text-sm transition ${
-            userRoleFilter === 'leasing_manager' 
-                ? 'bg-teal-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-    >
-        🚗 مدير تأجير ({users.filter(u => u.role === 'leasing_manager').length})
-    </button>
-</div>
+                    
+                    {/* فلتر الأدوار */}
+                    <div className="flex gap-2 mb-4">
+                        <button
+                            onClick={() => setUserRoleFilter('all')}
+                            className={`px-3 py-1 rounded-full text-sm transition ${
+                                userRoleFilter === 'all' 
+                                    ? 'bg-green-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            الكل ({users.length})
+                        </button>
+                        <button
+                            onClick={() => setUserRoleFilter('company')}
+                            className={`px-3 py-1 rounded-full text-sm transition ${
+                                userRoleFilter === 'company' 
+                                    ? 'bg-purple-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            🏢 شركات ({users.filter(u => u.role === 'company').length})
+                        </button>
+                        <button
+                            onClick={() => setUserRoleFilter('executive_manager')}
+                            className={`px-3 py-1 rounded-full text-sm transition ${
+                                userRoleFilter === 'executive_manager' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            👔 مدير تنفيذي ({users.filter(u => u.role === 'executive_manager').length})
+                        </button>
+                        <button
+                            onClick={() => setUserRoleFilter('call_center')}
+                            className={`px-3 py-1 rounded-full text-sm transition ${
+                                userRoleFilter === 'call_center' 
+                                    ? 'bg-indigo-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            📞 مركز اتصال ({users.filter(u => u.role === 'call_center').length})
+                        </button>
+                        <button
+                            onClick={() => setUserRoleFilter('bank_manager')}
+                            className={`px-3 py-1 rounded-full text-sm transition ${
+                                userRoleFilter === 'bank_manager' 
+                                    ? 'bg-pink-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            🏦 مدير بنك ({users.filter(u => u.role === 'bank_manager').length})
+                        </button>
+                        <button
+                            onClick={() => setUserRoleFilter('leasing_manager')}
+                            className={`px-3 py-1 rounded-full text-sm transition ${
+                                userRoleFilter === 'leasing_manager' 
+                                    ? 'bg-teal-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            🚗 مدير تأجير ({users.filter(u => u.role === 'leasing_manager').length})
+                        </button>
+                    </div>
+                    
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
@@ -1195,7 +1105,7 @@ const GeneralManagerDashboard = () => {
                                         ))
                                     )}
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1396,7 +1306,7 @@ const GeneralManagerDashboard = () => {
                                                     onClick={() => handleApproveRequest(request)}
                                                     className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2"
                                                 >
-                                                    <FaCheckDouble /> قبول وإنشاء حساب
+                                                    <FaCheckDouble /> قبول
                                                 </button>
                                                 <button
                                                     onClick={() => handleRejectRequest(request)}
@@ -1409,7 +1319,7 @@ const GeneralManagerDashboard = () => {
                                         
                                         {request.status === 'approved' && (
                                             <div className="text-center text-green-600 py-2">
-                                                <FaCheckCircle className="inline ml-1" /> تم قبول الطلب وإنشاء الحساب
+                                                <FaCheckCircle className="inline ml-1" /> تم قبول الطلب
                                             </div>
                                         )}
                                         
@@ -1437,228 +1347,7 @@ const GeneralManagerDashboard = () => {
             )}
 
             {/* ============================================= */}
-            {/* ✅ NEW TAB 5: COMPANY ACCOUNTS (سجل حسابات الشركات) */}
-            {/* ============================================= */}
-            {activeTab === 'companyAccounts' && (
-                <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <FaUserCheck className="text-purple-600" />
-                            سجل حسابات الشركات
-                            <span className="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                                {users.filter(u => u.role === 'company').length} حساب
-                            </span>
-                        </h2>
-                        <div className="relative">
-                            <FaSearch className="absolute right-3 top-3 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="🔍 بحث بالبريد / اسم الشركة..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-64 pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            />
-                        </div>
-                    </div>
-                    
-                    {/* إحصائيات سريعة */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-500 text-sm">إجمالي حسابات الشركات</p>
-                                    <p className="text-2xl font-bold text-purple-600">{users.filter(u => u.role === 'company').length}</p>
-                                </div>
-                                <FaUserCheck className="text-3xl text-purple-400" />
-                            </div>
-                        </div>
-                        <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg shadow p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-500 text-sm">شركات نشطة</p>
-                                    <p className="text-2xl font-bold text-green-600">{users.filter(u => u.role === 'company' && u.is_active).length}</p>
-                                </div>
-                                <FaCheckCircle className="text-3xl text-green-400" />
-                            </div>
-                        </div>
-                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-500 text-sm">إجمالي الشركات المسجلة</p>
-                                    <p className="text-2xl font-bold text-blue-600">{companies.length}</p>
-                                </div>
-                                <FaCompany className="text-3xl text-blue-400" />
-                            </div>
-                        </div>
-                        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg shadow p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-500 text-sm">بدون حساب مستخدم</p>
-                                    <p className="text-2xl font-bold text-yellow-600">
-                                        {companies.filter(c => !users.some(u => u.company_id === c.id && u.role === 'company')).length}
-                                    </p>
-                                </div>
-                                <FaUser className="text-3xl text-yellow-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* جدول حسابات الشركات */}
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gradient-to-r from-purple-600 to-purple-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">#</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">اسم الشركة</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">البريد الإلكتروني</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">كلمة المرور</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">رقم الهاتف</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">تاريخ الإنشاء</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">الحالة</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">الإجراءات</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {users.filter(u => u.role === 'company').length === 0 ? (
-                                        <tr>
-                                            <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
-                                                <FaUserCheck className="text-5xl text-gray-300 mx-auto mb-2" />
-                                                لا توجد حسابات شركات
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        users.filter(u => u.role === 'company')
-                                            .filter(u => {
-                                                if (!searchTerm) return true;
-                                                const term = searchTerm.toLowerCase();
-                                                const company = companies.find(c => c.id === u.company_id);
-                                                return u.email.toLowerCase().includes(term) ||
-                                                       (company && company.name.toLowerCase().includes(term));
-                                            })
-                                            .map((user, index) => {
-                                                const company = companies.find(c => c.id === user.company_id);
-                                                
-                                                return (
-                                                    <tr key={user.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-gray-500">{index + 1}</td>
-                                                        <td className="px-4 py-3 font-medium text-gray-900">
-                                                            {company?.name || '-'}
-                                                            {!company && <span className="text-xs text-red-500 mr-2">(بدون شركة مرتبطة)</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3 dir-ltr text-left">
-                                                            <span className="text-sm font-mono">{user.email}</span>
-                                                            <button
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(user.email);
-                                                                    toast.success('تم نسخ البريد الإلكتروني');
-                                                                }}
-                                                                className="mr-2 text-gray-400 hover:text-purple-600"
-                                                                title="نسخ البريد"
-                                                            >
-                                                                <FaCopy size={14} />
-                                                            </button>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded dir-ltr">
-                                                                    {showPasswordForUser[user.id] ? (user.password || '••••••••') : '••••••••'}
-                                                                </span>
-                                                                <button
-                                                                    onClick={() => setShowPasswordForUser(prev => ({ ...prev, [user.id]: !prev[user.id] }))}
-                                                                    className="text-gray-500 hover:text-purple-600"
-                                                                    title={showPasswordForUser[user.id] ? 'إخفاء' : 'إظهار'}
-                                                                >
-                                                                    {showPasswordForUser[user.id] ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const password = user.password || 'لم يتم حفظها';
-                                                                        navigator.clipboard.writeText(password);
-                                                                        toast.success('تم نسخ كلمة المرور');
-                                                                    }}
-                                                                    className="text-gray-500 hover:text-green-600"
-                                                                    title="نسخ كلمة المرور"
-                                                                >
-                                                                    <FaCopy size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3 dir-ltr">{user.phone || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">
-                                                            {new Date(user.created_at).toLocaleDateString('ar-TN')}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                                                user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                            }`}>
-                                                                {user.is_active ? 'نشط' : 'غير نشط'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const credentials = `البريد: ${user.email}\nكلمة المرور: ${user.password || '********'}`;
-                                                                        navigator.clipboard.writeText(credentials);
-                                                                        toast.success('تم نسخ بيانات الدخول');
-                                                                    }}
-                                                                    className="text-purple-600 hover:text-purple-800 p-1"
-                                                                    title="نسخ بيانات الدخول"
-                                                                >
-                                                                    <FaCopy size={18} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (window.confirm('⚠️ هل تريد إعادة تعيين كلمة المرور؟')) {
-                                                                            toast.success('تم إرسال رابط إعادة تعيين كلمة المرور');
-                                                                        }
-                                                                    }}
-                                                                    className="text-blue-600 hover:text-blue-800 p-1"
-                                                                    title="إعادة تعيين كلمة المرور"
-                                                                >
-                                                                    <FaSync size={16} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (window.confirm(`⚠️ هل تريد تعطيل حساب ${user.email}؟`)) {
-                                                                            toast.success('تم تعطيل الحساب');
-                                                                        }
-                                                                    }}
-                                                                    className="text-orange-600 hover:text-orange-800 p-1"
-                                                                    title="تعطيل الحساب"
-                                                                >
-                                                                    <FaBan size={16} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    {/* ملاحظة مهمة */}
-                    <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                            <FaInfoCircle className="text-blue-500 text-xl mt-0.5" />
-                            <div>
-                                <h4 className="font-semibold text-blue-800">📌 ملاحظة مهمة</h4>
-                                <p className="text-sm text-blue-700 mt-1">
-                                    كلمات المرور تظهر مرة واحدة فقط عند إنشاء الحساب. يُنصح بحفظها في مكان آمن أو استخدام زر "نسخ بيانات الدخول" لحفظها.
-                                    إذا فقدت كلمة المرور، يمكنك استخدام زر "إعادة تعيين كلمة المرور" لإرسال رابط جديد للشركة.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ============================================= */}
-            {/* TAB 6: STATS */}
+            {/* TAB 5: STATS */}
             {/* ============================================= */}
             {activeTab === 'stats' && stats && (
                 <div className="max-w-7xl mx-auto px-4">
@@ -1810,7 +1499,7 @@ const GeneralManagerDashboard = () => {
                                         onClick={() => { handleApproveRequest(selectedRequest); setShowRequestModal(false); }}
                                         className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
                                     >
-                                        قبول وإنشاء حساب
+                                        قبول
                                     </button>
                                     <button
                                         onClick={() => { handleRejectRequest(selectedRequest); setShowRequestModal(false); }}
@@ -1918,7 +1607,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="أدخل الاسم"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">البريد الإلكتروني *</label>
                                 <input
@@ -1929,7 +1617,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="example@shamsi.tn"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">كلمة المرور *</label>
                                 <input
@@ -1940,7 +1627,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="********"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">الدور</label>
                                 <select
@@ -1957,7 +1643,6 @@ const GeneralManagerDashboard = () => {
                                     <option value="company">شركة</option>
                                 </select>
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">رقم الهاتف (اختياري)</label>
                                 <input
@@ -2012,7 +1697,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="أدخل اسم الشركة"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">البريد الإلكتروني *</label>
                                 <input
@@ -2023,7 +1707,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="company@example.com"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">رقم الهاتف</label>
                                 <input
@@ -2034,7 +1717,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="أدخل رقم الهاتف"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">العنوان</label>
                                 <input
@@ -2045,7 +1727,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="أدخل العنوان"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">شخص الاتصال</label>
                                 <input
@@ -2056,7 +1737,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="اسم الشخص المسؤول"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">الوصف</label>
                                 <textarea
@@ -2067,7 +1747,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="وصف الشركة وخدماتها"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">عدد المشاريع المنجزة</label>
                                 <input
@@ -2078,7 +1757,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="مثال: 120"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">سنة التأسيس</label>
                                 <input
@@ -2089,7 +1767,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="مثال: 2015"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">رقم الترخيص</label>
                                 <input
@@ -2100,7 +1777,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="رقم الترخيص المهني"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">الموقع الإلكتروني</label>
                                 <input
@@ -2111,7 +1787,6 @@ const GeneralManagerDashboard = () => {
                                     placeholder="www.company.com"
                                 />
                             </div>
-                            
                             <div>
                                 <label className="block text-gray-700 mb-1">رابط الشعار (logo)</label>
                                 <input
