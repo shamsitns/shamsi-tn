@@ -13,6 +13,9 @@ const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
 const Login = lazy(() => import('./components/Login'));
 
+// ✅ صفحة تسجيل الشركات الجديدة (عامة - لا تحتاج تسجيل دخول)
+const JoinAsCompany = lazy(() => import('./pages/JoinAsCompany'));
+
 // لوحات التحكم
 const OwnerDashboard = lazy(() => import('./components/OwnerDashboard'));
 const GeneralManagerDashboard = lazy(() => import('./components/GeneralManagerDashboard'));
@@ -72,6 +75,9 @@ function App() {
                             <Route path="/blog" element={<BlogPage />} />
                             <Route path="/blog/:slug" element={<BlogPost />} />
                             <Route path="/login" element={<Login />} />
+                            
+                            {/* ✅ صفحة تسجيل الشركات الجديدة (عامة) */}
+                            <Route path="/join-as-company" element={<JoinAsCompany />} />
                             
                             {/* لوحة المالك */}
                             <Route 
@@ -143,7 +149,7 @@ function App() {
                                 } 
                             />
                             
-                            {/* ✅ لوحة الشركة */}
+                            {/* ✅ لوحة الشركة (للسجلين فقط) */}
                             <Route 
                                 path="/company" 
                                 element={
