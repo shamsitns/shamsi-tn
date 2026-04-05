@@ -6,7 +6,8 @@ import {
     FaMoneyBillWave, FaUser, FaMapMarkerAlt, FaCalendarAlt, 
     FaBolt, FaWhatsapp, FaEye, FaPaperPlane,
     FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf,
-    FaIndustry, FaHome, FaStore, FaTractor, FaSync
+    FaIndustry, FaHome, FaStore, FaTractor, FaSync,
+    FaFire, FaStar, FaChartLine, FaPercentage, FaTrophy
 } from 'react-icons/fa';
 
 const OperationsDashboard = () => {
@@ -24,6 +25,100 @@ const OperationsDashboard = () => {
     const [showNotesModal, setShowNotesModal] = useState(false);
     const [notes, setNotes] = useState('');
     const [stats, setStats] = useState(null);
+    const [userRole, setUserRole] = useState('operations'); // Default role
+    
+    // =============================================
+    // Helper Functions
+    // =============================================
+    
+    // Calculate Lead Score (Premium/High/Medium/Low)
+    const calculateLeadScore = (billAmount, propertyType, monthlyConsumption) => {
+        let score = 0;
+        
+        // Score based on bill amount
+        if (billAmount > 200) score += 50;
+        else if (billAmount > 150) score += 40;
+        else if (billAmount > 100) score += 30;
+        else if (billAmount > 70) score += 20;
+        else score += 10;
+        
+        // Score based on property type
+        switch(propertyType) {
+            case 'factory':
+                score += 35;
+                break;
+            case 'commercial':
+                score += 25;
+                break;
+            case 'farm':
+                score += 20;
+                break;
+            case 'house':
+                score += 15;
+                break;
+            case 'apartment':
+                score += 10;
+                break;
+            default:
+                score += 5;
+        }
+        
+        // Score based on monthly consumption
+        if (monthlyConsumption > 500) score += 30;
+        else if (monthlyConsumption > 300) score += 20;
+        else if (monthlyConsumption > 150) score += 10;
+        
+        return Math.min(score, 100); // Max 100 points
+    };
+    
+    // Get Lead Score Level
+    const getLeadScoreLevel = (score) => {
+        if (score >= 80) return { level: 'Premium', color: 'bg-gradient-to-r from-yellow-500 to-orange-500', icon: FaTrophy, text: 'عميل ممتاز' };
+        if (score >= 60) return { level: 'High', color: 'bg-gradient-to-r from-green-500 to-teal-500', icon: FaStar, text: 'عميل واعد جداً' };
+        if (score >= 40) return { level: 'Medium', color: 'bg-gradient-to-r from-blue-500 to-indigo-500', icon: FaChartLine, text: 'عميل متوسط' };
+        return { level: 'Low', color: 'bg-gradient-to-r from-gray-500 to-gray-600', icon: FaPercentage, text: 'عميل عادي' };
+    };
+    
+    // Sanitize lead data based on user role
+    const sanitizeLeadData = (lead, role) => {
+        if (role === 'client') {
+            const { commission_amount, system_price, company_price, platform_fee, ...safeLead } = lead;
+            return safeLead;
+        }
+        return lead;
+    };
+    
+    // Calculate advanced stats
+    const calculateAdvancedStats = (leadsData) => {
+        const totalLeads = leadsData.length;
+        const assignedLeads = leadsData.filter(l => l.status === 'assigned_to_company').length;
+        const completedLeads = leadsData.filter(l => l.status === 'completed').length;
+        const rejectedLeads = leadsData.filter(l => l.status === 'cancelled').length;
+        const pendingLeads = leadsData.filter(l => l.status === 'sent_to_operations').length;
+        
+        const totalKW = leadsData.reduce((sum, l) => sum + (parseFloat(l.required_kw) || 0), 0);
+        const averageKW = totalLeads > 0 ? (totalKW / totalLeads).toFixed(1) : 0;
+        
+        const conversionRate = totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(1) : 0;
+        
+        const totalCommission = leadsData.reduce((sum, l) => sum + (parseFloat(l.commission_amount) || 0), 0);
+        
+        // Calculate average bill amount
+        const totalBillAmount = leadsData.reduce((sum, l) => sum + (parseFloat(l.bill_amount) || 0), 0);
+        const averageBill = totalLeads > 0 ? (totalBillAmount / totalLeads).toFixed(0) : 0;
+        
+        return {
+            totalLeads,
+            assignedLeads,
+            completedLeads,
+            rejectedLeads,
+            pendingLeads,
+            averageKW,
+            conversionRate,
+            totalCommission,
+            averageBill
+        };
+    };
     
     // =============================================
     // Fetch Data
@@ -32,6 +127,9 @@ const OperationsDashboard = () => {
         fetchData();
         fetchCompanies();
         fetchStats();
+        // Get user role from localStorage or context
+        const role = localStorage.getItem('userRole') || 'operations';
+        setUserRole(role);
     }, [filter]);
     
     const fetchData = async () => {
@@ -40,7 +138,13 @@ const OperationsDashboard = () => {
             const params = filter !== 'all' ? { status: filter } : {};
             const response = await managerAPI.getLeads(params);
             console.log('📊 Operations leads data:', response.data);
-            setLeads(response.data.leads || []);
+            
+            // Sanitize data based on user role
+            const sanitizedLeads = (response.data.leads || []).map(lead => 
+                sanitizeLeadData(lead, userRole)
+            );
+            
+            setLeads(sanitizedLeads);
         } catch (error) {
             console.error('Error fetching leads:', error);
             toast.error('حدث خطأ في جلب البيانات');
@@ -195,6 +299,9 @@ const OperationsDashboard = () => {
         return amount.toLocaleString();
     };
     
+    // Get advanced stats
+    const advancedStats = calculateAdvancedStats(leads);
+    
     // =============================================
     // Render
     // =============================================
@@ -229,24 +336,48 @@ const OperationsDashboard = () => {
                 </div>
             </div>
             
-            {/* Quick Stats */}
+            {/* Advanced Stats Section */}
             <div className="max-w-7xl mx-auto px-4 py-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-indigo-600">{leads.filter(l => l.status === 'sent_to_operations').length}</div>
-                        <div className="text-sm text-gray-500">في انتظار الشركة</div>
+                        <div className="text-2xl font-bold text-indigo-600">{advancedStats.totalLeads}</div>
+                        <div className="text-sm text-gray-500">إجمالي الطلبات</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-purple-600">{leads.filter(l => l.status === 'assigned_to_company').length}</div>
+                        <div className="text-2xl font-bold text-purple-600">{advancedStats.assignedLeads}</div>
                         <div className="text-sm text-gray-500">مرسل لشركة</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-green-600">{leads.filter(l => l.status === 'completed').length}</div>
+                        <div className="text-2xl font-bold text-green-600">{advancedStats.completedLeads}</div>
                         <div className="text-sm text-gray-500">مكتمل</div>
                     </div>
                     <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-purple-600">{stats?.total_commission?.toLocaleString() || 0} دينار</div>
-                        <div className="text-sm text-gray-500">إجمالي العمولات</div>
+                        <div className="text-2xl font-bold text-red-600">{advancedStats.rejectedLeads}</div>
+                        <div className="text-sm text-gray-500">ملغي</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <div className="text-2xl font-bold text-blue-600">{advancedStats.averageKW}</div>
+                        <div className="text-sm text-gray-500">متوسط KW</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <div className="text-2xl font-bold text-emerald-600">{advancedStats.conversionRate}%</div>
+                        <div className="text-sm text-gray-500">نسبة التحويل</div>
+                    </div>
+                </div>
+                
+                {/* Financial Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow p-4">
+                        <div className="text-sm text-gray-600">إجمالي العمولات</div>
+                        <div className="text-2xl font-bold text-purple-600">{advancedStats.totalCommission.toLocaleString()} دينار</div>
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow p-4">
+                        <div className="text-sm text-gray-600">متوسط فاتورة الكهرباء</div>
+                        <div className="text-2xl font-bold text-blue-600">{advancedStats.averageBill.toLocaleString()} دينار</div>
+                    </div>
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg shadow p-4">
+                        <div className="text-sm text-gray-600">الطلبات قيد الانتظار</div>
+                        <div className="text-2xl font-bold text-green-600">{advancedStats.pendingLeads}</div>
                     </div>
                 </div>
             </div>
@@ -269,8 +400,25 @@ const OperationsDashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {leads.map((lead) => (
+                        {leads.map((lead) => {
+                            // Calculate lead score for this lead
+                            const leadScore = calculateLeadScore(
+                                lead.bill_amount, 
+                                lead.property_type,
+                                lead.monthly_consumption || 0
+                            );
+                            const scoreLevel = getLeadScoreLevel(leadScore);
+                            const ScoreIcon = scoreLevel.icon;
+                            
+                            return (
                             <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
+                                {/* Premium Badge for high score leads */}
+                                {leadScore >= 80 && (
+                                    <div className={`${scoreLevel.color} text-white text-xs py-1 px-3 text-center font-semibold`}>
+                                        <ScoreIcon className="inline ml-1" /> {scoreLevel.text} - نقاط: {leadScore}
+                                    </div>
+                                )}
+                                
                                 {/* Header */}
                                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b">
                                     <div className="flex justify-between items-start">
@@ -286,14 +434,19 @@ const OperationsDashboard = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Body */}
+                                {/* Body - Reorganized with better order */}
                                 <div className="p-4">
                                     <div className="space-y-2 mb-4">
+                                        {/* Power Rating - First priority */}
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">رقم الهاتف:</span>
-                                            <span className="font-medium" dir="ltr">{lead.phone}</span>
+                                            <span className="text-gray-500 flex items-center gap-1">
+                                                <FaBolt className="text-yellow-600" />
+                                                القدرة الموصى بها:
+                                            </span>
+                                            <span className="font-bold text-yellow-600">{lead.required_kw} kWp</span>
                                         </div>
                                         
+                                        {/* Bill Amount - Second priority */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
                                                 <FaMoneyBillWave className="text-green-600" />
@@ -307,14 +460,7 @@ const OperationsDashboard = () => {
                                             </span>
                                         </div>
                                         
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaBolt className="text-yellow-600" />
-                                                القدرة الموصى بها:
-                                            </span>
-                                            <span className="font-medium">{lead.required_kw} kWp</span>
-                                        </div>
-                                        
+                                        {/* Property Type */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
                                             <span className="font-medium flex items-center gap-1">
@@ -323,16 +469,7 @@ const OperationsDashboard = () => {
                                             </span>
                                         </div>
                                         
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaMoneyBillWave className="text-purple-600" />
-                                                عمولة المنصة:
-                                            </span>
-                                            <span className="font-bold text-purple-600">
-                                                {formatCurrency(lead.commission_amount)} دينار
-                                            </span>
-                                        </div>
-                                        
+                                        {/* City and Date */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1">
                                                 <FaCalendarAlt className="text-gray-400" />
@@ -342,7 +479,25 @@ const OperationsDashboard = () => {
                                                 {new Date(lead.created_at).toLocaleDateString('ar-TN')}
                                             </span>
                                         </div>
+                                        
+                                        {/* Commission - Moved to bottom */}
+                                        <div className="flex justify-between text-sm border-t pt-2 mt-2">
+                                            <span className="text-gray-500 flex items-center gap-1">
+                                                <FaMoneyBillWave className="text-purple-600" />
+                                                عمولة المنصة:
+                                            </span>
+                                            <span className="font-bold text-purple-600">
+                                                {formatCurrency(lead.commission_amount)} دينار
+                                            </span>
+                                        </div>
                                     </div>
+                                    
+                                    {/* Lead Score Badge (for non-premium leads) */}
+                                    {leadScore < 80 && leadScore >= 40 && (
+                                        <div className={`mb-3 p-1 rounded-lg text-center text-xs font-semibold ${scoreLevel.color} text-white`}>
+                                            <ScoreIcon className="inline ml-1" /> {scoreLevel.text} - {leadScore} نقطة
+                                        </div>
+                                    )}
                                     
                                     {lead.notes && (
                                         <div className="mb-4 p-2 bg-gray-50 rounded-lg text-sm border-r-4 border-purple-400">
@@ -410,7 +565,8 @@ const OperationsDashboard = () => {
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
                 )}
             </div>
