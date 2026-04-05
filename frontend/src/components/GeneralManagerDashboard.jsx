@@ -33,6 +33,7 @@ const GeneralManagerDashboard = () => {
     const [cityFilter, setCityFilter] = useState('all');
     const [priorityFilter, setPriorityFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('leads');
+    const [userRoleFilter, setUserRoleFilter] = useState('all');
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
     const [showCompanyModal, setShowCompanyModal] = useState(false);
@@ -93,8 +94,8 @@ const GeneralManagerDashboard = () => {
     }, [leads, searchTerm, cityFilter, priorityFilter, filter]);
 
     useEffect(() => {
-        filterUsers();
-    }, [users, searchTerm]);
+    filterUsers();
+}, [users, searchTerm, userRoleFilter]);
 
     useEffect(() => {
         filterCompanies();
@@ -243,17 +244,25 @@ const GeneralManagerDashboard = () => {
     };
 
     const filterUsers = () => {
-        let filtered = [...users];
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(user => 
-                user.name.toLowerCase().includes(term) ||
-                user.email.toLowerCase().includes(term) ||
-                (user.phone && user.phone.includes(term))
-            );
-        }
-        setFilteredUsers(filtered);
-    };
+    let filtered = [...users];
+    
+    // ✅ فلتر حسب الدور (role)
+    if (userRoleFilter !== 'all') {
+        filtered = filtered.filter(user => user.role === userRoleFilter);
+    }
+    
+    // ✅ فلتر حسب البحث
+    if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(user => 
+            user.name.toLowerCase().includes(term) ||
+            user.email.toLowerCase().includes(term) ||
+            (user.phone && user.phone.includes(term))
+        );
+    }
+    
+    setFilteredUsers(filtered);
+};
 
     const filterCompanies = () => {
         let filtered = [...companies];
@@ -1077,7 +1086,69 @@ const GeneralManagerDashboard = () => {
                             </button>
                         </div>
                     </div>
-                    
+                    {/* ✅ فلتر الأدوار */}
+<div className="flex gap-2 mb-4">
+    <button
+        onClick={() => setUserRoleFilter('all')}
+        className={`px-3 py-1 rounded-full text-sm transition ${
+            userRoleFilter === 'all' 
+                ? 'bg-green-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+    >
+        الكل ({users.length})
+    </button>
+    <button
+        onClick={() => setUserRoleFilter('company')}
+        className={`px-3 py-1 rounded-full text-sm transition ${
+            userRoleFilter === 'company' 
+                ? 'bg-purple-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+    >
+        🏢 شركات ({users.filter(u => u.role === 'company').length})
+    </button>
+    <button
+        onClick={() => setUserRoleFilter('executive_manager')}
+        className={`px-3 py-1 rounded-full text-sm transition ${
+            userRoleFilter === 'executive_manager' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+    >
+        👔 مدير تنفيذي ({users.filter(u => u.role === 'executive_manager').length})
+    </button>
+    <button
+        onClick={() => setUserRoleFilter('call_center')}
+        className={`px-3 py-1 rounded-full text-sm transition ${
+            userRoleFilter === 'call_center' 
+                ? 'bg-indigo-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+    >
+        📞 مركز اتصال ({users.filter(u => u.role === 'call_center').length})
+    </button>
+    <button
+        onClick={() => setUserRoleFilter('bank_manager')}
+        className={`px-3 py-1 rounded-full text-sm transition ${
+            userRoleFilter === 'bank_manager' 
+                ? 'bg-pink-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+    >
+        🏦 مدير بنك ({users.filter(u => u.role === 'bank_manager').length})
+    </button>
+    <button
+        onClick={() => setUserRoleFilter('leasing_manager')}
+        className={`px-3 py-1 rounded-full text-sm transition ${
+            userRoleFilter === 'leasing_manager' 
+                ? 'bg-teal-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+    >
+        🚗 مدير تأجير ({users.filter(u => u.role === 'leasing_manager').length})
+    </button>
+</div>
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
