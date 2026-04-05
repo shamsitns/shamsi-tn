@@ -470,7 +470,47 @@ const GeneralManagerDashboard = () => {
     };
 
     const handleApproveRequest = async (request) => {
+    try {
+        // ✅ أولاً: تحقق مما إذا كانت الشركة موجودة بالفعل
+        let companyId = null;
+        let existingCompany = null;
+        
         try {
+            // محاولة البحث عن شركة بنفس البريد
+            const companiesList = await adminAPI.getCompanies();
+            existingCompany = companiesList.data?.find(c => c.email === request.email);
+        } catch(e) {
+            console.log('Company check error:', e);
+        }
+        
+        if (existingCompany) {
+            // الشركة موجودة بالفعل، فقط قم بإنشاء المستخدم إذا لم يكن موجوداً
+            toast.info(`الشركة ${request.company_name} موجودة بالفعل. جاري إنشاء المستخدم...`);
+            
+            // التحقق من وجود مستخدم للشركة
+            const usersList = await adminAPI.getUsers();
+            const existingUser = usersList.data?.find(u => u.email === request.email && u.role === 'company');
+            
+            if (!existingUser) {
+                const generatedPassword = Math.random().toString(36).slice(-8);
+                await adminAPI.addUser({
+                    name: request.contact_name,
+                    email: request.email,
+                    password: generatedPassword,
+                    role: 'company',
+                    phone: request.phone,
+                    company_id: existingCompany.id
+                });
+                toast.success(`✅ تم إنشاء مستخدم للشركة: ${request.email} / كلمة المرور: ${generatedPassword}`);
+            } else {
+                toast.info('المستخدم موجود بالفعل');
+            }
+            
+            // تحديث حالة الطلب
+            await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'الشركة موجودة مسبقاً - تم إنشاء المستخدم');
+            
+        } else {
+            // الشركة غير موجودة، قم بإنشائها مع المستخدم
             const companyData = {
                 name: request.company_name,
                 email: request.email,
@@ -486,24 +526,27 @@ const GeneralManagerDashboard = () => {
             await adminAPI.updateCompanyRequestStatus(request.id, 'approved', `تم قبول الطلب وإنشاء حساب للشركة`);
             
             toast.success('✅ تم قبول الطلب وإنشاء الشركة والمستخدم');
-            showNotificationMessage(`تم إنشاء حساب للشركة: ${request.company_name}`);
             
             if (response.data?.companyUser) {
                 toast.success(`📧 البريد: ${response.data.companyUser.email} | 🔑 كلمة المرور: ${response.data.companyUser.password}`, {
                     duration: 10000
                 });
             }
-            
-            fetchCompanyRequests();
-            fetchCompanies();
-            fetchUsers();
-            setShowRequestModal(false);
-            setSelectedRequest(null);
-        } catch (error) {
-            console.error('Error approving request:', error);
-            toast.error('❌ حدث خطأ في قبول الطلب');
         }
-    };
+        
+        showNotificationMessage(`تم معالجة طلب الشركة: ${request.company_name}`);
+        fetchCompanyRequests();
+        fetchCompanies();
+        fetchUsers();
+        setShowRequestModal(false);
+        setSelectedRequest(null);
+        
+    } catch (error) {
+        console.error('Error approving request:', error);
+        const errorMsg = error.response?.data?.message || error.message;
+        toast.error(`❌ حدث خطأ: ${errorMsg}`);
+    }
+};
 
     const handleRejectRequest = async (request, reason) => {
         if (!reason) {
