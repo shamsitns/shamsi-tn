@@ -307,7 +307,8 @@ exports.sendToOperationsManager = async (req, res) => {
     console.log('👤 req.user:', req.user);
     
     try {
-        const { leadId } = req.params;
+        // ✅ التصحيح: استخدام id بدلاً من leadId
+        const leadId = req.params.id;
         const { notes } = req.body;
         const executiveId = req.user.id;
         
