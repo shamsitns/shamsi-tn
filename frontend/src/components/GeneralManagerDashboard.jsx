@@ -11,7 +11,7 @@ import {
     FaSearch, FaFilter, FaFire, FaTrophy, FaClock, FaCheckCircle,
     FaHourglassHalf, FaTimesCircle, FaBell, FaChartPie, FaArrowUp,
     FaHandshake, FaFileAlt, FaCheckDouble, FaUserCheck,
-    FaCopy, FaEyeSlash, FaBan  // ✅ Added new icons
+    FaCopy, FaEyeSlash, FaBan, FaInfoCircle
 } from 'react-icons/fa';
 
 const GeneralManagerDashboard = () => {
