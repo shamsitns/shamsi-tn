@@ -319,30 +319,30 @@ exports.rejectLead = async (req, res) => {
 // تعيين الطلبات
 // =============================================
 
-// تعيين طلب للمدير التنفيذي (يستخدم الـ ID من Frontend)
+// تعيين طلب للمدير التنفيذي (نسخة معدلة - بدون manager_assignments)
 exports.assignToExecutive = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const { executiveId, notes } = req.body;
+        const { notes } = req.body;
         const adminId = req.user.id;
         
-        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to executive ${executiveId}`);
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId}`);
         
-        // ✅ التحقق من وجود المدير التنفيذي بالـ ID المرسل من Frontend
+        // البحث عن المدير التنفيذي
         const executiveResult = await db.query(
-            'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
-            [executiveId, 'executive_manager']
+            "SELECT id, name FROM users WHERE role = 'executive_manager' AND is_active = true LIMIT 1"
         );
         const executive = getFirstRow(executiveResult);
         
         if (!executive) {
             return res.status(404).json({ 
-                message: 'المدير التنفيذي غير موجود',
-                executiveId: executiveId
+                message: 'لا يوجد مدير تنفيذي في النظام' 
             });
         }
         
-        console.log(`✅ Found executive: ${executive.name} (ID: ${executive.id})`);
+        const executiveId = executive.id;
+        
+        console.log(`✅ Found executive: ${executive.name} (ID: ${executiveId})`);
         
         // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
@@ -358,22 +358,18 @@ exports.assignToExecutive = async (req, res) => {
                  assigned_to = $1,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
-            [executive.id, leadId]
+            [executiveId, leadId]
         );
         
-        // إضافة سجل في manager_assignments
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, executive.id, adminId, notes || `تم تعيين الطلب للمدير التنفيذي: ${executive.name}`]
-        );
+        // ✅ تم تعطيل إدراج manager_assignments مؤقتاً
+        console.log(`📝 Assignment recorded for lead ${leadId} to executive ${executive.name} (ID: ${executiveId})`);
         
-        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executive.id})`);
+        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
         
         res.json({ 
             message: `تم إرسال الطلب للمدير التنفيذي: ${executive.name}`,
             leadId,
-            executiveId: executive.id,
+            executiveId,
             executiveName: executive.name
         });
         
@@ -411,13 +407,9 @@ exports.assignToCallCenter = async (req, res) => {
             [callCenterId, leadId]
         );
         
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, callCenterId, adminId, notes || `تم تعيين الطلب لمركز الاتصال: ${callCenter.name}`]
-        );
+        // ✅ تم تعطيل إدراج manager_assignments مؤقتاً
+        console.log(`📝 Assignment recorded for lead ${leadId} to call center ${callCenter.name}`);
         
-        console.log(`✅ Lead ${leadId} assigned to call center ${callCenter.name}`);
         res.json({ 
             message: `تم إرسال الطلب لمركز الاتصال: ${callCenter.name}`,
             leadId,
@@ -457,12 +449,6 @@ exports.assignToBankManager = async (req, res) => {
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
             [bankManagerId, leadId]
-        );
-        
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, bankManagerId, adminId, notes || `تم تعيين الطلب لمدير البنك: ${bankManager.name}`]
         );
         
         console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
@@ -507,12 +493,6 @@ exports.assignToLeasingManager = async (req, res) => {
             [leasingManagerId, leadId]
         );
         
-        await db.query(
-            `INSERT INTO manager_assignments (lead_id, manager_id, assigned_by, notes, assigned_at) 
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, leasingManagerId, adminId, notes || `تم تعيين الطلب لمدير التأجير: ${leasingManager.name}`]
-        );
-        
         console.log(`✅ Lead ${leadId} assigned to leasing manager ${leasingManager.name}`);
         res.json({ 
             message: `تم إرسال الطلب لمدير التأجير: ${leasingManager.name}`,
@@ -535,7 +515,6 @@ exports.deleteLead = async (req, res) => {
         const { leadId } = req.params;
         
         await db.query('DELETE FROM lead_companies WHERE lead_id = $1', [leadId]);
-        await db.query('DELETE FROM manager_assignments WHERE lead_id = $1', [leadId]);
         await db.query('DELETE FROM leads WHERE id = $1', [leadId]);
         
         res.json({ message: 'تم حذف الطلب بنجاح' });
