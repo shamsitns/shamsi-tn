@@ -53,7 +53,8 @@ const GeneralManagerDashboard = () => {
         email: '',
         password: '',
         role: 'executive_manager',
-        phone: ''
+        phone: '',
+        company_name: ''
     });
     const [newCompany, setNewCompany] = useState({
         name: '',
@@ -384,36 +385,37 @@ const GeneralManagerDashboard = () => {
             return;
         }
         
+        // البحث عن الشركة بنفس البريد الإلكتروني
+        let companyId = null;
         if (newUser.role === 'company') {
-            const confirmAdd = window.confirm(
-                '⚠️ هل أنت متأكد؟\n\n' +
-                'إضافة مستخدم شركة بدون شركة مرتبطة قد يسبب مشاكل.\n' +
-                'هل تريد المتابعة؟'
-            );
-            if (!confirmAdd) return;
-            
-            try {
-                await adminAPI.addUser(newUser);
-                toast.success('✅ تم إضافة مستخدم الشركة بنجاح');
-                toast.info('📌 ملاحظة: هذا المستخدم غير مرتبط بشركة حالياً', { duration: 5000 });
-                showNotificationMessage('تم إضافة مستخدم شركة جديد');
-                setShowUserModal(false);
-                setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
-                fetchUsers();
-            } catch (error) {
-                console.error('Error adding user:', error);
-                toast.error('❌ حدث خطأ في إضافة المستخدم');
+            const matchingCompany = companies.find(c => c.email === newUser.email);
+            if (matchingCompany) {
+                companyId = matchingCompany.id;
+            } else {
+                toast.error('⚠️ لا توجد شركة مسجلة بهذا البريد. الرجاء إضافة الشركة أولاً من تبويب "الشركات"', {
+                    duration: 5000
+                });
+                return;
             }
-            return;
         }
         
         try {
-            await adminAPI.addUser(newUser);
-            toast.success('✅ تم إضافة المستخدم بنجاح');
-            showNotificationMessage('تم إضافة مستخدم جديد');
+            await adminAPI.addUser({
+                name: newUser.name,
+                email: newUser.email,
+                password: newUser.password,
+                role: newUser.role,
+                phone: newUser.phone,
+                company_id: companyId
+            });
+            
+            toast.success('✅ تم إضافة مستخدم الشركة بنجاح');
+            toast.info('📝 يمكنك الآن اختبار تسجيل الدخول قبل إرسال البيانات للشركة', { duration: 5000 });
+            
             setShowUserModal(false);
-            setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
+            setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '', company_name: '' });
             fetchUsers();
+            
         } catch (error) {
             console.error('Error adding user:', error);
             toast.error('❌ حدث خطأ في إضافة المستخدم');
@@ -443,18 +445,23 @@ const GeneralManagerDashboard = () => {
         }
         
         try {
-            const response = await adminAPI.addCompany({
-                ...newCompany,
-                auto_create_user: true
+            await adminAPI.addCompany({
+                name: newCompany.name,
+                email: newCompany.email,
+                phone: newCompany.phone || '',
+                address: newCompany.address || '',
+                contact_person: newCompany.contact_person || '',
+                description: newCompany.description || '',
+                rating: newCompany.rating || 0,
+                projects_count: newCompany.projects_count || 0,
+                established_year: newCompany.established_year || '',
+                license_number: newCompany.license_number || '',
+                website: newCompany.website || '',
+                logo: newCompany.logo || ''
             });
-            toast.success('✅ تم إضافة الشركة والمستخدم بنجاح');
-            showNotificationMessage('تم إضافة شركة جديدة مع مستخدم');
             
-            if (response.data?.companyUser) {
-                toast.success(`📧 مستخدم الشركة: ${response.data.companyUser.email} / كلمة المرور: ${response.data.companyUser.password}`, {
-                    duration: 10000
-                });
-            }
+            toast.success('✅ تم إضافة الشركة بنجاح');
+            toast.info('📌 الآن أضف مستخدم للشركة من تبويب "المستخدمين"', { duration: 5000 });
             
             setShowCompanyModal(false);
             setNewCompany({
@@ -463,7 +470,7 @@ const GeneralManagerDashboard = () => {
                 license_number: '', website: '', logo: ''
             });
             fetchCompanies();
-            fetchUsers();
+            
         } catch (error) {
             console.error('Error adding company:', error);
             toast.error('❌ حدث خطأ في إضافة الشركة');
@@ -484,7 +491,7 @@ const GeneralManagerDashboard = () => {
         }
     };
 
-    // ✅ قبول طلب شركة - فقط تغيير الحالة (بدون إنشاء)
+    // قبول طلب شركة - فقط تغيير الحالة (بدون إنشاء)
     const handleApproveRequest = async (request) => {
         try {
             await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'تم قبول الطلب');
@@ -501,8 +508,7 @@ const GeneralManagerDashboard = () => {
             
         } catch (error) {
             console.error('Error approving request:', error);
-            const errorMsg = error.response?.data?.message || error.message;
-            toast.error(`❌ حدث خطأ: ${errorMsg}`);
+            toast.error(`❌ حدث خطأ: ${error.message}`);
         }
     };
 
@@ -957,12 +963,12 @@ const GeneralManagerDashboard = () => {
                                                         <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
                                                     </div>
                                                 </td>
-                                            </tr>
+                                             </tr>
                                             );
                                         })
                                     )}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                     </div>
                 </div>
@@ -1101,11 +1107,11 @@ const GeneralManagerDashboard = () => {
                                                         <FaTrash size={18} />
                                                     </button>
                                                 </td>
-                                            </tr>
+                                             </tr>
                                         ))
                                     )}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                     </div>
                 </div>
@@ -1665,7 +1671,7 @@ const GeneralManagerDashboard = () => {
                             <button
                                 onClick={() => {
                                     setShowUserModal(false);
-                                    setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
+                                    setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '', company_name: '' });
                                 }}
                                 className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
                             >
