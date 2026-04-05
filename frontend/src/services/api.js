@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// تحديد عنوان API
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+// تحديد عنوان API - ✅ استخدام رابط Render
+const API_URL = process.env.REACT_APP_API_URL || 'https://shamsi-tn.onrender.com/api';
 
 // إنشاء instance من axios
 const api = axios.create({
@@ -126,7 +126,6 @@ export const leadsAPI = {
 
 // ==================== Admin API (للمدير العام و المالك) ====================
 export const adminAPI = {
-    // الطلبات والإحصائيات
     getLeads: (params) => {
         console.log('📊 Fetching leads with params:', params);
         return api.get('/admin/leads', { params });
@@ -145,7 +144,6 @@ export const adminAPI = {
         return api.get('/admin/commissions/stats', { params });
     },
     
-    // الموافقة والرفض
     approveLead: (leadId) => {
         console.log('✅ Approving lead:', leadId);
         return api.post(`/admin/leads/${leadId}/approve`);
@@ -156,7 +154,6 @@ export const adminAPI = {
         return api.post(`/admin/leads/${leadId}/reject`, { reason });
     },
     
-    // تعيين الطلبات
     assignToExecutive: (leadId, executiveId, notes) => {
         console.log('📨 Assigning lead to executive:', leadId, executiveId);
         return api.post(`/admin/leads/${leadId}/assign-executive`, { executiveId, notes });
@@ -177,7 +174,6 @@ export const adminAPI = {
         return api.post(`/admin/leads/${leadId}/assign-leasing`, { leasingManagerId, leasingCompanyId, notes });
     },
     
-    // حذف الطلبات
     deleteLead: (leadId) => {
         console.log('🗑️ Deleting lead:', leadId);
         return api.delete(`/admin/leads/${leadId}`);
@@ -193,7 +189,6 @@ export const adminAPI = {
         return api.delete('/admin/leads/rejected');
     },
     
-    // إدارة المستخدمين
     getUsers: (role) => {
         console.log('👥 Fetching users');
         const params = role ? { role } : {};
@@ -215,7 +210,6 @@ export const adminAPI = {
         return api.delete(`/admin/users/${id}`);
     },
     
-    // إدارة الشركات
     getCompanies: () => {
         console.log('🏢 Fetching companies');
         return api.get('/admin/companies');
@@ -239,7 +233,6 @@ export const adminAPI = {
 
 // ==================== Manager API (للمديرين) ====================
 export const managerAPI = {
-    // الدوال الموجودة
     getLeads: (params) => {
         console.log('📊 Fetching my leads:', params);
         return api.get('/manager/leads', { params });
@@ -280,7 +273,6 @@ export const managerAPI = {
         return api.post(`/manager/leads/${leadId}/assign-company`, { companyId, notes });
     },
     
-    // ✅ الدوال الجديدة المضافة (للتوافق مع ExecutiveManagerDashboard)
     getMyLeads: (params) => {
         console.log('📊 Fetching my leads (getMyLeads):', params);
         return api.get('/manager/leads', { params });
