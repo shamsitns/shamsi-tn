@@ -9,7 +9,9 @@ import {
     FaHome, FaIndustry, FaStore, FaTractor, FaCity,
     FaBuilding as FaCompany, FaStar, FaPhone, FaEnvelope, FaGlobe,
     FaSearch, FaFilter, FaFire, FaTrophy, FaClock, FaCheckCircle,
-    FaHourglassHalf, FaTimesCircle, FaBell, FaChartPie, FaArrowUp
+    FaHourglassHalf, FaTimesCircle, FaBell, FaChartPie, FaArrowUp,
+    FaHandshake, FaFileAlt, FaCheckDouble, FaUserCheck,
+    FaCopy, FaEyeSlash, FaBan  // ✅ Added new icons
 } from 'react-icons/fa';
 
 const GeneralManagerDashboard = () => {
@@ -22,6 +24,8 @@ const GeneralManagerDashboard = () => {
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [filteredCompanies, setFilteredCompanies] = useState([]);
+    const [companyRequests, setCompanyRequests] = useState([]);
+    const [filteredRequests, setFilteredRequests] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
@@ -33,13 +37,19 @@ const GeneralManagerDashboard = () => {
     const [showUserModal, setShowUserModal] = useState(false);
     const [showCompanyModal, setShowCompanyModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [showRequestModal, setShowRequestModal] = useState(false);
     const [selectedLead, setSelectedLead] = useState(null);
+    const [selectedRequest, setSelectedRequest] = useState(null);
     const [selectedUserId, setSelectedUserId] = useState('');
     const [assignType, setAssignType] = useState('executive');
     const [rejectReason, setRejectReason] = useState('');
     const [showNotification, setShowNotification] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [cities, setCities] = useState([]);
+    
+    // ✅ New state for showing/hiding passwords in company accounts table
+    const [showPasswordForUser, setShowPasswordForUser] = useState({});
+    
     const [newUser, setNewUser] = useState({
         name: '',
         email: '',
@@ -72,6 +82,8 @@ const GeneralManagerDashboard = () => {
             fetchUsers();
         } else if (activeTab === 'companies') {
             fetchCompanies();
+        } else if (activeTab === 'requests') {
+            fetchCompanyRequests();
         }
         fetchStats();
     }, [filter, activeTab]);
@@ -87,6 +99,10 @@ const GeneralManagerDashboard = () => {
     useEffect(() => {
         filterCompanies();
     }, [companies, searchTerm]);
+
+    useEffect(() => {
+        filterRequests();
+    }, [companyRequests, searchTerm]);
 
     useEffect(() => {
         if (showAssignModal) {
@@ -134,6 +150,16 @@ const GeneralManagerDashboard = () => {
         } catch (error) {
             console.error('Error fetching companies:', error);
             toast.error('حدث خطأ في جلب الشركات');
+        }
+    };
+
+    const fetchCompanyRequests = async () => {
+        try {
+            const response = await adminAPI.getCompanyRequests();
+            setCompanyRequests(response.data || []);
+        } catch (error) {
+            console.error('Error fetching company requests:', error);
+            toast.error('حدث خطأ في جلب طلبات الشركات');
         }
     };
 
@@ -224,6 +250,20 @@ const GeneralManagerDashboard = () => {
             );
         }
         setFilteredCompanies(filtered);
+    };
+
+    const filterRequests = () => {
+        let filtered = [...companyRequests];
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(request => 
+                request.company_name.toLowerCase().includes(term) ||
+                request.contact_name.toLowerCase().includes(term) ||
+                request.email.toLowerCase().includes(term) ||
+                (request.phone && request.phone.includes(term))
+            );
+        }
+        setFilteredRequests(filtered);
     };
 
     // =============================================
@@ -357,12 +397,11 @@ const GeneralManagerDashboard = () => {
         try {
             const response = await adminAPI.addCompany({
                 ...newCompany,
-                auto_create_user: true  // ✅ طلب إنشاء مستخدم للشركة تلقائياً
+                auto_create_user: true
             });
             toast.success('✅ تم إضافة الشركة والمستخدم بنجاح');
             showNotificationMessage('تم إضافة شركة جديدة مع مستخدم');
             
-            // عرض معلومات المستخدم الذي تم إنشاؤه
             if (response.data?.companyUser) {
                 toast.success(`📧 مستخدم الشركة: ${response.data.companyUser.email} / كلمة المرور: ${response.data.companyUser.password}`, {
                     duration: 10000
@@ -376,7 +415,7 @@ const GeneralManagerDashboard = () => {
                 license_number: '', website: '', logo: ''
             });
             fetchCompanies();
-            fetchUsers(); // تحديث قائمة المستخدمين أيضاً
+            fetchUsers();
         } catch (error) {
             console.error('Error adding company:', error);
             toast.error('❌ حدث خطأ في إضافة الشركة');
@@ -389,11 +428,90 @@ const GeneralManagerDashboard = () => {
                 await adminAPI.deleteCompany(companyId);
                 toast.success('✅ تم حذف الشركة بنجاح');
                 fetchCompanies();
-                fetchUsers(); // تحديث قائمة المستخدمين
+                fetchUsers();
             } catch (error) {
                 console.error('Error deleting company:', error);
                 toast.error('❌ حدث خطأ في حذف الشركة');
             }
+        }
+    };
+
+    const handleApproveRequest = async (request) => {
+        try {
+            const companyData = {
+                name: request.company_name,
+                email: request.email,
+                phone: request.phone,
+                address: request.address || '',
+                contact_person: request.contact_name,
+                description: request.message || '',
+                auto_create_user: true
+            };
+            
+            const response = await adminAPI.addCompany(companyData);
+            
+            await adminAPI.updateCompanyRequestStatus(request.id, 'approved', `تم قبول الطلب وإنشاء حساب للشركة`);
+            
+            toast.success('✅ تم قبول الطلب وإنشاء الشركة والمستخدم');
+            showNotificationMessage(`تم إنشاء حساب للشركة: ${request.company_name}`);
+            
+            if (response.data?.companyUser) {
+                toast.success(`📧 البريد: ${response.data.companyUser.email} | 🔑 كلمة المرور: ${response.data.companyUser.password}`, {
+                    duration: 10000
+                });
+            }
+            
+            fetchCompanyRequests();
+            fetchCompanies();
+            fetchUsers();
+            setShowRequestModal(false);
+            setSelectedRequest(null);
+        } catch (error) {
+            console.error('Error approving request:', error);
+            toast.error('❌ حدث خطأ في قبول الطلب');
+        }
+    };
+
+    const handleRejectRequest = async (request, reason) => {
+        if (!reason) {
+            reason = prompt('الرجاء إدخال سبب الرفض:');
+            if (!reason) return;
+        }
+        
+        try {
+            await adminAPI.updateCompanyRequestStatus(request.id, 'rejected', reason);
+            toast.success('❌ تم رفض طلب الشركة');
+            showNotificationMessage('تم رفض طلب الشركة');
+            fetchCompanyRequests();
+        } catch (error) {
+            console.error('Error rejecting request:', error);
+            toast.error('حدث خطأ');
+        }
+    };
+
+    const handleAddCompanyUserManually = async (company) => {
+        const generatedPassword = Math.random().toString(36).slice(-8);
+        
+        const userData = {
+            name: company.contact_person || company.name,
+            email: company.email,
+            password: generatedPassword,
+            role: 'company',
+            phone: company.phone,
+            company_id: company.id
+        };
+        
+        try {
+            await adminAPI.addUser(userData);
+            toast.success(`✅ تم إنشاء مستخدم للشركة ${company.name}`);
+            toast.success(`📧 البريد: ${company.email} | 🔑 كلمة المرور: ${generatedPassword}`, {
+                duration: 10000
+            });
+            showNotificationMessage(`تم إنشاء حساب للشركة: ${company.name}`);
+            fetchUsers();
+        } catch (error) {
+            console.error('Error adding company user:', error);
+            toast.error('❌ حدث خطأ في إنشاء المستخدم');
         }
     };
 
@@ -444,12 +562,35 @@ const GeneralManagerDashboard = () => {
         );
     };
 
+    const getRequestStatusBadge = (status) => {
+        const badges = {
+            pending: 'bg-yellow-100 text-yellow-800',
+            approved: 'bg-green-100 text-green-800',
+            rejected: 'bg-red-100 text-red-800',
+            contacted: 'bg-blue-100 text-blue-800'
+        };
+        
+        const texts = {
+            pending: 'قيد المراجعة',
+            approved: 'تم القبول',
+            rejected: 'مرفوض',
+            contacted: 'تم التواصل'
+        };
+        
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badges[status] || 'bg-gray-100'}`}>
+                {texts[status] || status}
+            </span>
+        );
+    };
+
     const getRoleIcon = (role) => {
         switch(role) {
             case 'executive_manager': return <FaUserTie className="text-green-600" />;
             case 'call_center': return <FaHeadset className="text-indigo-600" />;
             case 'bank_manager': return <FaUniversity className="text-pink-600" />;
             case 'leasing_manager': return <FaCar className="text-teal-600" />;
+            case 'company': return <FaCompany className="text-purple-600" />;
             default: return <FaUser className="text-gray-600" />;
         }
     };
@@ -462,7 +603,8 @@ const GeneralManagerDashboard = () => {
             operations_manager: 'مدير عمليات',
             call_center: 'مركز اتصال',
             bank_manager: 'مدير بنك',
-            leasing_manager: 'مدير تأجير'
+            leasing_manager: 'مدير تأجير',
+            company: 'شركة'
         };
         return roles[role] || role;
     };
@@ -527,7 +669,7 @@ const GeneralManagerDashboard = () => {
                             </h1>
                             <p className="text-green-100 mt-1">إدارة الطلبات والمستخدمين والشركات والإحصائيات</p>
                         </div>
-                        <div className="flex gap-2 mt-3 sm:mt-0">
+                        <div className="flex gap-2 mt-3 sm:mt-0 flex-wrap">
                             <button
                                 onClick={() => { setActiveTab('leads'); setFilter('all'); setSearchTerm(''); setCityFilter('all'); setPriorityFilter('all'); }}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'leads' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
@@ -545,6 +687,29 @@ const GeneralManagerDashboard = () => {
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'companies' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
                             >
                                 الشركات
+                            </button>
+                            <button
+                                onClick={() => { setActiveTab('requests'); setSearchTerm(''); fetchCompanyRequests(); }}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === 'requests' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+                            >
+                                <FaHandshake /> طلبات الشركات
+                                {companyRequests.filter(r => r.status === 'pending').length > 0 && (
+                                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                        {companyRequests.filter(r => r.status === 'pending').length}
+                                    </span>
+                                )}
+                            </button>
+                            {/* ✅ NEW: Company Accounts Tab Button */}
+                            <button
+                                onClick={() => { setActiveTab('companyAccounts'); setSearchTerm(''); }}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === 'companyAccounts' ? 'bg-white text-purple-700' : 'bg-purple-700 text-white hover:bg-purple-800'}`}
+                            >
+                                <FaUserCheck /> حسابات الشركات
+                                {users.filter(u => u.role === 'company').length > 0 && (
+                                    <span className="bg-yellow-400 text-purple-800 text-xs px-1.5 py-0.5 rounded-full">
+                                        {users.filter(u => u.role === 'company').length}
+                                    </span>
+                                )}
                             </button>
                             <button
                                 onClick={() => setActiveTab('stats')}
@@ -729,7 +894,7 @@ const GeneralManagerDashboard = () => {
                                                         )}
                                                     </div>
                                                     <div className="text-sm text-gray-500">{lead.phone}</div>
-                                                 </td>
+                                                  </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
@@ -743,7 +908,7 @@ const GeneralManagerDashboard = () => {
                                                         {priority.level === 'medium' && '🟡 متوسطة'}
                                                         {priority.level === 'low' && '🟢 منخفضة'}
                                                     </span>
-                                                 </td>
+                                                  </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="w-24">
                                                         <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -756,7 +921,7 @@ const GeneralManagerDashboard = () => {
                                                             ></div>
                                                         </div>
                                                     </div>
-                                                 </td>
+                                                  </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -776,13 +941,13 @@ const GeneralManagerDashboard = () => {
                                                         )}
                                                         <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
                                                     </div>
-                                                 </td>
-                                             </tr>
+                                                  </td>
+                                              </tr>
                                             );
                                         })
                                     )}
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                     </div>
                 </div>
@@ -861,7 +1026,7 @@ const GeneralManagerDashboard = () => {
                                         ))
                                     )}
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                     </div>
                 </div>
@@ -902,7 +1067,9 @@ const GeneralManagerDashboard = () => {
                                 <p className="text-gray-400 text-sm">أضف شركات شريكة جديدة</p>
                             </div>
                         ) : (
-                            filteredCompanies.map((company) => (
+                            filteredCompanies.map((company) => {
+                                const hasUser = users.some(u => u.company_id === company.id && u.role === 'company');
+                                return (
                                 <div key={company.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition">
                                     {company.logo && (
                                         <div className="h-32 overflow-hidden bg-gray-100 flex items-center justify-center">
@@ -948,14 +1115,150 @@ const GeneralManagerDashboard = () => {
                                             <span className="text-sm text-gray-500">
                                                 <strong>{company.projects_count || 0}</strong> مشروع
                                             </span>
-                                            <button
-                                                onClick={() => handleDeleteCompany(company.id)}
-                                                className="text-red-500 hover:text-red-700 p-1"
-                                                title="حذف"
-                                            >
-                                                <FaTrash size={18} />
-                                            </button>
+                                            <div className="flex gap-2">
+                                                {!hasUser && (
+                                                    <button
+                                                        onClick={() => handleAddCompanyUserManually(company)}
+                                                        className="text-purple-500 hover:text-purple-700 p-1"
+                                                        title="إنشاء مستخدم للشركة"
+                                                    >
+                                                        <FaUserPlus size={18} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDeleteCompany(company.id)}
+                                                    className="text-red-500 hover:text-red-700 p-1"
+                                                    title="حذف"
+                                                >
+                                                    <FaTrash size={18} />
+                                                </button>
+                                            </div>
                                         </div>
+                                        {hasUser && (
+                                            <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                                                <FaUserCheck /> يوجد حساب مستخدم
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================= */}
+            {/* TAB 4: COMPANY REQUESTS */}
+            {/* ============================================= */}
+            {activeTab === 'requests' && (
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <FaHandshake className="text-green-600" />
+                            طلبات انضمام الشركات
+                        </h2>
+                        <div className="relative">
+                            <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="🔍 بحث باسم الشركة / البريد..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-64 pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredRequests.length === 0 ? (
+                            <div className="col-span-3 bg-white rounded-lg shadow p-12 text-center">
+                                <FaHandshake className="text-6xl text-gray-300 mx-auto mb-4" />
+                                <p className="text-gray-500">لا توجد طلبات انضمام</p>
+                                <p className="text-gray-400 text-sm">سيظهر هنا طلبات الشركات الجديدة</p>
+                            </div>
+                        ) : (
+                            filteredRequests.map((request) => (
+                                <div key={request.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition">
+                                    <div className={`p-4 ${request.status === 'pending' ? 'bg-yellow-50' : request.status === 'approved' ? 'bg-green-50' : 'bg-red-50'}`}>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-gray-800">{request.company_name}</h3>
+                                                <p className="text-sm text-gray-600">جهة اتصال: {request.contact_name}</p>
+                                            </div>
+                                            {getRequestStatusBadge(request.status)}
+                                        </div>
+                                        
+                                        <div className="space-y-2 text-sm mb-4">
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <FaPhone className="text-green-500" />
+                                                <span dir="ltr">{request.phone}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <FaEnvelope className="text-blue-500" />
+                                                <span className="truncate">{request.email}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <FaMapMarkerAlt className="text-red-500" />
+                                                <span>{request.city}</span>
+                                            </div>
+                                            {request.address && (
+                                                <div className="flex items-center gap-2 text-gray-600">
+                                                    <FaBuilding className="text-gray-500" />
+                                                    <span className="text-xs">{request.address}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {request.message && (
+                                            <div className="mb-4 p-3 bg-gray-50 rounded-lg border-r-4 border-green-400">
+                                                <p className="text-xs text-gray-500 font-semibold mb-1">📝 رسالة إضافية:</p>
+                                                <p className="text-sm text-gray-700">{request.message}</p>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="text-xs text-gray-400 mb-3">
+                                            تاريخ الطلب: {new Date(request.created_at).toLocaleDateString('ar-TN')}
+                                        </div>
+                                        
+                                        {request.status === 'pending' && (
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleApproveRequest(request)}
+                                                    className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2"
+                                                >
+                                                    <FaCheckDouble /> قبول وإنشاء حساب
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectRequest(request)}
+                                                    className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2"
+                                                >
+                                                    <FaTimes /> رفض
+                                                </button>
+                                            </div>
+                                        )}
+                                        
+                                        {request.status === 'approved' && (
+                                            <div className="text-center text-green-600 py-2">
+                                                <FaCheckCircle className="inline ml-1" /> تم قبول الطلب وإنشاء الحساب
+                                            </div>
+                                        )}
+                                        
+                                        {request.status === 'rejected' && (
+                                            <div className="text-center text-red-600 py-2">
+                                                <FaTimesCircle className="inline ml-1" /> تم رفض الطلب
+                                                {request.notes && (
+                                                    <p className="text-xs text-gray-500 mt-1">السبب: {request.notes}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                        
+                                        <button
+                                            onClick={() => { setSelectedRequest(request); setShowRequestModal(true); }}
+                                            className="w-full mt-2 text-gray-500 hover:text-green-600 text-xs flex items-center justify-center gap-1"
+                                        >
+                                            <FaEye /> عرض التفاصيل
+                                        </button>
                                     </div>
                                 </div>
                             ))
@@ -965,7 +1268,228 @@ const GeneralManagerDashboard = () => {
             )}
 
             {/* ============================================= */}
-            {/* TAB 4: STATS */}
+            {/* ✅ NEW TAB 5: COMPANY ACCOUNTS (سجل حسابات الشركات) */}
+            {/* ============================================= */}
+            {activeTab === 'companyAccounts' && (
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <FaUserCheck className="text-purple-600" />
+                            سجل حسابات الشركات
+                            <span className="text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                                {users.filter(u => u.role === 'company').length} حساب
+                            </span>
+                        </h2>
+                        <div className="relative">
+                            <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="🔍 بحث بالبريد / اسم الشركة..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-64 pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                        </div>
+                    </div>
+                    
+                    {/* إحصائيات سريعة */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">إجمالي حسابات الشركات</p>
+                                    <p className="text-2xl font-bold text-purple-600">{users.filter(u => u.role === 'company').length}</p>
+                                </div>
+                                <FaUserCheck className="text-3xl text-purple-400" />
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">شركات نشطة</p>
+                                    <p className="text-2xl font-bold text-green-600">{users.filter(u => u.role === 'company' && u.is_active).length}</p>
+                                </div>
+                                <FaCheckCircle className="text-3xl text-green-400" />
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">إجمالي الشركات المسجلة</p>
+                                    <p className="text-2xl font-bold text-blue-600">{companies.length}</p>
+                                </div>
+                                <FaCompany className="text-3xl text-blue-400" />
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-500 text-sm">بدون حساب مستخدم</p>
+                                    <p className="text-2xl font-bold text-yellow-600">
+                                        {companies.filter(c => !users.some(u => u.company_id === c.id && u.role === 'company')).length}
+                                    </p>
+                                </div>
+                                <FaUser className="text-3xl text-yellow-400" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* جدول حسابات الشركات */}
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gradient-to-r from-purple-600 to-purple-700">
+                                    <tr>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">#</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">اسم الشركة</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">البريد الإلكتروني</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">كلمة المرور</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">رقم الهاتف</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">تاريخ الإنشاء</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">الحالة</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {users.filter(u => u.role === 'company').length === 0 ? (
+                                        <tr>
+                                            <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                                                <FaUserCheck className="text-5xl text-gray-300 mx-auto mb-2" />
+                                                لا توجد حسابات شركات
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        users.filter(u => u.role === 'company')
+                                            .filter(u => {
+                                                if (!searchTerm) return true;
+                                                const term = searchTerm.toLowerCase();
+                                                const company = companies.find(c => c.id === u.company_id);
+                                                return u.email.toLowerCase().includes(term) ||
+                                                       (company && company.name.toLowerCase().includes(term));
+                                            })
+                                            .map((user, index) => {
+                                                const company = companies.find(c => c.id === user.company_id);
+                                                
+                                                return (
+                                                    <tr key={user.id} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-3 text-gray-500">{index + 1}</td>
+                                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                                            {company?.name || '-'}
+                                                            {!company && <span className="text-xs text-red-500 mr-2">(بدون شركة مرتبطة)</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 dir-ltr text-left">
+                                                            <span className="text-sm font-mono">{user.email}</span>
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(user.email);
+                                                                    toast.success('تم نسخ البريد الإلكتروني');
+                                                                }}
+                                                                className="mr-2 text-gray-400 hover:text-purple-600"
+                                                                title="نسخ البريد"
+                                                            >
+                                                                <FaCopy size={14} />
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded dir-ltr">
+                                                                    {showPasswordForUser[user.id] ? (user.password || '••••••••') : '••••••••'}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => setShowPasswordForUser(prev => ({ ...prev, [user.id]: !prev[user.id] }))}
+                                                                    className="text-gray-500 hover:text-purple-600"
+                                                                    title={showPasswordForUser[user.id] ? 'إخفاء' : 'إظهار'}
+                                                                >
+                                                                    {showPasswordForUser[user.id] ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const password = user.password || 'لم يتم حفظها';
+                                                                        navigator.clipboard.writeText(password);
+                                                                        toast.success('تم نسخ كلمة المرور');
+                                                                    }}
+                                                                    className="text-gray-500 hover:text-green-600"
+                                                                    title="نسخ كلمة المرور"
+                                                                >
+                                                                    <FaCopy size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 dir-ltr">{user.phone || '-'}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-500">
+                                                            {new Date(user.created_at).toLocaleDateString('ar-TN')}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                                user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                            }`}>
+                                                                {user.is_active ? 'نشط' : 'غير نشط'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const credentials = `البريد: ${user.email}\nكلمة المرور: ${user.password || '********'}`;
+                                                                        navigator.clipboard.writeText(credentials);
+                                                                        toast.success('تم نسخ بيانات الدخول');
+                                                                    }}
+                                                                    className="text-purple-600 hover:text-purple-800 p-1"
+                                                                    title="نسخ بيانات الدخول"
+                                                                >
+                                                                    <FaCopy size={18} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (window.confirm('⚠️ هل تريد إعادة تعيين كلمة المرور؟')) {
+                                                                            toast.success('تم إرسال رابط إعادة تعيين كلمة المرور');
+                                                                        }
+                                                                    }}
+                                                                    className="text-blue-600 hover:text-blue-800 p-1"
+                                                                    title="إعادة تعيين كلمة المرور"
+                                                                >
+                                                                    <FaSync size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (window.confirm(`⚠️ هل تريد تعطيل حساب ${user.email}؟`)) {
+                                                                            toast.success('تم تعطيل الحساب');
+                                                                        }
+                                                                    }}
+                                                                    className="text-orange-600 hover:text-orange-800 p-1"
+                                                                    title="تعطيل الحساب"
+                                                                >
+                                                                    <FaBan size={16} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    {/* ملاحظة مهمة */}
+                    <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <FaInfoCircle className="text-blue-500 text-xl mt-0.5" />
+                            <div>
+                                <h4 className="font-semibold text-blue-800">📌 ملاحظة مهمة</h4>
+                                <p className="text-sm text-blue-700 mt-1">
+                                    كلمات المرور تظهر مرة واحدة فقط عند إنشاء الحساب. يُنصح بحفظها في مكان آمن أو استخدام زر "نسخ بيانات الدخول" لحفظها.
+                                    إذا فقدت كلمة المرور، يمكنك استخدام زر "إعادة تعيين كلمة المرور" لإرسال رابط جديد للشركة.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================= */}
+            {/* TAB 6: STATS */}
             {/* ============================================= */}
             {activeTab === 'stats' && stats && (
                 <div className="max-w-7xl mx-auto px-4">
@@ -1025,6 +1549,108 @@ const GeneralManagerDashboard = () => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================= */}
+            {/* Request Details Modal */}
+            {/* ============================================= */}
+            {showRequestModal && selectedRequest && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <FaFileAlt className="text-green-600" />
+                            تفاصيل طلب الشركة
+                        </h3>
+                        
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-gray-500">اسم الشركة</label>
+                                    <p className="font-semibold">{selectedRequest.company_name}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500">اسم المسؤول</label>
+                                    <p className="font-semibold">{selectedRequest.contact_name}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-gray-500">رقم الهاتف</label>
+                                    <p className="font-semibold" dir="ltr">{selectedRequest.phone}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500">البريد الإلكتروني</label>
+                                    <p className="font-semibold">{selectedRequest.email}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-gray-500">الولاية</label>
+                                    <p className="font-semibold">{selectedRequest.city}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500">الحالة</label>
+                                    <p>{getRequestStatusBadge(selectedRequest.status)}</p>
+                                </div>
+                            </div>
+                            
+                            {selectedRequest.address && (
+                                <div>
+                                    <label className="text-xs text-gray-500">العنوان</label>
+                                    <p className="text-sm">{selectedRequest.address}</p>
+                                </div>
+                            )}
+                            
+                            {selectedRequest.message && (
+                                <div>
+                                    <label className="text-xs text-gray-500">الرسالة</label>
+                                    <p className="text-sm bg-gray-50 p-2 rounded-lg">{selectedRequest.message}</p>
+                                </div>
+                            )}
+                            
+                            {selectedRequest.notes && (
+                                <div>
+                                    <label className="text-xs text-gray-500">ملاحظات الإدارة</label>
+                                    <p className="text-sm bg-red-50 p-2 rounded-lg">{selectedRequest.notes}</p>
+                                </div>
+                            )}
+                            
+                            <div className="grid grid-cols-2 gap-3 text-xs text-gray-400 pt-2 border-t">
+                                <div>تاريخ الطلب: {new Date(selectedRequest.created_at).toLocaleDateString('ar-TN')}</div>
+                                {selectedRequest.reviewed_at && (
+                                    <div>تاريخ المراجعة: {new Date(selectedRequest.reviewed_at).toLocaleDateString('ar-TN')}</div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => { setShowRequestModal(false); setSelectedRequest(null); }}
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                            >
+                                إغلاق
+                            </button>
+                            {selectedRequest.status === 'pending' && (
+                                <>
+                                    <button
+                                        onClick={() => { handleApproveRequest(selectedRequest); setShowRequestModal(false); }}
+                                        className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                                    >
+                                        قبول وإنشاء حساب
+                                    </button>
+                                    <button
+                                        onClick={() => { handleRejectRequest(selectedRequest); setShowRequestModal(false); }}
+                                        className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition"
+                                    >
+                                        رفض
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1159,6 +1785,7 @@ const GeneralManagerDashboard = () => {
                                     <option value="leasing_manager">مدير تأجير</option>
                                     <option value="operations_manager">مدير عمليات</option>
                                     <option value="general_manager">مدير عام</option>
+                                    <option value="company">شركة</option>
                                 </select>
                             </div>
                             
