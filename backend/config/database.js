@@ -89,19 +89,17 @@ const createTablesPostgres = async (pool) => {
     console.log('Note: leads table update:', err.message);
   }
 
-  // إضافة أعمدة companies
+ // إضافة أعمدة companies
 try {
-    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_person VARCHAR(255);`);
-    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS description TEXT;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating DECIMAL(2,1) DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reviews_count INTEGER DEFAULT 0;`);
-    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS projects_count INTEGER DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS projects_completed INTEGER DEFAULT 0;`);
-    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS established_year VARCHAR(4);`);
-    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_number VARCHAR(100);`);
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    // ✅ أضف هذه الأعمدة الجديدة
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_person VARCHAR(255);`);
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS description TEXT;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS website VARCHAR(255);`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo VARCHAR(500);`);
-    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
     console.log('✅ Updated companies table with all columns');
 } catch (err) {
     console.log('Note: companies table update:', err.message);
