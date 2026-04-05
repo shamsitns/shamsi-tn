@@ -16,11 +16,12 @@ const Login = lazy(() => import('./components/Login'));
 // لوحات التحكم
 const OwnerDashboard = lazy(() => import('./components/OwnerDashboard'));
 const GeneralManagerDashboard = lazy(() => import('./components/GeneralManagerDashboard'));
-const ExecutiveManagerDashboard = lazy(() => import('./components/ExecutiveManagerDashboard')); // ✅ موجود
+const ExecutiveManagerDashboard = lazy(() => import('./components/ExecutiveManagerDashboard'));
 const OperationsManagerDashboard = lazy(() => import('./components/OperationsDashboard'));
 const CallCenterDashboard = lazy(() => import('./components/CallCenterDashboard'));
 const BankManagerDashboard = lazy(() => import('./components/BankManagerDashboard'));
 const LeasingManagerDashboard = lazy(() => import('./components/LeasingManagerDashboard'));
+const CompanyDashboard = lazy(() => import('./components/CompanyDashboard')); // ✅ إضافة لوحة الشركة
 
 // مكون تحميل مؤقت
 const LoadingSpinner = () => (
@@ -45,7 +46,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
             'operations_manager': '/operations',
             'call_center': '/callcenter',
             'bank_manager': '/bank',
-            'leasing_manager': '/leasing'
+            'leasing_manager': '/leasing',
+            'company': '/company'  // ✅ إضافة توجيه الشركة
         };
         
         const redirectPath = roleRedirects[user.role] || '/';
@@ -137,6 +139,16 @@ function App() {
                                 element={
                                     <ProtectedRoute allowedRoles={['leasing_manager']}>
                                         <LeasingManagerDashboard />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
+                            {/* ✅ لوحة الشركة */}
+                            <Route 
+                                path="/company" 
+                                element={
+                                    <ProtectedRoute allowedRoles={['company']}>
+                                        <CompanyDashboard />
                                     </ProtectedRoute>
                                 } 
                             />
