@@ -2,7 +2,25 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
-
+// إنشاء جدول company_passwords تلقائياً
+const ensureTable = async () => {
+    try {
+        const db = getDb();
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS company_passwords (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                plain_password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ company_passwords table ready');
+    } catch (err) {
+        console.error('Error creating table:', err.message);
+    }
+};
+// استدعاء الدالة
+setTimeout(() => ensureTable(), 2000);
 // =============================================
 // POST /api/company-requests - تسجيل شركة جديدة
 // =============================================
@@ -276,7 +294,10 @@ router.get('/company-accounts', async (req, res) => {
     try {
         const db = getDb();
         
-        // Get all company users with their company info
+        // تأكد من وجود الجدول
+        await ensureTable();
+        
+        // Get all company users with their company info and plain password
         const result = await db.query(`
             SELECT 
                 u.id,
@@ -292,27 +313,21 @@ router.get('/company-accounts', async (req, res) => {
                 c.contact_person,
                 c.address as company_address,
                 c.rating,
-                c.projects_completed
+                c.projects_completed,
+                cp.plain_password as password
             FROM users u
             LEFT JOIN companies c ON u.company_id = c.id
+            LEFT JOIN company_passwords cp ON u.id = cp.user_id
             WHERE u.role = 'company'
             ORDER BY u.created_at DESC
         `);
         
         const accounts = result.rows || result;
         
-        // Note: Passwords are hashed, so we cannot display them
-        // In production, you should store plain passwords in a separate secure table
-        // For now, we return a placeholder
-        const accountsWithPlaceholderPassword = accounts.map(acc => ({
-            ...acc,
-            password: '••••••••' // Placeholder - actual password cannot be retrieved
-        }));
-        
         res.json({
             success: true,
-            count: accountsWithPlaceholderPassword.length,
-            data: accountsWithPlaceholderPassword
+            count: accounts.length,
+            data: accounts
         });
         
     } catch (error) {
@@ -323,5 +338,43 @@ router.get('/company-accounts', async (req, res) => {
         });
     }
 });
-
+// =============================================
+// POST /api/company-requests/store-password - تخزين كلمة مرور الشركة
+// =============================================
+router.post('/store-password', async (req, res) => {
+    const { userId, plainPassword } = req.body;
+    
+    if (!userId || !plainPassword) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'بيانات غير كاملة' 
+        });
+    }
+    
+    try {
+        const db = getDb();
+        
+        // تأكد من وجود الجدول
+        await ensureTable();
+        
+        // تخزين أو تحديث كلمة المرور
+        await db.query(`
+            INSERT INTO company_passwords (user_id, plain_password)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id) DO UPDATE SET plain_password = $2
+        `, [userId, plainPassword]);
+        
+        res.json({ 
+            success: true, 
+            message: 'تم تخزين كلمة المرور بنجاح' 
+        });
+        
+    } catch (error) {
+        console.error('Error storing password:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'حدث خطأ في تخزين كلمة المرور' 
+        });
+    }
+});
 module.exports = router;
