@@ -231,7 +231,7 @@ export const adminAPI = {
     },
 
     // =============================================
-    // ✅ NEW: Company Requests Management
+    // ✅ Company Requests Management
     // =============================================
     getCompanyRequests: () => {
         console.log('📋 Fetching company requests');
@@ -253,11 +253,17 @@ export const adminAPI = {
         return api.delete(`/company-requests/${id}`);
     },
     
-    // ✅ NEW: Get all company accounts (users with role 'company')
+    // ✅ Get all company accounts (users with role 'company')
     getCompanyAccounts: () => {
         console.log('👥 Fetching company accounts');
         return api.get('/company-requests/company-accounts');
-    }
+    },
+    
+    // ✅ Store company password in plain text for admin access
+    storeCompanyPassword: (userId, plainPassword) => {
+        console.log('🔐 Storing company password for user:', userId);
+        return api.post('/company-requests/store-password', { userId, plainPassword });
+    },
 };
 
 // ==================== Manager API (للمديرين) ====================
