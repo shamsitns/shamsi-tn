@@ -379,23 +379,31 @@ const GeneralManagerDashboard = () => {
     // User Management
     // =============================================
     const handleAddUser = async () => {
-        if (!newUser.name || !newUser.email || !newUser.password) {
-            toast.error('يرجى إكمال جميع البيانات المطلوبة');
-            return;
-        }
-        
-        try {
-            await adminAPI.addUser(newUser);
-            toast.success('✅ تم إضافة المستخدم بنجاح');
-            showNotificationMessage('تم إضافة مستخدم جديد');
-            setShowUserModal(false);
-            setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
-            fetchUsers();
-        } catch (error) {
-            console.error('Error adding user:', error);
-            toast.error('❌ حدث خطأ في إضافة المستخدم');
-        }
-    };
+    if (!newUser.name || !newUser.email || !newUser.password) {
+        toast.error('يرجى إكمال جميع البيانات المطلوبة');
+        return;
+    }
+    
+    // ✅ منع إنشاء مستخدم شركة بدون شركة مرتبطة
+    if (newUser.role === 'company') {
+        toast.error('⚠️ لا يمكن إنشاء مستخدم شركة بشكل منفرد. الرجاء إضافة الشركة أولاً من تبويب "الشركات" ثم سيتم إنشاء المستخدم تلقائياً.', {
+            duration: 5000
+        });
+        return;
+    }
+    
+    try {
+        await adminAPI.addUser(newUser);
+        toast.success('✅ تم إضافة المستخدم بنجاح');
+        showNotificationMessage('تم إضافة مستخدم جديد');
+        setShowUserModal(false);
+        setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '' });
+        fetchUsers();
+    } catch (error) {
+        console.error('Error adding user:', error);
+        toast.error('❌ حدث خطأ في إضافة المستخدم');
+    }
+};
 
     const handleDeleteUser = async (userId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟')) {
