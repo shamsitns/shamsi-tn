@@ -28,6 +28,9 @@ const bankRoutes = require('./routes/bank');
 const leasingRoutes = require('./routes/leasing');
 const companyDashboardRoutes = require('./routes/companyDashboard'); // ✅ إضافة مسار الشركة الجديد
 
+// ✅ NEW: Import company requests routes
+const companyRequestsRoutes = require('./routes/companyRequests');
+
 // =============================================
 // التأكد من وجود مجلد data (لـ SQLite على Render)
 // =============================================
@@ -118,6 +121,9 @@ app.use(`${API_PREFIX}/companies`, companyRoutes);
 app.use(`${API_PREFIX}/bank`, bankRoutes);
 app.use(`${API_PREFIX}/leasing`, leasingRoutes);
 app.use(`${API_PREFIX}/company`, companyDashboardRoutes); // ✅ إضافة مسار الشركة الجديد
+
+// ✅ NEW: Company Requests Routes (لصفحة JoinAsCompany)
+app.use(`${API_PREFIX}/company-requests`, companyRequestsRoutes);
 
 // =============================================
 // Health Check
@@ -470,6 +476,7 @@ const startServer = async () => {
     🛡️  Helmet: Enabled
     🔒 Rate Limiting: Disabled (temporarily)
     📝 Request ID: Enabled
+    ✅ Company Requests API: Enabled (/api/company-requests)
     ════════════════════════════════════════════════════════
             `);
         });
