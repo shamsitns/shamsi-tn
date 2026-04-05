@@ -154,14 +154,30 @@ const GeneralManagerDashboard = () => {
     };
 
     const fetchCompanyRequests = async () => {
-        try {
-            const response = await adminAPI.getCompanyRequests();
-            setCompanyRequests(response.data || []);
-        } catch (error) {
-            console.error('Error fetching company requests:', error);
-            toast.error('حدث خطأ في جلب طلبات الشركات');
+    try {
+        const response = await adminAPI.getCompanyRequests();
+        // ✅ تأكد أن البيانات مصفوفة بغض النظر عن شكل الاستجابة
+        let requestsData = [];
+        
+        if (response.data?.data && Array.isArray(response.data.data)) {
+            requestsData = response.data.data;
+        } else if (Array.isArray(response.data)) {
+            requestsData = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+            // إذا كانت الاستجابة كائن ولكن ليس به data مصفوفة
+            requestsData = [];
         }
-    };
+        
+        console.log('📋 Company requests loaded:', requestsData.length);
+        setCompanyRequests(requestsData);
+        setFilteredRequests(requestsData);
+    } catch (error) {
+        console.error('Error fetching company requests:', error);
+        toast.error('حدث خطأ في جلب طلبات الشركات');
+        setCompanyRequests([]);
+        setFilteredRequests([]);
+    }
+};
 
     const fetchStats = async () => {
         try {
@@ -253,18 +269,27 @@ const GeneralManagerDashboard = () => {
     };
 
     const filterRequests = () => {
-        let filtered = [...companyRequests];
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(request => 
-                request.company_name.toLowerCase().includes(term) ||
-                request.contact_name.toLowerCase().includes(term) ||
-                request.email.toLowerCase().includes(term) ||
-                (request.phone && request.phone.includes(term))
-            );
-        }
-        setFilteredRequests(filtered);
-    };
+    // ✅ تأكد أن companyRequests مصفوفة
+    const requestsArray = Array.isArray(companyRequests) ? companyRequests : [];
+    
+    // إذا كان لا يوجد مصطلح بحث، أظهر الكل
+    if (!searchTerm || searchTerm.trim() === '') {
+        setFilteredRequests(requestsArray);
+        return;
+    }
+    
+    const term = searchTerm.toLowerCase().trim();
+    const filtered = requestsArray.filter(request => 
+        request && (
+            (request.company_name && request.company_name.toLowerCase().includes(term)) ||
+            (request.contact_name && request.contact_name.toLowerCase().includes(term)) ||
+            (request.email && request.email.toLowerCase().includes(term)) ||
+            (request.phone && request.phone.includes(term))
+        )
+    );
+    
+    setFilteredRequests(filtered);
+};
 
     // =============================================
     // Lead Management
