@@ -157,6 +157,23 @@ const createTablesPostgres = async (pool) => {
       roof_needed DECIMAL(10,2),
       co2_reduction DECIMAL(10,2),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    // ✅ NEW: Company Requests Table for JoinAsCompany
+    `CREATE TABLE IF NOT EXISTS company_requests (
+      id SERIAL PRIMARY KEY,
+      request_id VARCHAR(36) UNIQUE NOT NULL,
+      company_name VARCHAR(255) NOT NULL,
+      contact_name VARCHAR(255) NOT NULL,
+      phone VARCHAR(20) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      city VARCHAR(100) NOT NULL,
+      address TEXT,
+      message TEXT,
+      status VARCHAR(50) DEFAULT 'pending',
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at TIMESTAMP
     )`
   ];
 
@@ -180,7 +197,12 @@ const createTablesPostgres = async (pool) => {
     `CREATE INDEX IF NOT EXISTS idx_leads_meter_number ON leads(meter_number)`,
     `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)`,
-    `CREATE INDEX IF NOT EXISTS idx_lead_history_lead ON lead_history(lead_id)`
+    `CREATE INDEX IF NOT EXISTS idx_lead_history_lead ON lead_history(lead_id)`,
+    
+    // ✅ NEW: Indexes for company_requests
+    `CREATE INDEX IF NOT EXISTS idx_company_requests_email ON company_requests(email)`,
+    `CREATE INDEX IF NOT EXISTS idx_company_requests_status ON company_requests(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_company_requests_created_at ON company_requests(created_at)`
   ];
 
   for (const query of newIndexes) {
@@ -420,12 +442,34 @@ const createTablesSQLite = async (db) => {
       status TEXT DEFAULT 'pending',
       paid_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    // ✅ NEW: Company Requests Table for SQLite
+    `CREATE TABLE IF NOT EXISTS company_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id TEXT UNIQUE NOT NULL,
+      company_name TEXT NOT NULL,
+      contact_name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT NOT NULL,
+      city TEXT NOT NULL,
+      address TEXT,
+      message TEXT,
+      status TEXT DEFAULT 'pending',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME
     )`
   ];
   
   for (const query of queries) {
     await db.exec(query);
   }
+  
+  // ✅ Create indexes for SQLite
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_company_requests_email ON company_requests(email)`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_company_requests_status ON company_requests(status)`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_company_requests_created_at ON company_requests(created_at)`);
   
   await insertDefaultUsersSQLite(db);
 };
