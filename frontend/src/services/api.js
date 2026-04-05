@@ -228,6 +228,35 @@ export const adminAPI = {
     deleteCompany: (id) => {
         console.log('🗑️ Deleting company:', id);
         return api.delete(`/admin/companies/${id}`);
+    },
+
+    // =============================================
+    // ✅ NEW: Company Requests Management
+    // =============================================
+    getCompanyRequests: () => {
+        console.log('📋 Fetching company requests');
+        return api.get('/company-requests');
+    },
+    
+    getCompanyRequestById: (id) => {
+        console.log('📋 Fetching company request:', id);
+        return api.get(`/company-requests/${id}`);
+    },
+    
+    updateCompanyRequestStatus: (id, status, notes) => {
+        console.log('🔄 Updating company request status:', id, status);
+        return api.patch(`/company-requests/${id}/status`, { status, notes });
+    },
+    
+    deleteCompanyRequest: (id) => {
+        console.log('🗑️ Deleting company request:', id);
+        return api.delete(`/company-requests/${id}`);
+    },
+    
+    // ✅ NEW: Get all company accounts (users with role 'company')
+    getCompanyAccounts: () => {
+        console.log('👥 Fetching company accounts');
+        return api.get('/company-requests/company-accounts');
     }
 };
 
@@ -351,6 +380,15 @@ export const companiesAPI = {
     getOne: (id) => api.get(`/companies/${id}`),
 };
 
+// ==================== Company API (للوحة تحكم الشركة) ====================
+export const companyAPI = {
+    getMyLeads: () => api.get('/company/leads'),
+    getMyStats: () => api.get('/company/stats'),
+    getLeadDetails: (leadId) => api.get(`/company/leads/${leadId}`),
+    updateLeadStatus: (leadId, status, notes) => api.patch(`/company/leads/${leadId}/status`, { status, notes }),
+    updateCommission: (leadId, commission_rate, notes) => api.patch(`/company/leads/${leadId}/commission`, { commission_rate, notes })
+};
+
 // ==================== Helper Functions ====================
 export const checkServerHealth = async () => {
     try {
@@ -387,16 +425,6 @@ export const handleApiError = (error) => {
     } else {
         return { message: error.message || 'حدث خطأ في الطلب' };
     }
-};
-
-// ==================== Company API (للوحة تحكم الشركة) ====================
-export const companyAPI = {
-    getMyLeads: () => api.get('/company/leads'),
-    getMyStats: () => api.get('/company/stats'),
-    getLeadDetails: (leadId) => api.get(`/company/leads/${leadId}`),
-    updateLeadStatus: (leadId, status, notes) => api.patch(`/company/leads/${leadId}/status`, { status, notes }),
-    // ✅ إضافة دالة تحديث العمولة
-    updateCommission: (leadId, commission_rate, notes) => api.patch(`/company/leads/${leadId}/commission`, { commission_rate, notes })
 };
 
 export default api;
