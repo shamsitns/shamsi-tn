@@ -82,28 +82,25 @@ const createTablesPostgres = async (pool) => {
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS financing_type VARCHAR(20) DEFAULT 'cash';`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS installation_status VARCHAR(50) DEFAULT 'pending';`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
-    // ✅ إضافة عمود assigned_to
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);`);
     console.log('✅ Updated leads table with all columns');
   } catch (err) {
     console.log('Note: leads table update:', err.message);
   }
 
- // إضافة أعمدة companies
-try {
+  // إضافة أعمدة companies
+  try {
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating DECIMAL(2,1) DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reviews_count INTEGER DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS projects_completed INTEGER DEFAULT 0;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
-    // ✅ أضف هذه الأعمدة الجديدة
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_person VARCHAR(255);`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS description TEXT;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS website VARCHAR(255);`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo VARCHAR(500);`);
     console.log('✅ Updated companies table with all columns');
-} catch (err) {
+  } catch (err) {
     console.log('Note: companies table update:', err.message);
-}
   }
 
   // ============================================
@@ -259,13 +256,13 @@ try {
     )`,
     
     `CREATE TABLE IF NOT EXISTS manager_assignments (
-  id SERIAL PRIMARY KEY,
-  lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
-  manager_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  assigned_by INTEGER REFERENCES users(id),
-  notes TEXT,
-  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)`,
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+      manager_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      assigned_by INTEGER REFERENCES users(id),
+      notes TEXT,
+      assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
     
     `CREATE TABLE IF NOT EXISTS activity_logs (
       id SERIAL PRIMARY KEY,
