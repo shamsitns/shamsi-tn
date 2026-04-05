@@ -528,10 +528,14 @@ const GeneralManagerDashboard = () => {
             toast.success('✅ تم قبول الطلب وإنشاء الشركة والمستخدم');
             
             if (response.data?.companyUser) {
-                toast.success(`📧 البريد: ${response.data.companyUser.email} | 🔑 كلمة المرور: ${response.data.companyUser.password}`, {
-                    duration: 10000
-                });
-            }
+    toast.success(`📧 البريد: ${response.data.companyUser.email} | 🔑 كلمة المرور: ${response.data.companyUser.password}`, {
+        duration: 10000
+    });
+    
+    // ✅ تخزين كلمة المرور في جدول company_passwords
+    await adminAPI.storeCompanyPassword(response.data.companyUser.id, response.data.companyUser.password);
+    console.log('✅ Password stored for user:', response.data.companyUser.id);
+}
         }
         
         showNotificationMessage(`تم معالجة طلب الشركة: ${request.company_name}`);
