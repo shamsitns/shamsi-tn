@@ -5,7 +5,7 @@ import {
     FaChartLine, FaClipboardList, FaCheckCircle, FaTimesCircle,
     FaHourglassHalf, FaCalendarAlt, FaUser, FaMapMarkerAlt,
     FaBolt, FaMoneyBillWave, FaPhone, FaEye, FaSpinner,
-    FaCheck, FaTimes, FaBuilding
+    FaCheck, FaTimes, FaBuilding, FaEdit, FaSave
 } from 'react-icons/fa';
 
 const CompanyDashboard = () => {
@@ -14,6 +14,8 @@ const CompanyDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedLead, setSelectedLead] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [showCommissionModal, setShowCommissionModal] = useState(false);
+    const [commissionValue, setCommissionValue] = useState('');
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
@@ -52,6 +54,26 @@ const CompanyDashboard = () => {
             setShowDetailsModal(false);
         } catch (error) {
             toast.error('حدث خطأ في تحديث الحالة');
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const handleUpdateCommission = async (leadId) => {
+        if (!commissionValue || commissionValue <= 0) {
+            toast.error('يرجى إدخال عمولة صالحة');
+            return;
+        }
+        
+        setUpdating(true);
+        try {
+            await companyAPI.updateCommission(leadId, commissionValue);
+            toast.success(`تم تحديث العمولة إلى ${commissionValue} دينار`);
+            fetchLeads();
+            setShowCommissionModal(false);
+            setCommissionValue('');
+        } catch (error) {
+            toast.error('حدث خطأ في تحديث العمولة');
         } finally {
             setUpdating(false);
         }
@@ -172,7 +194,7 @@ const CompanyDashboard = () => {
                                     <tr>
                                         <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
                                             لا توجد طلبات معينة لشركتك حالياً
-                                        </td>
+                                         </td>
                                     </tr>
                                 ) : (
                                     leads.map((lead) => (
@@ -183,7 +205,22 @@ const CompanyDashboard = () => {
                                             <td className="px-4 py-3">{lead.phone}</td>
                                             <td className="px-4 py-3">{lead.city}</td>
                                             <td className="px-4 py-3">{lead.required_kw} kWp</td>
-                                            <td className="px-4 py-3">{formatCurrency(lead.commission_amount)} دينار</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-green-600">{formatCurrency(lead.commission_amount)} دينار</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedLead(lead);
+                                                            setCommissionValue(lead.commission_amount || '');
+                                                            setShowCommissionModal(true);
+                                                        }}
+                                                        className="text-blue-500 hover:text-blue-700"
+                                                        title="تعديل العمولة"
+                                                    >
+                                                        <FaEdit size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-3">
                                                 {getStatusBadge(lead.assignment_status || lead.status)}
                                             </td>
@@ -253,7 +290,7 @@ const CompanyDashboard = () => {
                                     <p className="font-semibold">{selectedLead.panels_count}</p>
                                 </div>
                                 <div>
-                                    <label className="text-gray-500 text-sm">العمولة</label>
+                                    <label className="text-gray-500 text-sm">العمولة الحالية</label>
                                     <p className="font-semibold text-green-600">{formatCurrency(selectedLead.commission_amount)} دينار</p>
                                 </div>
                             </div>
@@ -298,6 +335,50 @@ const CompanyDashboard = () => {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Commission Modal */}
+            {showCommissionModal && selectedLead && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <FaMoneyBillWave className="text-green-600" /> تعديل العمولة
+                        </h3>
+                        <p className="text-gray-600 mb-2">الطلب: <span className="font-semibold">{selectedLead.name}</span></p>
+                        <p className="text-gray-500 text-sm mb-4">القدرة: {selectedLead.required_kw} kWp</p>
+                        
+                        <label className="block text-gray-700 mb-2">العمولة (دينار):</label>
+                        <input
+                            type="number"
+                            value={commissionValue}
+                            onChange={(e) => setCommissionValue(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            placeholder="أدخل قيمة العمولة"
+                            min="0"
+                            step="10"
+                        />
+                        <p className="text-xs text-gray-500 mb-4">💡 يمكنك تحديد العمولة المناسبة لهذا المشروع</p>
+                        
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => handleUpdateCommission(selectedLead.id)}
+                                disabled={updating}
+                                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+                            >
+                                <FaSave /> حفظ العمولة
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowCommissionModal(false);
+                                    setCommissionValue('');
+                                }}
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+                            >
+                                إلغاء
+                            </button>
                         </div>
                     </div>
                 </div>
