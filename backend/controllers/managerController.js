@@ -284,7 +284,7 @@ exports.getAvailableCompanies = async (req, res) => {
         const result = await db.query(`
             SELECT id, name, phone, address, contact_person, is_active 
             FROM companies 
-            WHERE is_active = true
+            WHERE is_active = 1
             ORDER BY name ASC
         `);
         
@@ -307,7 +307,6 @@ exports.sendToOperationsManager = async (req, res) => {
     console.log('👤 req.user:', req.user);
     
     try {
-        // ✅ التصحيح: استخدام id بدلاً من leadId
         const leadId = req.params.id;
         const { notes } = req.body;
         const executiveId = req.user.id;
