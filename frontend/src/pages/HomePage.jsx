@@ -5,7 +5,7 @@ import {
     FaShieldAlt, FaClock, FaThumbsUp,
     FaCalculator, FaInfoCircle, FaMoneyBillWave, FaBuilding,
     FaFileInvoice, FaTachometerAlt, FaSearch, FaHome,
-    FaCheckCircle, FaPlug
+    FaCheckCircle, FaPlug, FaUserPlus, FaRocket, FaMedal
 } from 'react-icons/fa';
 
 const HomePage = () => {
@@ -43,12 +43,21 @@ const HomePage = () => {
                     <p className="text-md mb-8 max-w-2xl mx-auto opacity-80">
                         ⚡ هذا الحساب هو تقدير أولي - الدراسة النهائية والسعر يتم تقديمهما بعد التواصل مع فريقنا
                     </p>
-                    <Link
-                        to="/calculator"
-                        className="inline-block bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 shadow-lg"
-                    >
-                        ابدأ الحساب التقريبي الآن
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Link
+                            to="/calculator"
+                            className="inline-block bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 shadow-lg"
+                        >
+                            ابدأ الحساب التقريبي الآن
+                        </Link>
+                        {/* المكان الأول: زر انضم كشركة في الهيرو */}
+                        <Link
+                            to="/join-as-company"
+                            className="inline-block bg-transparent hover:bg-white/20 border-2 border-white text-white font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 shadow-lg flex items-center gap-2"
+                        >
+                            <FaBuilding /> انضم كشركة شريكة
+                        </Link>
+                    </div>
                     
                     {/* إحصاءات سريعة */}
                     <div className="flex flex-wrap justify-center gap-6 mt-12">
@@ -177,6 +186,48 @@ const HomePage = () => {
                                 يمكن أيضاً تمويل المشروع عبر شركات التأجير التمويلي (Leasing)، خاصة للمحلات التجارية والمصانع والشركات.
                             </p>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Call to Action for Companies - المكان الثاني */}
+            <section className="py-16 px-4 bg-gradient-to-r from-indigo-600 to-purple-600">
+                <div className="max-w-5xl mx-auto text-center text-white">
+                    <div className="flex justify-center mb-6">
+                        <div className="bg-white/20 backdrop-blur-sm p-4 rounded-full">
+                            <FaBuilding className="text-5xl" />
+                        </div>
+                    </div>
+                    <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                        هل أنت شركة تركيب طاقة شمسية؟
+                    </h2>
+                    <p className="text-xl mb-6 opacity-95 max-w-2xl mx-auto">
+                        انضم إلى منصة Shamsi.tn واحصل على طلبات عملاء جدد يومياً
+                    </p>
+                    <div className="flex flex-wrap gap-4 justify-center">
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg px-6 py-3">
+                            <p className="font-bold">+5000</p>
+                            <p className="text-sm">عميل مهتم</p>
+                        </div>
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg px-6 py-3">
+                            <p className="font-bold">+120</p>
+                            <p className="text-sm">مشروع منجز</p>
+                        </div>
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg px-6 py-3">
+                            <p className="font-bold">+50</p>
+                            <p className="text-sm">شريك نجاح</p>
+                        </div>
+                    </div>
+                    <div className="mt-8">
+                        <Link
+                            to="/join-as-company"
+                            className="inline-block bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 shadow-lg flex items-center gap-2 mx-auto w-fit"
+                        >
+                            <FaUserPlus /> سجل شركتك الآن - مجاناً
+                        </Link>
+                        <p className="text-sm mt-4 opacity-80">
+                            * لا يوجد أي التزام، تواصل معنا وسنرسل لك جميع التفاصيل
+                        </p>
                     </div>
                 </div>
             </section>
@@ -389,6 +440,18 @@ const HomePage = () => {
                     </div>
                 </div>
             </section>
+
+            {/* Floating Button for Companies - المكان الثالث (زر عائم) */}
+            <Link
+                to="/join-as-company"
+                className="fixed bottom-6 left-6 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-110 z-50 flex items-center gap-2 group"
+                title="انضم كشركة شريكة"
+            >
+                <FaBuilding className="text-xl" />
+                <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
+                    انضم كشركة شريكة
+                </span>
+            </Link>
         </div>
     );
 };
