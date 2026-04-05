@@ -183,13 +183,28 @@ router.patch('/:id/status', async (req, res) => {
     
     try {
         const db = getDb();
-        const result = await db.query(
-            `UPDATE company_requests 
-             SET status = $1, notes = $2, reviewed_at = CURRENT_TIMESTAMP
-             WHERE id = $3 OR request_id = $3
-             RETURNING id, request_id, company_name, status`,
-            [status, notes || null, id]
-        );
+        
+        // ✅ تحقق مما إذا كان id رقمي أم نصي (request_id)
+        const isNumericId = /^\d+$/.test(id);
+        
+        let result;
+        if (isNumericId) {
+            result = await db.query(
+                `UPDATE company_requests 
+                 SET status = $1, notes = $2, reviewed_at = CURRENT_TIMESTAMP
+                 WHERE id = $3
+                 RETURNING id, request_id, company_name, status`,
+                [status, notes || null, parseInt(id)]
+            );
+        } else {
+            result = await db.query(
+                `UPDATE company_requests 
+                 SET status = $1, notes = $2, reviewed_at = CURRENT_TIMESTAMP
+                 WHERE request_id = $3
+                 RETURNING id, request_id, company_name, status`,
+                [status, notes || null, id]
+            );
+        }
         
         const updated = (result.rows || result)[0];
         
@@ -199,6 +214,8 @@ router.patch('/:id/status', async (req, res) => {
                 message: 'الطلب غير موجود' 
             });
         }
+        
+        console.log(`✅ Updated company request ${id} to status: ${status}`);
         
         res.json({
             success: true,
@@ -210,7 +227,8 @@ router.patch('/:id/status', async (req, res) => {
         console.error('Error updating company request:', error);
         res.status(500).json({ 
             success: false,
-            message: 'حدث خطأ في تحديث البيانات' 
+            message: 'حدث خطأ في تحديث البيانات',
+            error: error.message
         });
     }
 });
