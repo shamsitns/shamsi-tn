@@ -4,7 +4,7 @@ import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
     FaSun, FaUserShield, FaUserTie, FaBuilding, FaHeadset, FaChartLine,
-    FaUniversity, FaCar, FaEye, FaEyeSlash
+    FaUniversity, FaCar, FaEye, FaEyeSlash, FaStore
 } from 'react-icons/fa';
 
 // ============================================
@@ -18,7 +18,9 @@ const DemoAccounts = ({ onSelectEmail }) => {
         { role: 'operations_manager', name: 'مدير عمليات', email: 'operations@shamsi.tn', icon: <FaBuilding />, color: 'bg-orange-100 text-orange-700' },
         { role: 'call_center', name: 'مركز اتصال', email: 'callcenter@shamsi.tn', icon: <FaHeadset />, color: 'bg-indigo-100 text-indigo-700' },
         { role: 'bank_manager', name: 'مدير بنك', email: 'bank@shamsi.tn', icon: <FaUniversity />, color: 'bg-pink-100 text-pink-700' },
-        { role: 'leasing_manager', name: 'مدير تأجير', email: 'leasing@shamsi.tn', icon: <FaCar />, color: 'bg-teal-100 text-teal-700' }
+        { role: 'leasing_manager', name: 'مدير تأجير', email: 'leasing@shamsi.tn', icon: <FaCar />, color: 'bg-teal-100 text-teal-700' },
+        // ✅ إضافة حساب شركة تجريبي
+        { role: 'company', name: 'شركة', email: 'company-1@shamsi.tn', icon: <FaStore />, color: 'bg-cyan-100 text-cyan-700' }
     ];
 
     return (
@@ -66,7 +68,8 @@ const roleRoutes = {
     'operations_manager': '/operations',
     'call_center': '/callcenter',
     'bank_manager': '/bank',
-    'leasing_manager': '/leasing'
+    'leasing_manager': '/leasing',
+    'company': '/company'  // ✅ إضافة مسار الشركة
 };
 
 const Login = () => {
