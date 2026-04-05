@@ -328,7 +328,6 @@ exports.assignToExecutive = async (req, res) => {
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId}`);
         
-        // البحث عن المدير التنفيذي
         const executiveResult = await db.query(
             "SELECT id, name FROM users WHERE role = 'executive_manager' AND is_active = true LIMIT 1"
         );
@@ -344,14 +343,12 @@ exports.assignToExecutive = async (req, res) => {
         
         console.log(`✅ Found executive: ${executive.name} (ID: ${executiveId})`);
         
-        // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // تحديث lead مع تعيينه للمدير التنفيذي
         await db.query(
             `UPDATE leads 
              SET status = 'contacted', 
@@ -361,7 +358,6 @@ exports.assignToExecutive = async (req, res) => {
             [executiveId, leadId]
         );
         
-        // ✅ تم تعطيل إدراج manager_assignments مؤقتاً
         console.log(`📝 Assignment recorded for lead ${leadId} to executive ${executive.name} (ID: ${executiveId})`);
         
         console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
@@ -407,7 +403,6 @@ exports.assignToCallCenter = async (req, res) => {
             [callCenterId, leadId]
         );
         
-        // ✅ تم تعطيل إدراج manager_assignments مؤقتاً
         console.log(`📝 Assignment recorded for lead ${leadId} to call center ${callCenter.name}`);
         
         res.json({ 
@@ -546,6 +541,7 @@ exports.getAllCompanies = async (req, res) => {
     }
 };
 
+// ✅ دالة addCompany المعدلة (تنشئ مستخدم للشركة تلقائياً)
 exports.addCompany = async (req, res) => {
     try {
         const { name, email, phone, address, contact_person, projects_count } = req.body;
@@ -554,12 +550,38 @@ exports.addCompany = async (req, res) => {
             return res.status(400).json({ message: 'الاسم والبريد الإلكتروني مطلوبان' });
         }
         
-        await db.query(`
+        // التحقق من عدم وجود الشركة مسبقاً
+        const existing = await db.query('SELECT id FROM companies WHERE email = $1', [email]);
+        if (getRows(existing).length > 0) {
+            return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
+        }
+        
+        // إضافة الشركة
+        const result = await db.query(`
             INSERT INTO companies (name, email, phone, address, contact_person, projects_count, is_active)
             VALUES ($1, $2, $3, $4, $5, $6, 1)
+            RETURNING id
         `, [name, email, phone || null, address || null, contact_person || null, projects_count || 0]);
         
-        res.status(201).json({ message: 'تم إضافة الشركة بنجاح' });
+        const companyId = result.rows[0].id;
+        
+        // ✅ إنشاء مستخدم للشركة
+        const companyUserEmail = `company-${companyId}@shamsi.tn`;
+        const companyPassword = 'company123';
+        const hashedPassword = await bcrypt.hash(companyPassword, 10);
+        
+        await db.query(`
+            INSERT INTO users (name, email, password, role, company_id, is_active, created_at)
+            VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)
+        `, [`مدير ${name}`, companyUserEmail, hashedPassword, 'company', companyId]);
+        
+        console.log(`✅ Company ${name} added with user: ${companyUserEmail} / ${companyPassword}`);
+        
+        res.status(201).json({ 
+            message: 'تم إضافة الشركة والمستخدم بنجاح',
+            company: { id: companyId, name, email },
+            companyUser: { email: companyUserEmail, password: companyPassword }
+        });
         
     } catch (error) {
         console.error('❌ Error adding company:', error);
