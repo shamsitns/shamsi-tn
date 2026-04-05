@@ -541,10 +541,10 @@ exports.getAllCompanies = async (req, res) => {
     }
 };
 
-// ✅ دالة addCompany المعدلة (تنشئ مستخدم للشركة تلقائياً)
+// ✅ دالة addCompany (مع إنشاء مستخدم تلقائي + الحقول الجديدة)
 exports.addCompany = async (req, res) => {
     try {
-        const { name, email, phone, address, contact_person, projects_count } = req.body;
+        const { name, email, phone, address, contact_person, projects_count, description, website, logo } = req.body;
         
         if (!name || !email) {
             return res.status(400).json({ message: 'الاسم والبريد الإلكتروني مطلوبان' });
@@ -558,14 +558,14 @@ exports.addCompany = async (req, res) => {
         
         // إضافة الشركة
         const result = await db.query(`
-            INSERT INTO companies (name, email, phone, address, contact_person, projects_count, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, 1)
+            INSERT INTO companies (name, email, phone, address, contact_person, projects_count, description, website, logo, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1)
             RETURNING id
-        `, [name, email, phone || null, address || null, contact_person || null, projects_count || 0]);
+        `, [name, email, phone || null, address || null, contact_person || null, projects_count || 0, description || null, website || null, logo || null]);
         
         const companyId = result.rows[0].id;
         
-        // ✅ إنشاء مستخدم للشركة
+        // ✅ إنشاء مستخدم للشركة تلقائياً
         const companyUserEmail = `company-${companyId}@shamsi.tn`;
         const companyPassword = 'company123';
         const hashedPassword = await bcrypt.hash(companyPassword, 10);
