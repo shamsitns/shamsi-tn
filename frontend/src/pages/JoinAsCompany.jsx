@@ -27,38 +27,58 @@ const JoinAsCompany = () => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+        // استخدام الرابط الكامل للـ API
+        const API_URL = process.env.REACT_APP_API_URL || 'https://shamsi-tn.onrender.com/api';
         
-        try {
-            const response = await fetch('/api/company-requests', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+        console.log('📤 Sending company request to:', `${API_URL}/company-requests`);
+        console.log('📦 Data:', formData);
+        
+        const response = await fetch(`${API_URL}/company-requests`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        console.log('📥 Response status:', response.status);
+        
+        const data = await response.json();
+        console.log('📥 Response data:', data);
+        
+        if (response.ok) {
+            toast.success('✅ تم إرسال طلبك بنجاح! سنتواصل معكم قريباً');
+            setFormData({
+                company_name: '',
+                contact_name: '',
+                phone: '',
+                email: '',
+                city: '',
+                address: '',
+                message: ''
             });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                toast.success('✅ تم إرسال طلبك بنجاح! سنتواصل معكم قريباً');
-                setFormData({
-                    company_name: '',
-                    contact_name: '',
-                    phone: '',
-                    email: '',
-                    city: '',
-                    address: '',
-                    message: ''
-                });
-            } else {
-                toast.error(data.message || 'حدث خطأ في إرسال الطلب');
-            }
-        } catch (error) {
-            toast.error('حدث خطأ في الاتصال بالخادم');
-        } finally {
-            setLoading(false);
+        } else {
+            toast.error(data.message || 'حدث خطأ في إرسال الطلب');
         }
-    };
+    } catch (error) {
+        console.error('❌ Error details:', error);
+        console.error('❌ Error message:', error.message);
+        
+        // عرض رسالة خطأ أكثر تحديداً
+        if (error.message === 'Failed to fetch') {
+            toast.error('❌ لا يمكن الاتصال بالخادم. يرجى المحاولة لاحقاً.');
+        } else {
+            toast.error('❌ حدث خطأ في الاتصال بالخادم: ' + error.message);
+        }
+    } finally {
+        setLoading(false);
+    }
+};
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 py-12 px-4">
