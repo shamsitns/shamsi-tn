@@ -71,6 +71,14 @@ const createTablesPostgres = async (pool) => {
     console.log('Note: users table update:', err.message);
   }
 
+  // ✅ حذف عمود password من companies إذا كان موجوداً
+  try {
+    await pool.query(`ALTER TABLE companies DROP COLUMN IF EXISTS password;`);
+    console.log('✅ Removed password column from companies table');
+  } catch (err) {
+    console.log('Note: could not drop password column:', err.message);
+  }
+
   // إضافة جميع أعمدة leads المفقودة
   try {
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);`);
