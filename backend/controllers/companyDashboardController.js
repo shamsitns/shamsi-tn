@@ -28,6 +28,7 @@ exports.getMyLeads = async (req, res) => {
                    lc.status as assignment_status,
                    lc.assigned_at,
                    lc.notes as assignment_notes,
+                   lc.commission_rate,
                    u.name as assigned_by_name
             FROM leads l
             JOIN lead_companies lc ON l.id = lc.lead_id
@@ -193,6 +194,7 @@ exports.getLeadDetails = async (req, res) => {
                    lc.status as assignment_status,
                    lc.assigned_at,
                    lc.notes as assignment_notes,
+                   lc.commission_rate,
                    u.name as assigned_by_name
             FROM leads l
             JOIN lead_companies lc ON l.id = lc.lead_id
@@ -211,5 +213,59 @@ exports.getLeadDetails = async (req, res) => {
     } catch (error) {
         console.error('❌ Error getting lead details:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب تفاصيل الطلب', error: error.message });
+    }
+};
+
+// =============================================
+// ✅ تحديث العمولة للطلب
+// =============================================
+exports.updateCommission = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        const { commission_rate, notes } = req.body;
+        const companyId = req.user.company_id;
+        
+        if (!commission_rate || commission_rate < 0) {
+            return res.status(400).json({ message: 'العمولة غير صالحة' });
+        }
+        
+        // التحقق من أن الطلب معين لهذه الشركة
+        const existingResult = await db.query(
+            'SELECT id, commission_rate FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
+            [leadId, companyId]
+        );
+        const existing = getFirstRow(existingResult);
+        
+        if (!existing) {
+            return res.status(404).json({ message: 'الطلب غير معين لشركتك' });
+        }
+        
+        // تحديث العمولة في lead_companies
+        await db.query(
+            `UPDATE lead_companies 
+             SET commission_rate = $1,
+                 notes = COALESCE(notes, '') || '\n' || $2,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE lead_id = $3 AND company_id = $4`,
+            [commission_rate, `[${new Date().toISOString()}] تم تحديث العمولة إلى: ${commission_rate} دينار`, leadId, companyId]
+        );
+        
+        // تحديث عمولة الـ lead الرئيسي
+        await db.query(
+            `UPDATE leads SET commission_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [commission_rate, leadId]
+        );
+        
+        console.log(`✅ Commission updated for lead ${leadId} to ${commission_rate} by company ${companyId}`);
+        
+        res.json({ 
+            message: `تم تحديث العمولة إلى ${commission_rate} دينار`,
+            leadId,
+            commission_rate
+        });
+        
+    } catch (error) {
+        console.error('❌ Error updating commission:', error);
+        res.status(500).json({ message: 'حدث خطأ في تحديث العمولة', error: error.message });
     }
 };
