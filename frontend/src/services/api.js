@@ -388,5 +388,11 @@ export const handleApiError = (error) => {
         return { message: error.message || 'حدث خطأ في الطلب' };
     }
 };
-
+// ==================== Company API (للوحة تحكم الشركة) ====================
+export const companyAPI = {
+    getMyLeads: () => api.get('/company/leads'),
+    getMyStats: () => api.get('/company/stats'),
+    getLeadDetails: (leadId) => api.get(`/company/leads/${leadId}`),
+    updateLeadStatus: (leadId, status, notes) => api.patch(`/company/leads/${leadId}/status`, { status, notes })
+};
 export default api;
