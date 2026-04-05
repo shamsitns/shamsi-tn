@@ -337,11 +337,10 @@ exports.sendToOperationsManager = async (req, res) => {
             [operationsManager.id, executiveId, leadId]
         );
         
-        console.log(`📝 Assignment recorded for lead ${leadId} to operations manager ${operationsManager.name}`);
-        
         console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
-        res.json({ 
+        // ✅ إرسال response بنجاح
+        return res.status(200).json({ 
             message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
             commission: commission,
@@ -351,7 +350,7 @@ exports.sendToOperationsManager = async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error sending to operations:', error);
-        res.status(500).json({ message: 'حدث خطأ في إرسال الطلب لمدير العمليات', error: error.message });
+        return res.status(500).json({ message: 'حدث خطأ في إرسال الطلب لمدير العمليات', error: error.message });
     }
 };
 
@@ -395,11 +394,9 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
             [operationsManager.id, executiveId, leadId]
         );
         
-        console.log(`📝 Assignment recorded for lead ${leadId} to operations manager ${operationsManager.name}`);
-        
         console.log(`✅ Lead ${leadId} accepted and sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
-        res.json({ 
+        return res.status(200).json({ 
             message: `تم قبول الطلب وإرساله لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
             commission: commission,
@@ -409,7 +406,7 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error accepting lead:', error);
-        res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
+        return res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
     }
 };
 
