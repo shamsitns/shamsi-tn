@@ -301,6 +301,11 @@ exports.getAvailableCompanies = async (req, res) => {
 // إرسال الطلب لمدير العمليات (للمدير التنفيذي)
 // =============================================
 exports.sendToOperationsManager = async (req, res) => {
+    console.log('🚀🔴🔴 sendToOperationsManager FUNCTION IS CALLED! 🔴🔴🚀');
+    console.log('📝 req.params:', req.params);
+    console.log('📝 req.body:', req.body);
+    console.log('👤 req.user:', req.user);
+    
     try {
         const { leadId } = req.params;
         const { notes } = req.body;
@@ -311,6 +316,7 @@ exports.sendToOperationsManager = async (req, res) => {
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(resultLead);
         if (!lead) {
+            console.log('❌ Lead not found:', leadId);
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
@@ -321,6 +327,7 @@ exports.sendToOperationsManager = async (req, res) => {
         const operationsManager = getFirstRow(opsResult);
         
         if (!operationsManager) {
+            console.log('❌ No operations manager available');
             return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
         
@@ -339,10 +346,9 @@ exports.sendToOperationsManager = async (req, res) => {
         
         console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.name} with commission ${commission}`);
         
-        // ✅ إرسال response بنجاح
         return res.status(200).json({ 
             message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
-            leadId,
+            leadId: parseInt(leadId),
             commission: commission,
             operationsManagerId: operationsManager.id,
             operationsManagerName: operationsManager.name
