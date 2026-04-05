@@ -141,6 +141,40 @@ app.get(`${API_PREFIX}/uptime`, (req, res) => {
 });
 
 // =============================================
+// ✅ TEMPORARY: List all registered routes
+// =============================================
+app.get('/api/routes', (req, res) => {
+    const routes = [];
+    
+    function extractRoutes(stack, basePath = '') {
+        stack.forEach(layer => {
+            if (layer.route) {
+                const path = basePath + layer.route.path;
+                const methods = Object.keys(layer.route.methods);
+                routes.push({ path, methods });
+            } else if (layer.name === 'router' && layer.handle.stack) {
+                const routerPath = layer.regexp.source
+                    .replace('\\/?(?=\\/|$)', '')
+                    .replace(/\\\//g, '/')
+                    .replace(/\^/g, '')
+                    .replace(/\?/g, '')
+                    .replace(/\(\?:\(\[\^\\\/\]\+\?\)\)/g, ':param');
+                extractRoutes(layer.handle.stack, basePath + routerPath);
+            }
+        });
+    }
+    
+    extractRoutes(app._router.stack, '');
+    
+    const apiRoutes = routes.filter(route => route.path.startsWith('/api'));
+    
+    res.json({
+        totalRoutes: apiRoutes.length,
+        routes: apiRoutes
+    });
+});
+
+// =============================================
 // ✅ TEMPORARY: Run seed to add executive manager
 // =============================================
 app.get(`${API_PREFIX}/run-seed`, async (req, res) => {
@@ -271,11 +305,9 @@ app.get(`${API_PREFIX}/add-test-leads`, async (req, res) => {
     try {
         const db = getDb();
         
-        // الحصول على ID المدير العام
         const gmResult = await db.query("SELECT id FROM users WHERE email = 'gm@shamsi.tn' LIMIT 1");
         const gmId = (gmResult.rows || gmResult)[0]?.id || 2;
         
-        // إضافة leads تجريبية
         const testLeads = [
             { name: 'أحمد بن علي', phone: '12345678', city: 'تونس', property_type: 'house', bill_amount: 250, bill_period_months: 60, bill_season: 'summer', required_kw: 5.0, panels_count: 10, commission_amount: 750, status: 'pending', created_by: gmId },
             { name: 'سارة بن سالم', phone: '87654321', city: 'صفاقس', property_type: 'apartment', bill_amount: 180, bill_period_months: 60, bill_season: 'spring', required_kw: 3.5, panels_count: 7, commission_amount: 525, status: 'approved', created_by: gmId },
