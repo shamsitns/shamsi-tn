@@ -26,6 +26,7 @@ const managerRoutes = require('./routes/manager');
 const companyRoutes = require('./routes/companies');
 const bankRoutes = require('./routes/bank');
 const leasingRoutes = require('./routes/leasing');
+const companyDashboardRoutes = require('./routes/companyDashboard'); // ✅ إضافة مسار الشركة الجديد
 
 // =============================================
 // التأكد من وجود مجلد data (لـ SQLite على Render)
@@ -116,6 +117,7 @@ app.use(`${API_PREFIX}/manager`, managerRoutes);
 app.use(`${API_PREFIX}/companies`, companyRoutes);
 app.use(`${API_PREFIX}/bank`, bankRoutes);
 app.use(`${API_PREFIX}/leasing`, leasingRoutes);
+app.use(`${API_PREFIX}/company`, companyDashboardRoutes); // ✅ إضافة مسار الشركة الجديد
 
 // =============================================
 // Health Check
