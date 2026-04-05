@@ -108,7 +108,6 @@ const GeneralManagerDashboard = () => {
             const leadsData = response.data.leads || [];
             setLeads(leadsData);
             
-            // استخراج المدن الفريدة
             const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
             setCities(uniqueCities);
         } catch (error) {
@@ -174,17 +173,14 @@ const GeneralManagerDashboard = () => {
     const filterLeads = () => {
         let filtered = [...leads];
         
-        // فلتر حسب الحالة
         if (filter !== 'all') {
             filtered = filtered.filter(lead => lead.status === filter);
         }
         
-        // فلتر حسب المدينة
         if (cityFilter !== 'all') {
             filtered = filtered.filter(lead => lead.city === cityFilter);
         }
         
-        // فلتر حسب الأولوية
         if (priorityFilter !== 'all') {
             filtered = filtered.filter(lead => {
                 const priority = getLeadPriority(lead);
@@ -192,7 +188,6 @@ const GeneralManagerDashboard = () => {
             });
         }
         
-        // فلتر حسب البحث
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(lead => 
@@ -360,9 +355,20 @@ const GeneralManagerDashboard = () => {
         }
         
         try {
-            await adminAPI.addCompany(newCompany);
-            toast.success('✅ تم إضافة الشركة بنجاح');
-            showNotificationMessage('تم إضافة شركة جديدة');
+            const response = await adminAPI.addCompany({
+                ...newCompany,
+                auto_create_user: true  // ✅ طلب إنشاء مستخدم للشركة تلقائياً
+            });
+            toast.success('✅ تم إضافة الشركة والمستخدم بنجاح');
+            showNotificationMessage('تم إضافة شركة جديدة مع مستخدم');
+            
+            // عرض معلومات المستخدم الذي تم إنشاؤه
+            if (response.data?.companyUser) {
+                toast.success(`📧 مستخدم الشركة: ${response.data.companyUser.email} / كلمة المرور: ${response.data.companyUser.password}`, {
+                    duration: 10000
+                });
+            }
+            
             setShowCompanyModal(false);
             setNewCompany({
                 name: '', email: '', phone: '', address: '', contact_person: '',
@@ -370,6 +376,7 @@ const GeneralManagerDashboard = () => {
                 license_number: '', website: '', logo: ''
             });
             fetchCompanies();
+            fetchUsers(); // تحديث قائمة المستخدمين أيضاً
         } catch (error) {
             console.error('Error adding company:', error);
             toast.error('❌ حدث خطأ في إضافة الشركة');
@@ -382,6 +389,7 @@ const GeneralManagerDashboard = () => {
                 await adminAPI.deleteCompany(companyId);
                 toast.success('✅ تم حذف الشركة بنجاح');
                 fetchCompanies();
+                fetchUsers(); // تحديث قائمة المستخدمين
             } catch (error) {
                 console.error('Error deleting company:', error);
                 toast.error('❌ حدث خطأ في حذف الشركة');
@@ -484,7 +492,6 @@ const GeneralManagerDashboard = () => {
         return stars;
     };
 
-    // حساب الإحصائيات المتقدمة
     const advancedStats = {
         totalLeads: filteredLeads.length,
         hotLeads: filteredLeads.filter(l => isHotLead(l)).length,
@@ -492,9 +499,6 @@ const GeneralManagerDashboard = () => {
         conversionRate: ((filteredLeads.filter(l => l.status === 'completed').length / filteredLeads.length) * 100 || 0).toFixed(0)
     };
 
-    // =============================================
-    // Render
-    // =============================================
     if (loading && activeTab === 'leads') {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -628,7 +632,6 @@ const GeneralManagerDashboard = () => {
                     {/* Search and Filters */}
                     <div className="bg-white rounded-lg shadow-md p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            {/* Search */}
                             <div className="relative">
                                 <FaSearch className="absolute right-3 top-3 text-gray-400" />
                                 <input
@@ -640,7 +643,6 @@ const GeneralManagerDashboard = () => {
                                 />
                             </div>
                             
-                            {/* City Filter */}
                             <div className="relative">
                                 <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
                                 <select
@@ -655,7 +657,6 @@ const GeneralManagerDashboard = () => {
                                 </select>
                             </div>
                             
-                            {/* Priority Filter */}
                             <div className="relative">
                                 <FaFire className="absolute right-3 top-3 text-gray-400" />
                                 <select
@@ -670,7 +671,6 @@ const GeneralManagerDashboard = () => {
                                 </select>
                             </div>
                             
-                            {/* Status Filter */}
                             <div className="relative">
                                 <FaFilter className="absolute right-3 top-3 text-gray-400" />
                                 <select
@@ -729,7 +729,7 @@ const GeneralManagerDashboard = () => {
                                                         )}
                                                     </div>
                                                     <div className="text-sm text-gray-500">{lead.phone}</div>
-                                                </td>
+                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
@@ -743,7 +743,7 @@ const GeneralManagerDashboard = () => {
                                                         {priority.level === 'medium' && '🟡 متوسطة'}
                                                         {priority.level === 'low' && '🟢 منخفضة'}
                                                     </span>
-                                                </td>
+                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="w-24">
                                                         <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -756,7 +756,7 @@ const GeneralManagerDashboard = () => {
                                                             ></div>
                                                         </div>
                                                     </div>
-                                                </td>
+                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex gap-2">
@@ -776,8 +776,8 @@ const GeneralManagerDashboard = () => {
                                                         )}
                                                         <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
                                                     </div>
-                                                </td>
-                                            </tr>
+                                                 </td>
+                                             </tr>
                                             );
                                         })
                                     )}
@@ -970,7 +970,6 @@ const GeneralManagerDashboard = () => {
             {activeTab === 'stats' && stats && (
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="grid md:grid-cols-2 gap-6">
-                        {/* إحصائيات حسب المدينة */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaCity /> الطلبات حسب المدينة</h3>
                             <div className="space-y-2">
@@ -983,7 +982,6 @@ const GeneralManagerDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* إحصائيات حسب نوع العقار */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaBuilding /> نوع العقار</h3>
                             <div className="space-y-2">
@@ -1003,7 +1001,6 @@ const GeneralManagerDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* إحصائيات العمولات */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaChartLine /> العمولات</h3>
                             <div className="space-y-2">
@@ -1018,7 +1015,6 @@ const GeneralManagerDashboard = () => {
                             </div>
                         </div>
                         
-                        {/* الإحصائيات الشهرية */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaCalendarAlt /> الطلبات الشهرية</h3>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
