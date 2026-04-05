@@ -65,6 +65,8 @@ const createTablesPostgres = async (pool) => {
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    // ✅ إضافة عمود company_id لربط المستخدم بالشركة
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);`);
     console.log('✅ Updated users table');
   } catch (err) {
     console.log('Note: users table update:', err.message);
@@ -185,7 +187,8 @@ const createTablesPostgres = async (pool) => {
       password VARCHAR(255) NOT NULL,
       name VARCHAR(255) NOT NULL,
       phone VARCHAR(50),
-      role VARCHAR(50) NOT NULL CHECK (role IN ('owner', 'general_manager', 'executive_manager', 'operations_manager', 'call_center', 'admin')),
+      role VARCHAR(50) NOT NULL CHECK (role IN ('owner', 'general_manager', 'executive_manager', 'operations_manager', 'call_center', 'admin', 'company')),
+      company_id INTEGER REFERENCES companies(id),
       is_active BOOLEAN DEFAULT true,
       must_change_password BOOLEAN DEFAULT false,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -309,9 +312,11 @@ const createTablesSQLite = async (db) => {
       name TEXT NOT NULL,
       phone TEXT,
       role TEXT NOT NULL,
+      company_id INTEGER,
       is_active INTEGER DEFAULT 1,
       must_change_password INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (company_id) REFERENCES companies(id)
     )`,
     
     `CREATE TABLE IF NOT EXISTS companies (
