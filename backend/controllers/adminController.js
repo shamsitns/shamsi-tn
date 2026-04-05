@@ -541,7 +541,7 @@ exports.getAllCompanies = async (req, res) => {
     }
 };
 
-// ✅ دالة addCompany (مع إنشاء مستخدم تلقائي + الحقول الجديدة)
+// ✅ دالة addCompany (لا تنشئ مستخدم - المدير العام يضيف المستخدم يدوياً)
 exports.addCompany = async (req, res) => {
     try {
         const { name, email, phone, address, contact_person, projects_count, description, website, logo } = req.body;
@@ -556,7 +556,7 @@ exports.addCompany = async (req, res) => {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
         }
         
-        // إضافة الشركة
+        // ✅ إضافة الشركة فقط (بدون إنشاء مستخدم)
         const result = await db.query(`
             INSERT INTO companies (name, email, phone, address, contact_person, projects_count, description, website, logo, is_active)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1)
@@ -565,22 +565,11 @@ exports.addCompany = async (req, res) => {
         
         const companyId = result.rows[0].id;
         
-        // ✅ إنشاء مستخدم للشركة تلقائياً
-        const companyUserEmail = `company-${companyId}@shamsi.tn`;
-        const companyPassword = 'company123';
-        const hashedPassword = await bcrypt.hash(companyPassword, 10);
-        
-        await db.query(`
-            INSERT INTO users (name, email, password, role, company_id, is_active, created_at)
-            VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)
-        `, [`مدير ${name}`, companyUserEmail, hashedPassword, 'company', companyId]);
-        
-        console.log(`✅ Company ${name} added with user: ${companyUserEmail} / ${companyPassword}`);
+        console.log(`✅ Company ${name} added successfully (ID: ${companyId})`);
         
         res.status(201).json({ 
-            message: 'تم إضافة الشركة والمستخدم بنجاح',
-            company: { id: companyId, name, email },
-            companyUser: { email: companyUserEmail, password: companyPassword }
+            message: 'تم إضافة الشركة بنجاح',
+            company: { id: companyId, name, email }
         });
         
     } catch (error) {
