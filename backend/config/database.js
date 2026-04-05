@@ -261,12 +261,13 @@ try {
     )`,
     
     `CREATE TABLE IF NOT EXISTS manager_assignments (
-      id SERIAL PRIMARY KEY,
-      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
-      manager_id INTEGER REFERENCES users(id),
-      assigned_by INTEGER REFERENCES users(id),
-      assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
+  id SERIAL PRIMARY KEY,
+  lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+  manager_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  assigned_by INTEGER REFERENCES users(id),
+  notes TEXT,
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`,
     
     `CREATE TABLE IF NOT EXISTS activity_logs (
       id SERIAL PRIMARY KEY,
