@@ -251,4 +251,59 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// =============================================
+// ✅ NEW: GET /api/company-requests/company-accounts - جلب جميع حسابات الشركات (للمدير فقط)
+// =============================================
+router.get('/company-accounts', async (req, res) => {
+    try {
+        const db = getDb();
+        
+        // Get all company users with their company info
+        const result = await db.query(`
+            SELECT 
+                u.id,
+                u.email,
+                u.name,
+                u.phone,
+                u.role,
+                u.is_active,
+                u.created_at,
+                u.updated_at,
+                u.company_id,
+                c.name as company_name,
+                c.contact_person,
+                c.address as company_address,
+                c.rating,
+                c.projects_completed
+            FROM users u
+            LEFT JOIN companies c ON u.company_id = c.id
+            WHERE u.role = 'company'
+            ORDER BY u.created_at DESC
+        `);
+        
+        const accounts = result.rows || result;
+        
+        // Note: Passwords are hashed, so we cannot display them
+        // In production, you should store plain passwords in a separate secure table
+        // For now, we return a placeholder
+        const accountsWithPlaceholderPassword = accounts.map(acc => ({
+            ...acc,
+            password: '••••••••' // Placeholder - actual password cannot be retrieved
+        }));
+        
+        res.json({
+            success: true,
+            count: accountsWithPlaceholderPassword.length,
+            data: accountsWithPlaceholderPassword
+        });
+        
+    } catch (error) {
+        console.error('Error fetching company accounts:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'حدث خطأ في جلب البيانات' 
+        });
+    }
+});
+
 module.exports = router;
