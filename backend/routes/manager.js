@@ -50,9 +50,9 @@ router.get('/companies/available', getAvailableCompanies);
 // =============================================
 // مسارات عامة للمديرين (مع ID) - REST style
 // =============================================
-router.get('/leads/:id', getLeadDetails); // ✅ تغيير من /details إلى /:id
+router.get('/leads/:id', getLeadDetails);
 router.put('/leads/:id/status', updateLeadStatus);
-router.post('/leads/:id/notes', addLeadNote); // ✅ إضافة ملاحظات
+router.post('/leads/:id/notes', addLeadNote);
 
 // =============================================
 // مسارات للمدير التنفيذي فقط
@@ -64,17 +64,19 @@ router.post('/leads/:id/accept', isExecutiveManager, acceptLeadAndSendToOperatio
 // مسارات لمدير العمليات فقط
 // =============================================
 router.post('/leads/:id/assign-company', isOperationsManager, assignToCompany);
+// ✅ مسار إضافي للتوافق مع leadId (تمت الإضافة فقط، لم نحذف أي شيء)
+router.post('/leads/:leadId/assign-company', isOperationsManager, assignToCompany);
 
 // =============================================
 // مسارات لمركز الاتصال فقط
 // =============================================
-router.post('/leads/:id/contact', isCallCenter, markAsContacted); // ✅ تسجيل التواصل مع العميل
+router.post('/leads/:id/contact', isCallCenter, markAsContacted);
 
 // =============================================
 // مسارات البحث والفلترة المتقدمة
 // =============================================
 router.get('/leads/filter/:status', getMyLeads);
 router.get('/leads/city/:city', getMyLeads);
-router.get('/leads/search', getMyLeads); // بحث متقدم
+router.get('/leads/search', getMyLeads);
 
 module.exports = router;
