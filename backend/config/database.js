@@ -508,7 +508,7 @@ const insertDefaultUsersPostgres = async (pool) => {
     { email: 'manager@shamsi.tn', password: 'manager123', name: 'Executive Manager', role: 'executive_manager', must_change_password: true },
     { email: 'operations@shamsi.tn', password: 'operations123', name: 'Operations Manager', role: 'operations_manager', must_change_password: true },
     { email: 'callcenter@shamsi.tn', password: 'call123', name: 'Call Center', role: 'call_center', must_change_password: true },
-    { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: true }
+    { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: true },
     // ✅ NEW: Test company account
     { email: 'companytest@shamsi.tn', password: 'company123', name: 'شركة اختبار', role: 'company', must_change_password: false }
   ];
@@ -533,7 +533,9 @@ const insertDefaultUsersSQLite = async (db) => {
     { email: 'manager@shamsi.tn', password: 'manager123', name: 'Executive Manager', role: 'executive_manager', must_change_password: 1 },
     { email: 'operations@shamsi.tn', password: 'operations123', name: 'Operations Manager', role: 'operations_manager', must_change_password: 1 },
     { email: 'callcenter@shamsi.tn', password: 'call123', name: 'Call Center', role: 'call_center', must_change_password: 1 },
-    { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: 1 }
+    { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: 1 },
+    // ✅ NEW: Test company account for SQLite
+    { email: 'companytest@shamsi.tn', password: 'company123', name: 'شركة اختبار', role: 'company', must_change_password: 0 }
   ];
   
   for (const user of users) {
