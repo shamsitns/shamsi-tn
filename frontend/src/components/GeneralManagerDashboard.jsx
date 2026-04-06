@@ -117,22 +117,37 @@ const GeneralManagerDashboard = () => {
     };
 
     const fetchLeads = async () => {
-        setLoading(true);
-        try {
-            const params = filter !== 'all' ? { status: filter } : {};
-            const response = await adminAPI.getLeads(params);
-            const leadsData = response.data.leads || [];
-            setLeads(leadsData);
-            
-            const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
-            setCities(uniqueCities);
-        } catch (error) {
-            console.error('Error fetching leads:', error);
-            toast.error('حدث خطأ في جلب البيانات');
-        } finally {
-            setLoading(false);
-        }
-    };
+    setLoading(true);
+    try {
+        const params = filter !== 'all' ? { status: filter } : {};
+        
+        // ✅ استخدام fetch مباشرة بدلاً من adminAPI
+        const token = localStorage.getItem('token');
+        const queryString = new URLSearchParams(params).toString();
+        const url = `https://shamsi-tn.onrender.com/api/admin/leads${queryString ? `?${queryString}` : ''}`;
+        
+        console.log('📊 Fetching from:', url);
+        
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await response.json();
+        console.log('📊 fetchLeads response:', data);
+        
+        const leadsData = data.leads || [];
+        console.log('📊 Leads data:', leadsData);
+        setLeads(leadsData);
+        
+        const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
+        setCities(uniqueCities);
+    } catch (error) {
+        console.error('Error fetching leads:', error);
+        toast.error('حدث خطأ في جلب البيانات');
+    } finally {
+        setLoading(false);
+    }
+};
 
     const fetchUsers = async () => {
         try {
