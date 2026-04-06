@@ -28,8 +28,8 @@ const HomePage = () => {
                 <div className="absolute inset-0 bg-black/30"></div>
                 
                 <div className="relative z-10 max-w-6xl mx-auto text-center text-white px-4 py-16">
-                    <div className="flex justify-center mb-6">
-                        <div className="bg-yellow-500/20 backdrop-blur-sm p-4 rounded-full">
+                                            <div className="flex justify-center mb-6">
+<div className="bg-yellow-500/20 backdrop-blur-sm p-4 rounded-full">
                             <FaSun className="text-5xl text-yellow-400" />
                         </div>
                     </div>
