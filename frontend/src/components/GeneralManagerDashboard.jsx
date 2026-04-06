@@ -470,43 +470,44 @@ const GeneralManagerDashboard = () => {
     // Company Management
     // =============================================
     const handleAddCompany = async () => {
-        if (!newCompany.name || !newCompany.email) {
-            toast.error('يرجى إكمال الاسم والبريد الإلكتروني');
-            return;
-        }
+    if (!newCompany.name || !newCompany.email) {
+        toast.error('يرجى إكمال الاسم والبريد الإلكتروني');
+        return;
+    }
+    
+    try {
+        const response = await adminAPI.addCompany({
+            name: newCompany.name,
+            email: newCompany.email,
+            phone: newCompany.phone || '',
+            address: newCompany.address || '',
+            contact_person: newCompany.contact_person || '',
+            description: newCompany.description || '',
+            rating: newCompany.rating || 0,
+            projects_count: newCompany.projects_count || 0,
+            established_year: newCompany.established_year || '',
+            license_number: newCompany.license_number || '',
+            website: newCompany.website || '',
+            logo: newCompany.logo || ''
+        });
         
-        try {
-            await adminAPI.addCompany({
-                name: newCompany.name,
-                email: newCompany.email,
-                phone: newCompany.phone || '',
-                address: newCompany.address || '',
-                contact_person: newCompany.contact_person || '',
-                description: newCompany.description || '',
-                rating: newCompany.rating || 0,
-                projects_count: newCompany.projects_count || 0,
-                established_year: newCompany.established_year || '',
-                license_number: newCompany.license_number || '',
-                website: newCompany.website || '',
-                logo: newCompany.logo || ''
-            });
-            
-            toast.success('✅ تم إضافة الشركة بنجاح');
-            toast.info('📌 الآن أضف مستخدم للشركة من تبويب "المستخدمين"', { duration: 5000 });
-            
-            setShowCompanyModal(false);
-            setNewCompany({
-                name: '', email: '', phone: '', address: '', contact_person: '',
-                description: '', rating: 0, projects_count: 0, established_year: '',
-                license_number: '', website: '', logo: ''
-            });
-            fetchCompanies();
-            
-        } catch (error) {
-            console.error('Error adding company:', error);
-            toast.error('❌ حدث خطأ في إضافة الشركة');
-        }
-    };
+        console.log('Company added:', response.data);
+        toast.success('✅ تم إضافة الشركة بنجاح');
+        
+        setShowCompanyModal(false);
+        setNewCompany({
+            name: '', email: '', phone: '', address: '', contact_person: '',
+            description: '', rating: 0, projects_count: 0, established_year: '',
+            license_number: '', website: '', logo: ''
+        });
+        fetchCompanies();
+        
+    } catch (error) {
+        console.error('Error adding company:', error);
+        const errorMsg = error.response?.data?.message || error.message;
+        toast.error(`❌ حدث خطأ: ${errorMsg}`);
+    }
+};
 
     const handleDeleteCompany = async (companyId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذه الشركة؟')) {
