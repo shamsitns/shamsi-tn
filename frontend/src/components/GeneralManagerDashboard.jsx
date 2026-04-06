@@ -844,16 +844,166 @@ const GeneralManagerDashboard = () => {
                 </div>
             )}
 
-            {/* باقي المحتوى (TAB 1 إلى TAB 5) - نفس الكود السابق */}
             {/* ============================================= */}
-            {/* TAB 1: LEADS - نفس الكود السابق */}
-            {/* ============================================= */}
-            {activeTab === 'leads' && (
-                // ... باقي كود تبويب الطلبات (محذوف للاختصار ولكن موجود في ملفك الأصلي)
-                <div className="max-w-7xl mx-auto px-4">
-                    {/* ... محتوى تبويب الطلبات ... */}
+{/* TAB 1: LEADS */}
+{/* ============================================= */}
+{activeTab === 'leads' && (
+    <div className="max-w-7xl mx-auto px-4">
+        {/* Search and Filters */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                    <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="🔍 بحث بالاسم / الهاتف / المدينة..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
                 </div>
-            )}
+                <div className="relative">
+                    <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
+                    <select
+                        value={cityFilter}
+                        onChange={(e) => setCityFilter(e.target.value)}
+                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                    >
+                        <option value="all">جميع المدن</option>
+                        {cities.map(city => (
+                            <option key={city} value={city}>{city}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="relative">
+                    <FaFire className="absolute right-3 top-3 text-gray-400" />
+                    <select
+                        value={priorityFilter}
+                        onChange={(e) => setPriorityFilter(e.target.value)}
+                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                    >
+                        <option value="all">جميع الأولويات</option>
+                        <option value="high">🔴 أولوية عالية</option>
+                        <option value="medium">🟡 أولوية متوسطة</option>
+                        <option value="low">🟢 أولوية منخفضة</option>
+                    </select>
+                </div>
+                <div className="relative">
+                    <FaFilter className="absolute right-3 top-3 text-gray-400" />
+                    <select
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                    >
+                        <option value="all">جميع الحالات</option>
+                        <option value="pending">قيد المراجعة</option>
+                        <option value="approved">موافق عليها</option>
+                        <option value="contacted">تم التواصل</option>
+                        <option value="sent_to_operations">مرسل لعمليات</option>
+                        <option value="assigned_to_company">مرسل لشركة</option>
+                        <option value="completed">مكتملة</option>
+                        <option value="cancelled">ملغية</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        {/* Leads Table */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">العميل</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المدينة</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الفاتورة</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">القدرة</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأولوية</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">التقدم</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredLeads.length === 0 ? (
+                            <tr>
+                                <td colSpan="8" className="px-4 py-8 text-center text-gray-500">لا توجد طلبات</td>
+                            </tr>
+                        ) : (
+                            filteredLeads.map((lead) => {
+                                const priority = getLeadPriority(lead);
+                                const hot = isHotLead(lead);
+                                const progress = getProgressPercentage(lead.status);
+                                return (
+                                    <tr key={lead.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium text-gray-900 flex items-center gap-2">
+                                                {lead.name}
+                                                {hot && (
+                                                    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                        <FaFire className="text-xs" /> HOT
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-gray-500">{lead.phone}</div>
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                priority.level === 'high' ? 'bg-red-100 text-red-800' :
+                                                priority.level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-green-100 text-green-800'
+                                            }`}>
+                                                {priority.level === 'high' && '🔴 عالية'}
+                                                {priority.level === 'medium' && '🟡 متوسطة'}
+                                                {priority.level === 'low' && '🟢 منخفضة'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <div className="w-24">
+                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <span>{progress}%</span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                    <div 
+                                                        className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                                                        style={{ width: `${progress}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <div className="flex gap-2">
+                                                {lead.status === 'pending' && (
+                                                    <>
+                                                        <button onClick={() => handleApprove(lead.id)} className="text-green-600 hover:text-green-800 p-1" title="موافقة"><FaCheck size={18} /></button>
+                                                        <button onClick={() => { setSelectedLead(lead); setShowRejectModal(true); }} className="text-red-600 hover:text-red-800 p-1" title="رفض"><FaTimes size={18} /></button>
+                                                    </>
+                                                )}
+                                                {lead.status === 'approved' && (
+                                                    <>
+                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('executive'); setShowAssignModal(true); }} className="text-purple-600 hover:text-purple-800 p-1" title="إرسال لمدير تنفيذي"><FaUserTie size={18} /></button>
+                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('callcenter'); setShowAssignModal(true); }} className="text-indigo-600 hover:text-indigo-800 p-1" title="إرسال لمركز الاتصال"><FaHeadset size={18} /></button>
+                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('bank'); setShowAssignModal(true); }} className="text-pink-600 hover:text-pink-800 p-1" title="إرسال لمدير بنك"><FaUniversity size={18} /></button>
+                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('leasing'); setShowAssignModal(true); }} className="text-teal-600 hover:text-teal-800 p-1" title="إرسال لمدير تأجير"><FaCar size={18} /></button>
+                                                    </>
+                                                )}
+                                                <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+)}
 
             {/* ============================================= */}
             {/* TAB 2: USERS MANAGEMENT */}
