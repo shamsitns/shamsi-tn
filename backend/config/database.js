@@ -336,6 +336,32 @@ const createTablesPostgres = async (pool) => {
     }
   }
   
+  // ============================================
+  // ✅ Ensure 'company' role is in the CHECK constraint
+  // ============================================
+  try {
+    const constraintCheck = await pool.query(`
+      SELECT conname, pg_get_constraintdef(oid) as def
+      FROM pg_constraint
+      WHERE conrelid = 'users'::regclass AND contype = 'c'
+    `);
+    const constraint = constraintCheck.rows[0];
+    if (constraint && !constraint.def.includes("'company'")) {
+      await pool.query(`ALTER TABLE users DROP CONSTRAINT ${constraint.conname}`);
+      await pool.query(`
+        ALTER TABLE users ADD CONSTRAINT users_role_check 
+        CHECK (role IN ('owner', 'general_manager', 'executive_manager', 'operations_manager', 'call_center', 'admin', 'company'))
+      `);
+      console.log('✅ Updated users role check constraint to include company');
+    } else if (!constraint) {
+      console.log('⚠️ No role check constraint found on users table');
+    } else {
+      console.log('✅ Role check constraint already includes company');
+    }
+  } catch (err) {
+    console.log('Note: could not update role constraint:', err.message);
+  }
+  
   console.log('✅ All tables created successfully');
   await insertDefaultUsersPostgres(pool);
 };
@@ -483,6 +509,8 @@ const insertDefaultUsersPostgres = async (pool) => {
     { email: 'operations@shamsi.tn', password: 'operations123', name: 'Operations Manager', role: 'operations_manager', must_change_password: true },
     { email: 'callcenter@shamsi.tn', password: 'call123', name: 'Call Center', role: 'call_center', must_change_password: true },
     { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: true }
+    // ✅ NEW: Test company account
+    { email: 'companytest@shamsi.tn', password: 'company123', name: 'شركة اختبار', role: 'company', must_change_password: false }
   ];
   
   for (const user of users) {
