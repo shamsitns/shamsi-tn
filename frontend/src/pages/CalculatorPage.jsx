@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 
 // ============================================
-// قائمة الولايات التونسية
+// قائمة الولايات التونسية (مع جربة)
 // ============================================
 const tunisianCities = [
     'تونس', 'أريانة', 'بن عروس', 'منوبة', 'نابل', 'بنزرت', 'باجة', 'جندوبة',
@@ -34,9 +34,9 @@ const prosolBanks = [
 ];
 
 // ============================================
-// الإشعاع الشمسي حسب الولاية (للمعلومات فقط)
+// بيانات الإشعاع الشمسي حسب الولاية (مطابقة للخادم)
 // ============================================
-const solarRadiation = {
+const solarRadiationByCity = {
     'تونس': 4.8, 'أريانة': 4.8, 'بن عروس': 4.8, 'منوبة': 4.8,
     'نابل': 5.0, 'بنزرت': 4.7, 'باجة': 4.6, 'جندوبة': 4.5,
     'الكاف': 4.6, 'سليانة': 4.7, 'زغوان': 4.8, 'سوسة': 5.0,
@@ -47,31 +47,150 @@ const solarRadiation = {
 };
 
 // ============================================
-// ✅ المعادلة الجديدة (نفس معادلة الخادم)
-// تستخدم لتتناسب مع البيانات المخزنة في قاعدة البيانات
+// معاملات الموسم (مطابقة للخادم)
 // ============================================
-const calculateSolarSystemBackend = (billAmount, billDays) => {
-    // تحويل قيمة الفاتورة إلى استهلاك شهري بالكيلوواط/ساعة
-    // متوسط سعر الكيلوواط/ساعة في تونس ≈ 0.25 دينار
-    const avgRate = 0.25;
-    const monthlyConsumption = (billAmount / avgRate); // kWh/شهر
-    const monthlyConsumptionAdjusted = monthlyConsumption * (30 / billDays); // ضبط حسب فترة الفاتورة
+const seasonFactors = {
+    spring: 1.00,
+    summer: 1.25,
+    autumn: 1.00,
+    winter: 1.10
+};
+
+// ============================================
+// شرائح الكهرباء STEG (مطابقة للخادم)
+// ============================================
+const electricityRates = [
+    { max: 100, rate: 0.181 },
+    { max: 300, rate: 0.223 },
+    { max: 500, rate: 0.338 },
+    { max: Infinity, rate: 0.419 }
+];
+
+// ============================================
+// حساب الاستهلاك من الفاتورة حسب شرائح STEG (مطابق للخادم)
+// ============================================
+function calculateConsumption(billAmount) {
+    let remaining = billAmount;
+    let totalKwh = 0;
     
-    // قاعدة تقريبية: كل 1 كيلوواط ينتج 150 كيلوواط/ساعة شهرياً في تونس
-    const productionPerKw = 150;
-    const requiredKw = Math.ceil(monthlyConsumptionAdjusted / productionPerKw * 10) / 10;
+    for (const tier of electricityRates) {
+        const tierMaxKwh = tier.max;
+        const tierCost = tierMaxKwh * tier.rate;
+        
+        if (remaining <= tierCost) {
+            totalKwh += remaining / tier.rate;
+            break;
+        } else {
+            totalKwh += tierMaxKwh;
+            remaining -= tierCost;
+        }
+    }
     
-    // عدد الألواح (باستخدام لوح بقدرة 0.5 كيلوواط تقريباً)
-    const panelsCount = Math.ceil(requiredKw / 0.48);
-    const requiredRoofArea = panelsCount * 2.2;
-    const annualProduction = Math.round(requiredKw * productionPerKw * 12);
-    const annualSavings = Math.round(annualProduction * avgRate);
+    return Math.round(totalKwh);
+}
+
+// ============================================
+// حساب الاستهلاك السنوي المعدل (مطابق للخادم)
+// ============================================
+function calculateAdjustedAnnualConsumption(billAmount, billDays, season, propertyType) {
+    const totalKwh = calculateConsumption(billAmount);
+    const dailyKwh = totalKwh / billDays;
+    const annualKwh = dailyKwh * 365;
+    const seasonFactor = seasonFactors[season] || 1.00;
+    let adjustedAnnualKwh = annualKwh * seasonFactor;
+    
+    // تعديل حسب نوع العقار (محلات/مصانع +15%)
+    const isCommercial = ['commercial', 'factory'].includes(propertyType);
+    if (isCommercial) {
+        adjustedAnnualKwh = adjustedAnnualKwh * 1.15;
+    }
+    
+    return Math.round(adjustedAnnualKwh);
+}
+
+// ============================================
+// حساب القدرة المطلوبة (مطابق للخادم)
+// ============================================
+function calculateRequiredKw(adjustedAnnualKwh, city) {
+    const radiation = solarRadiationByCity[city] || 4.8;
+    const systemEfficiency = 0.85;
+    const sunlightHours = 365;
+    
+    const requiredKw = adjustedAnnualKwh / (radiation * sunlightHours * systemEfficiency);
+    return Math.round(requiredKw * 10) / 10;
+}
+
+// ============================================
+// حساب عدد الألواح (مطابق للخادم)
+// ============================================
+function calculatePanelsCount(requiredKw, panelPower = 0.55) {
+    return Math.ceil(requiredKw / panelPower);
+}
+
+// ============================================
+// حساب الإنتاج السنوي (مطابق للخادم)
+// ============================================
+function calculateAnnualProduction(requiredKw, city) {
+    const radiation = solarRadiationByCity[city] || 4.8;
+    const systemEfficiency = 0.85;
+    const days = 365;
+    
+    return Math.round(requiredKw * radiation * days * systemEfficiency);
+}
+
+// ============================================
+// حساب التوفير السنوي (مطابق للخادم)
+// ============================================
+function calculateAnnualSavings(annualProduction, avgRate = 0.25) {
+    return Math.round(annualProduction * avgRate);
+}
+
+// ============================================
+// حساب المساحة المطلوبة (مطابق للخادم)
+// ============================================
+function calculateRequiredRoofArea(panelsCount, panelArea = 2.2) {
+    return Math.round(panelsCount * panelArea);
+}
+
+// ============================================
+// حساب توفير CO2 (مطابق للخادم)
+// ============================================
+function calculateCO2Savings(annualProduction) {
+    return Math.round(annualProduction * 0.4);
+}
+
+// ============================================
+// حساب النظام الشمسي الكامل (مطابق للخادم)
+// ============================================
+function calculateSolarSystemComplete(billAmount, billDays, season, propertyType, city) {
+    // 1. الاستهلاك السنوي المعدل
+    const adjustedAnnualConsumption = calculateAdjustedAnnualConsumption(billAmount, billDays, season, propertyType);
+    
+    // 2. القدرة المطلوبة
+    const requiredKw = calculateRequiredKw(adjustedAnnualConsumption, city);
+    
+    // 3. عدد الألواح
+    const panelsCount = calculatePanelsCount(requiredKw);
+    
+    // 4. الإنتاج السنوي
+    const annualProduction = calculateAnnualProduction(requiredKw, city);
+    
+    // 5. التوفير السنوي والشهري
+    const annualSavings = calculateAnnualSavings(annualProduction);
     const monthlySavings = Math.round(annualSavings / 12);
-    const co2Saved = Math.round(annualProduction * 0.4);
     
-    // Solar Score (تقديري)
-    const solarScore = Math.min(100, Math.round(requiredRoofArea / 20 * 100));
-    const coveragePercent = Math.min(100, Math.round(monthlyConsumptionAdjusted / (requiredKw * productionPerKw) * 100));
+    // 6. المساحة المطلوبة
+    const requiredRoofArea = calculateRequiredRoofArea(panelsCount);
+    
+    // 7. توفير CO2
+    const co2Saved = calculateCO2Savings(annualProduction);
+    
+    // 8. درجة ملاءمة السطح (تقديرية)
+    const solarScore = Math.min(100, Math.round((solarRadiationByCity[city] / 5.8) * 80 + (requiredRoofArea > 0 ? 20 : 0)));
+    
+    // 9. نسبة تغطية الاستهلاك
+    const monthlyConsumption = calculateConsumption(billAmount) / (billDays / 30);
+    const coveragePercent = Math.min(100, Math.round((annualProduction / (monthlyConsumption * 12)) * 100));
     
     return {
         required_kw: requiredKw,
@@ -81,13 +200,33 @@ const calculateSolarSystemBackend = (billAmount, billDays) => {
         monthly_savings: monthlySavings,
         required_roof_area: requiredRoofArea,
         co2_saved: co2Saved,
-        radiation: solarRadiation['تونس'] || 4.8,
-        monthly_consumption: monthlyConsumptionAdjusted,
-        roof_area_valid: true,
         solar_score: solarScore,
-        coverage_percent: coveragePercent
+        coverage_percent: coveragePercent,
+        monthly_consumption: monthlyConsumption,
+        radiation: solarRadiationByCity[city]
     };
-};
+}
+
+// ============================================
+// أنواع العقار
+// ============================================
+const propertyTypes = [
+    { value: 'house', label: 'منزل', icon: FaHome, desc: 'دار مستقلة', period: 60, type: 'residential' },
+    { value: 'apartment', label: 'شقة', icon: FaBuilding, desc: 'في عمارة', period: 60, type: 'residential' },
+    { value: 'farm', label: 'مزرعة', icon: FaTractor, desc: 'أرض فلاحية', period: 60, type: 'agricultural' },
+    { value: 'commercial', label: 'محل تجاري', icon: FaStore, desc: 'محل / مكتب', period: 30, type: 'commercial' },
+    { value: 'factory', label: 'مصنع', icon: FaIndustry, desc: 'منشأة صناعية', period: 30, type: 'commercial' }
+];
+
+// ============================================
+// مواسم الفاتورة
+// ============================================
+const billSeasons = [
+    { value: 'spring', label: 'الربيع', months: 'أفريل - ماي', icon: '🌸', desc: 'استهلاك معتدل', factor: 1.00 },
+    { value: 'summer', label: 'الصيف', months: 'جوان - أوت', icon: '☀️', desc: 'استهلاك مرتفع (تكييف)', factor: 1.25 },
+    { value: 'autumn', label: 'الخريف', months: 'سبتمبر - أكتوبر', icon: '🍂', desc: 'استهلاك معتدل', factor: 1.00 },
+    { value: 'winter', label: 'الشتاء', months: 'نوفمبر - مارس', icon: '❄️', desc: 'استهلاك مرتفع (تدفئة)', factor: 1.10 }
+];
 
 // ============================================
 // خيارات الدفع حسب نوع العقار
@@ -152,7 +291,7 @@ const CalculatorPage = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // ✅ حساب النظام باستخدام نفس معادلة الخادم
+    // ✅ حساب النظام باستخدام نفس دوال الخادم
     const handleCalculate = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -166,9 +305,12 @@ const CalculatorPage = () => {
         const property = propertyTypes.find(p => p.value === formData.property_type);
         const billDays = property.period;
         
-        const solarData = calculateSolarSystemBackend(
+        const solarData = calculateSolarSystemComplete(
             parseFloat(formData.bill_value),
-            billDays
+            billDays,
+            formData.bill_season,
+            formData.property_type,
+            formData.city
         );
         
         setResult(solarData);
@@ -220,7 +362,7 @@ const CalculatorPage = () => {
             payment_method: selectedPayment,
             preferred_bank: selectedBank?.name || null,
             additional_info: `مساحة السطح: ${formData.roof_area} م²، نوع السطح: ${formData.roof_type}`,
-            // ✅ إرسال النتائج المحسوبة (نفس التي شاهدها العميل)
+            // ✅ إرسال القيم المحسوبة (نفس التي شاهدها العميل)
             required_kw: result.required_kw,
             panels_count: result.panels_count,
             annual_production: result.annual_production,
@@ -252,15 +394,6 @@ const CalculatorPage = () => {
 
     const nextStep = () => setStep(step + 1);
     const prevStep = () => setStep(step - 1);
-
-    // تعريف propertyTypes هنا (لأنه مستخدم في دالة handleCalculate و handleConfirmAndSend)
-    const propertyTypes = [
-        { value: 'house', label: 'منزل', icon: FaHome, desc: 'دار مستقلة', period: 60, type: 'residential' },
-        { value: 'apartment', label: 'شقة', icon: FaBuilding, desc: 'في عمارة', period: 60, type: 'residential' },
-        { value: 'farm', label: 'مزرعة', icon: FaTractor, desc: 'أرض فلاحية', period: 60, type: 'agricultural' },
-        { value: 'commercial', label: 'محل تجاري', icon: FaStore, desc: 'محل / مكتب', period: 30, type: 'commercial' },
-        { value: 'factory', label: 'مصنع', icon: FaIndustry, desc: 'منشأة صناعية', period: 30, type: 'commercial' }
-    ];
 
     // ==================== STEP 1 ====================
     const renderStep1 = () => (
@@ -319,6 +452,16 @@ const CalculatorPage = () => {
                     })}
                 </div>
                 <p className="text-xs text-gray-500 text-center">📅 فترة الفاتورة: {selectedProperty.period === 60 ? 'شهرين (60 يوم)' : 'شهر (30 يوم)'}</p>
+                <div className="grid grid-cols-2 gap-2">
+                    {billSeasons.map((season) => (
+                        <button key={season.value} type="button" onClick={() => setFormData({ ...formData, bill_season: season.value })}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition ${formData.bill_season === season.value ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}>
+                            <span className="text-xl">{season.icon}</span>
+                            <span className="font-semibold text-sm">{season.label}</span>
+                            <span className="text-xs text-gray-500">{season.months}</span>
+                        </button>
+                    ))}
+                </div>
                 <input type="number" name="bill_value" value={formData.bill_value} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder={`قيمة الفاتورة (دينار) - ${selectedProperty.period === 60 ? 'شهرين' : 'شهر'} *`} />
                 <input type="number" name="roof_area" value={formData.roof_area} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="مساحة السطح (متر مربع) *" />
                 <p className="text-xs text-gray-500 text-center">📐 كل لوح شمسي يحتاج حوالي 2.2 متر مربع</p>
@@ -417,7 +560,7 @@ const CalculatorPage = () => {
                 <div className="bg-gray-50 p-3 rounded-xl text-sm">
                     <div className="grid grid-cols-2 gap-2">
                         <div><FaLeaf className="inline text-green-500 ml-1" /> تخفيض CO₂: <strong>{result.co2_saved.toLocaleString()} كغ/سنة</strong></div>
-                        <div><FaSun className="inline text-orange-500 ml-1" /> الإشعاع الشمسي: <strong>{solarRadiation[formData.city] || 4.8} kWh/m²/يوم</strong></div>
+                        <div><FaSun className="inline text-orange-500 ml-1" /> الإشعاع الشمسي: <strong>{result.radiation} kWh/m²/يوم</strong></div>
                         <div><FaClock className="inline text-blue-500 ml-1" /> فترة الفاتورة: <strong>{property.period === 60 ? 'شهرين' : 'شهر'}</strong></div>
                     </div>
                     {formData.meter_number && <div className="mt-2 pt-2 border-t"><FaIdCard className="inline text-blue-500 ml-1" /> رقم العداد: <strong>{formData.meter_number}</strong></div>}
