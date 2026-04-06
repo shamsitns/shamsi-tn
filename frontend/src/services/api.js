@@ -321,6 +321,18 @@ export const managerAPI = {
     addLeadNote: (leadId, notes) => {
         console.log('📝 Adding note to lead:', leadId);
         return api.post(`/manager/leads/${leadId}/notes`, { notes });
+    },
+
+    // ✅ NEW: Commission rate for a specific company (used by operations manager)
+    getCompanyCommissionRate: (companyId) => {
+        console.log('💰 Fetching commission rate for company:', companyId);
+        return api.get(`/manager/companies/${companyId}/commission-rate`);
+    },
+
+    // ✅ NEW: Update commission amount for a lead (when completing the deal)
+    updateLeadCommission: (leadId, commission) => {
+        console.log('💹 Updating lead commission:', leadId, commission);
+        return api.put(`/manager/leads/${leadId}/commission`, { commission });
     }
 };
 
@@ -392,7 +404,19 @@ export const companyAPI = {
     getMyStats: () => api.get('/company/stats'),
     getLeadDetails: (leadId) => api.get(`/company/leads/${leadId}`),
     updateLeadStatus: (leadId, status, notes) => api.patch(`/company/leads/${leadId}/status`, { status, notes }),
-    updateCommission: (leadId, commission_rate, notes) => api.patch(`/company/leads/${leadId}/commission`, { commission_rate, notes })
+    updateCommission: (leadId, commission_rate, notes) => api.patch(`/company/leads/${leadId}/commission`, { commission_rate, notes }),
+
+    // ✅ NEW: Get company's current commission rate (per kWp)
+    getCommissionRate: () => {
+        console.log('💰 Fetching company commission rate');
+        return api.get('/company/commission-rate');
+    },
+
+    // ✅ NEW: Update company's commission rate (per kWp)
+    updateCommissionRate: (rate) => {
+        console.log('💹 Updating company commission rate to:', rate);
+        return api.put('/company/commission-rate', { commission_rate: rate });
+    }
 };
 
 // ==================== Helper Functions ====================

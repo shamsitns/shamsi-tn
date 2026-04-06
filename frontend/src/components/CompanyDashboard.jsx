@@ -5,7 +5,7 @@ import {
     FaChartLine, FaClipboardList, FaCheckCircle, FaTimesCircle,
     FaHourglassHalf, FaCalendarAlt, FaUser, FaMapMarkerAlt,
     FaBolt, FaMoneyBillWave, FaPhone, FaEye, FaSpinner,
-    FaCheck, FaTimes, FaBuilding, FaEdit, FaSave
+    FaCheck, FaTimes, FaBuilding, FaEdit, FaSave, FaPercentage
 } from 'react-icons/fa';
 
 const CompanyDashboard = () => {
@@ -17,10 +17,14 @@ const CompanyDashboard = () => {
     const [showCommissionModal, setShowCommissionModal] = useState(false);
     const [commissionValue, setCommissionValue] = useState('');
     const [updating, setUpdating] = useState(false);
+    const [companyCommissionRate, setCompanyCommissionRate] = useState(0);
+    const [showCommissionRateModal, setShowCommissionRateModal] = useState(false);
+    const [newCommissionRate, setNewCommissionRate] = useState('');
 
     useEffect(() => {
         fetchLeads();
         fetchStats();
+        fetchCommissionRate();
     }, []);
 
     const fetchLeads = async () => {
@@ -41,6 +45,16 @@ const CompanyDashboard = () => {
             setStats(response.data);
         } catch (error) {
             console.error('Error fetching stats:', error);
+        }
+    };
+
+    const fetchCommissionRate = async () => {
+        try {
+            const response = await companyAPI.getCommissionRate();
+            setCompanyCommissionRate(response.data.commission_rate);
+            setNewCommissionRate(response.data.commission_rate);
+        } catch (error) {
+            console.error('Error fetching commission rate:', error);
         }
     };
 
@@ -74,6 +88,25 @@ const CompanyDashboard = () => {
             setCommissionValue('');
         } catch (error) {
             toast.error('حدث خطأ في تحديث العمولة');
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const handleUpdateCommissionRate = async () => {
+        const rate = parseFloat(newCommissionRate);
+        if (isNaN(rate) || rate < 0) {
+            toast.error('يرجى إدخال نسبة عمولة صالحة (رقم موجب)');
+            return;
+        }
+        setUpdating(true);
+        try {
+            await companyAPI.updateCommissionRate(rate);
+            setCompanyCommissionRate(rate);
+            toast.success(`تم تحديث نسبة العمولة إلى ${rate} دينار/كيلوواط`);
+            setShowCommissionRateModal(false);
+        } catch (error) {
+            toast.error('حدث خطأ في تحديث النسبة');
         } finally {
             setUpdating(false);
         }
@@ -140,6 +173,12 @@ const CompanyDashboard = () => {
                             </h1>
                             <p className="text-blue-100 mt-1">إدارة الطلبات المعينة لشركتك</p>
                         </div>
+                        <button
+                            onClick={() => setShowCommissionRateModal(true)}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-4 py-2 rounded-lg flex items-center gap-2 font-semibold"
+                        >
+                            <FaPercentage /> نسبة العمولة: {companyCommissionRate} دينار/kWp
+                        </button>
                     </div>
                 </div>
             </div>
@@ -201,7 +240,7 @@ const CompanyDashboard = () => {
                                         <tr key={lead.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900">{lead.name}</div>
-                                            </td>
+                                             </td>
                                             <td className="px-4 py-3">{lead.phone}</td>
                                             <td className="px-4 py-3">{lead.city}</td>
                                             <td className="px-4 py-3">{lead.required_kw} kWp</td>
@@ -220,13 +259,13 @@ const CompanyDashboard = () => {
                                                         <FaEdit size={14} />
                                                     </button>
                                                 </div>
-                                            </td>
+                                             </td>
                                             <td className="px-4 py-3">
                                                 {getStatusBadge(lead.assignment_status || lead.status)}
-                                            </td>
+                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                                 {new Date(lead.assigned_at).toLocaleDateString('ar-TN')}
-                                            </td>
+                                             </td>
                                             <td className="px-4 py-3">
                                                 <button
                                                     onClick={() => {
@@ -238,12 +277,12 @@ const CompanyDashboard = () => {
                                                 >
                                                     <FaEye size={18} />
                                                 </button>
-                                            </td>
-                                        </tr>
+                                             </td>
+                                         </tr>
                                     ))
                                 )}
                             </tbody>
-                        </table>
+                         </table>
                     </div>
                 </div>
             </div>
@@ -340,7 +379,7 @@ const CompanyDashboard = () => {
                 </div>
             )}
 
-            {/* Commission Modal */}
+            {/* Commission Modal (per lead) */}
             {showCommissionModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -374,6 +413,50 @@ const CompanyDashboard = () => {
                                 onClick={() => {
                                     setShowCommissionModal(false);
                                     setCommissionValue('');
+                                }}
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+                            >
+                                إلغاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Commission Rate Modal */}
+            {showCommissionRateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <FaPercentage className="text-yellow-600" /> تحديد نسبة العمولة
+                        </h3>
+                        <p className="text-gray-600 mb-2">النسبة الحالية: <span className="font-bold text-green-600">{companyCommissionRate} دينار/كيلوواط</span></p>
+                        <p className="text-gray-500 text-sm mb-4">سيتم حساب العمولة كالتالي: <strong>القدرة (kWp) × السعر (دينار/kWp)</strong></p>
+                        
+                        <label className="block text-gray-700 mb-2">السعر الجديد (دينار لكل كيلوواط):</label>
+                        <input
+                            type="number"
+                            value={newCommissionRate}
+                            onChange={(e) => setNewCommissionRate(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            placeholder="مثال: 150"
+                            min="0"
+                            step="10"
+                        />
+                        <p className="text-xs text-gray-500 mb-4">💡 مثال: إذا كانت القدرة 5 كيلوواط والسعر 150 دينار/kWp، فستكون العمولة = 750 دينار</p>
+                        
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleUpdateCommissionRate}
+                                disabled={updating}
+                                className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 flex items-center justify-center gap-2"
+                            >
+                                <FaSave /> حفظ السعر
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowCommissionRateModal(false);
+                                    setNewCommissionRate(companyCommissionRate);
                                 }}
                                 className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
                             >

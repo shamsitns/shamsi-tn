@@ -604,3 +604,42 @@ exports.exportLeads = async (req, res) => {
         res.status(500).json({ message: 'حدث خطأ في تصدير الطلبات', error: error.message });
     }
 };
+
+// =============================================
+// ✅ NEW: الحصول على نسبة عمولة شركة معينة (للمدير)
+// =============================================
+exports.getCompanyCommissionRate = async (req, res) => {
+    try {
+        const { companyId } = req.params;
+        const result = await db.query('SELECT commission_rate FROM companies WHERE id = $1', [companyId]);
+        const rate = getFirstRow(result)?.commission_rate || 0;
+        res.json({ commission_rate: parseFloat(rate) });
+    } catch (error) {
+        console.error('Error getting company commission rate:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب نسبة العمولة' });
+    }
+};
+
+// =============================================
+// ✅ NEW: تحديث عمولة طلب معين (عند إتمام الصفقة)
+// =============================================
+exports.updateLeadCommission = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        const { commission } = req.body;
+        
+        if (commission === undefined || commission < 0) {
+            return res.status(400).json({ message: 'قيمة العمولة غير صالحة' });
+        }
+        
+        await db.query(
+            `UPDATE leads SET commission_amount = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [commission, leadId]
+        );
+        
+        res.json({ message: 'تم تحديث العمولة بنجاح' });
+    } catch (error) {
+        console.error('Error updating lead commission:', error);
+        res.status(500).json({ message: 'حدث خطأ في تحديث العمولة' });
+    }
+};

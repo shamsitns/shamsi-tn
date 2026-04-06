@@ -5,7 +5,9 @@ const {
     updateLeadStatus,
     getMyStats,
     getLeadDetails,
-    updateCommission  // ✅ إضافة الدالة الجديدة
+    updateCommission,
+    getCommissionRate,
+    updateCommissionRate
 } = require('../controllers/companyDashboardController');
 
 const router = express.Router();
@@ -18,6 +20,10 @@ router.get('/leads', getMyLeads);
 router.get('/stats', getMyStats);
 router.get('/leads/:leadId', getLeadDetails);
 router.patch('/leads/:leadId/status', updateLeadStatus);
-router.patch('/leads/:leadId/commission', updateCommission);  // ✅ مسار تحديث العمولة
+router.patch('/leads/:leadId/commission', updateCommission);
+
+// ✅ NEW: Commission rate management
+router.get('/commission-rate', getCommissionRate);
+router.put('/commission-rate', updateCommissionRate);
 
 module.exports = router;

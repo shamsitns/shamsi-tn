@@ -12,7 +12,10 @@ const {
     acceptLeadAndSendToOperations,
     addLeadNote,
     markAsContacted,
-    exportLeads
+    exportLeads,
+    // ✅ دوال جديدة لنظام العمولة
+    getCompanyCommissionRate,
+    updateLeadCommission
 } = require('../controllers/managerController');
 
 const router = express.Router();
@@ -78,5 +81,14 @@ router.post('/leads/:id/contact', isCallCenter, markAsContacted);
 router.get('/leads/filter/:status', getMyLeads);
 router.get('/leads/city/:city', getMyLeads);
 router.get('/leads/search', getMyLeads);
+
+// =============================================
+// ✅ NEW: مسارات نظام العمولة
+// =============================================
+// الحصول على نسبة عمولة شركة معينة (لأي مدير مصرح له)
+router.get('/companies/:companyId/commission-rate', getCompanyCommissionRate);
+
+// تحديث عمولة طلب معين (عند إتمام الصفقة من قبل مدير العمليات)
+router.put('/leads/:leadId/commission', updateLeadCommission);
 
 module.exports = router;

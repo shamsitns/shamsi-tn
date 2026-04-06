@@ -25,7 +25,8 @@ const OperationsDashboard = () => {
     const [showNotesModal, setShowNotesModal] = useState(false);
     const [notes, setNotes] = useState('');
     const [stats, setStats] = useState(null);
-    const [userRole, setUserRole] = useState('operations'); // Default role
+    const [userRole, setUserRole] = useState('operations');
+    const [updating, setUpdating] = useState(false);
     
     // =============================================
     // Helper Functions
@@ -35,43 +36,28 @@ const OperationsDashboard = () => {
     const calculateLeadScore = (billAmount, propertyType, monthlyConsumption) => {
         let score = 0;
         
-        // Score based on bill amount
         if (billAmount > 200) score += 50;
         else if (billAmount > 150) score += 40;
         else if (billAmount > 100) score += 30;
         else if (billAmount > 70) score += 20;
         else score += 10;
         
-        // Score based on property type
         switch(propertyType) {
-            case 'factory':
-                score += 35;
-                break;
-            case 'commercial':
-                score += 25;
-                break;
-            case 'farm':
-                score += 20;
-                break;
-            case 'house':
-                score += 15;
-                break;
-            case 'apartment':
-                score += 10;
-                break;
-            default:
-                score += 5;
+            case 'factory': score += 35; break;
+            case 'commercial': score += 25; break;
+            case 'farm': score += 20; break;
+            case 'house': score += 15; break;
+            case 'apartment': score += 10; break;
+            default: score += 5;
         }
         
-        // Score based on monthly consumption
         if (monthlyConsumption > 500) score += 30;
         else if (monthlyConsumption > 300) score += 20;
         else if (monthlyConsumption > 150) score += 10;
         
-        return Math.min(score, 100); // Max 100 points
+        return Math.min(score, 100);
     };
     
-    // Get Lead Score Level
     const getLeadScoreLevel = (score) => {
         if (score >= 80) return { level: 'Premium', color: 'bg-gradient-to-r from-yellow-500 to-orange-500', icon: FaTrophy, text: 'عميل ممتاز' };
         if (score >= 60) return { level: 'High', color: 'bg-gradient-to-r from-green-500 to-teal-500', icon: FaStar, text: 'عميل واعد جداً' };
@@ -79,7 +65,6 @@ const OperationsDashboard = () => {
         return { level: 'Low', color: 'bg-gradient-to-r from-gray-500 to-gray-600', icon: FaPercentage, text: 'عميل عادي' };
     };
     
-    // Sanitize lead data based on user role
     const sanitizeLeadData = (lead, role) => {
         if (role === 'client') {
             const { commission_amount, system_price, company_price, platform_fee, ...safeLead } = lead;
@@ -88,7 +73,6 @@ const OperationsDashboard = () => {
         return lead;
     };
     
-    // Calculate advanced stats
     const calculateAdvancedStats = (leadsData) => {
         const totalLeads = leadsData.length;
         const assignedLeads = leadsData.filter(l => l.status === 'assigned_to_company').length;
@@ -98,26 +82,12 @@ const OperationsDashboard = () => {
         
         const totalKW = leadsData.reduce((sum, l) => sum + (parseFloat(l.required_kw) || 0), 0);
         const averageKW = totalLeads > 0 ? (totalKW / totalLeads).toFixed(1) : 0;
-        
         const conversionRate = totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(1) : 0;
-        
         const totalCommission = leadsData.reduce((sum, l) => sum + (parseFloat(l.commission_amount) || 0), 0);
-        
-        // Calculate average bill amount
         const totalBillAmount = leadsData.reduce((sum, l) => sum + (parseFloat(l.bill_amount) || 0), 0);
         const averageBill = totalLeads > 0 ? (totalBillAmount / totalLeads).toFixed(0) : 0;
         
-        return {
-            totalLeads,
-            assignedLeads,
-            completedLeads,
-            rejectedLeads,
-            pendingLeads,
-            averageKW,
-            conversionRate,
-            totalCommission,
-            averageBill
-        };
+        return { totalLeads, assignedLeads, completedLeads, rejectedLeads, pendingLeads, averageKW, conversionRate, totalCommission, averageBill };
     };
     
     // =============================================
@@ -127,7 +97,6 @@ const OperationsDashboard = () => {
         fetchData();
         fetchCompanies();
         fetchStats();
-        // Get user role from localStorage or context
         const role = localStorage.getItem('userRole') || 'operations';
         setUserRole(role);
     }, [filter]);
@@ -137,13 +106,7 @@ const OperationsDashboard = () => {
         try {
             const params = filter !== 'all' ? { status: filter } : {};
             const response = await managerAPI.getLeads(params);
-            console.log('📊 Operations leads data:', response.data);
-            
-            // Sanitize data based on user role
-            const sanitizedLeads = (response.data.leads || []).map(lead => 
-                sanitizeLeadData(lead, userRole)
-            );
-            
+            const sanitizedLeads = (response.data.leads || []).map(lead => sanitizeLeadData(lead, userRole));
             setLeads(sanitizedLeads);
         } catch (error) {
             console.error('Error fetching leads:', error);
@@ -179,7 +142,6 @@ const OperationsDashboard = () => {
             toast.error('يرجى اختيار شركة');
             return;
         }
-        
         try {
             await managerAPI.assignToCompany(selectedLead.id, selectedCompany, assignmentNotes);
             toast.success('✅ تم إرسال الطلب للشركة بنجاح');
@@ -195,23 +157,53 @@ const OperationsDashboard = () => {
         }
     };
     
+    // ✅ Modified: Handle status update with automatic commission calculation for completed leads
     const handleUpdateStatus = async (leadId, newStatus) => {
         const statusNotes = prompt('أضف ملاحظات عن تحديث الحالة:');
         
+        setUpdating(true);
         try {
+            // If marking as completed, calculate commission based on company rate
+            if (newStatus === 'completed') {
+                // Find the lead to get assigned_company_id and required_kw
+                const lead = leads.find(l => l.id === leadId);
+                if (!lead) {
+                    toast.error('الطلب غير موجود');
+                    setUpdating(false);
+                    return;
+                }
+                
+                if (!lead.assigned_company_id) {
+                    toast.error('لا توجد شركة معينة لهذا الطلب');
+                    setUpdating(false);
+                    return;
+                }
+                
+                // Get company commission rate
+                const rateResponse = await managerAPI.getCompanyCommissionRate(lead.assigned_company_id);
+                const rate = rateResponse.data.commission_rate || 0;
+                const calculatedCommission = (lead.required_kw || 0) * rate;
+                
+                // Update commission amount
+                await managerAPI.updateLeadCommission(leadId, calculatedCommission);
+                toast.success(`💹 تم حساب العمولة تلقائياً: ${calculatedCommission.toLocaleString()} دينار (${lead.required_kw} kWp × ${rate} دينار/kWp)`);
+            }
+            
+            // Update lead status
             await managerAPI.updateLeadStatus(leadId, newStatus, statusNotes);
             toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
             fetchData();
             fetchStats();
         } catch (error) {
             console.error('Error updating status:', error);
-            toast.error('❌ حدث خطأ');
+            toast.error('❌ حدث خطأ في تحديث الحالة');
+        } finally {
+            setUpdating(false);
         }
     };
     
     const handleAddNotes = async () => {
         if (!selectedLead) return;
-        
         try {
             await managerAPI.updateLeadStatus(selectedLead.id, selectedLead.status, notes);
             toast.success('✅ تم إضافة الملاحظات');
@@ -247,14 +239,12 @@ const OperationsDashboard = () => {
             completed: 'bg-green-100 text-green-800',
             cancelled: 'bg-red-100 text-red-800'
         };
-        
         const texts = {
             sent_to_operations: 'في انتظار الشركة',
             assigned_to_company: 'مرسل لشركة',
             completed: 'مكتمل',
             cancelled: 'ملغي'
         };
-        
         return (
             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badges[status] || 'bg-gray-100'}`}>
                 {texts[status] || status}
@@ -299,12 +289,8 @@ const OperationsDashboard = () => {
         return amount.toLocaleString();
     };
     
-    // Get advanced stats
     const advancedStats = calculateAdvancedStats(leads);
     
-    // =============================================
-    // Render
-    // =============================================
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -326,10 +312,7 @@ const OperationsDashboard = () => {
                             </h1>
                             <p className="text-purple-100 mt-1">إدارة الطلبات وتوزيعها على شركات التركيب</p>
                         </div>
-                        <button
-                            onClick={() => { fetchData(); fetchStats(); }}
-                            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
-                        >
+                        <button onClick={() => { fetchData(); fetchStats(); }} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2">
                             <FaSync /> تحديث
                         </button>
                     </div>
@@ -365,7 +348,6 @@ const OperationsDashboard = () => {
                     </div>
                 </div>
                 
-                {/* Financial Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                     <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow p-4">
                         <div className="text-sm text-gray-600">إجمالي العمولات</div>
@@ -401,25 +383,17 @@ const OperationsDashboard = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {leads.map((lead) => {
-                            // Calculate lead score for this lead
-                            const leadScore = calculateLeadScore(
-                                lead.bill_amount, 
-                                lead.property_type,
-                                lead.monthly_consumption || 0
-                            );
+                            const leadScore = calculateLeadScore(lead.bill_amount, lead.property_type, lead.monthly_consumption || 0);
                             const scoreLevel = getLeadScoreLevel(leadScore);
                             const ScoreIcon = scoreLevel.icon;
-                            
                             return (
                             <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
-                                {/* Premium Badge for high score leads */}
                                 {leadScore >= 80 && (
                                     <div className={`${scoreLevel.color} text-white text-xs py-1 px-3 text-center font-semibold`}>
                                         <ScoreIcon className="inline ml-1" /> {scoreLevel.text} - نقاط: {leadScore}
                                     </div>
                                 )}
                                 
-                                {/* Header */}
                                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b">
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
@@ -434,65 +408,30 @@ const OperationsDashboard = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Body - Reorganized with better order */}
                                 <div className="p-4">
                                     <div className="space-y-2 mb-4">
-                                        {/* Power Rating - First priority */}
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaBolt className="text-yellow-600" />
-                                                القدرة الموصى بها:
-                                            </span>
+                                            <span className="text-gray-500 flex items-center gap-1"><FaBolt className="text-yellow-600" /> القدرة الموصى بها:</span>
                                             <span className="font-bold text-yellow-600">{lead.required_kw} kWp</span>
                                         </div>
-                                        
-                                        {/* Bill Amount - Second priority */}
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaMoneyBillWave className="text-green-600" />
-                                                فاتورة الكهرباء:
-                                            </span>
-                                            <span className="font-bold text-green-600">
-                                                {lead.bill_amount} دينار
-                                                <span className="text-xs text-gray-500 block">
-                                                    ({lead.bill_period_months === 60 ? 'شهرين' : 'شهر'})
-                                                </span>
-                                            </span>
+                                            <span className="text-gray-500 flex items-center gap-1"><FaMoneyBillWave className="text-green-600" /> فاتورة الكهرباء:</span>
+                                            <span className="font-bold text-green-600">{lead.bill_amount} دينار<span className="text-xs text-gray-500 block">({lead.bill_period_months === 60 ? 'شهرين' : 'شهر'})</span></span>
                                         </div>
-                                        
-                                        {/* Property Type */}
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
-                                            <span className="font-medium flex items-center gap-1">
-                                                {getPropertyIcon(lead.property_type)}
-                                                {getPropertyText(lead.property_type)}
-                                            </span>
+                                            <span className="font-medium flex items-center gap-1">{getPropertyIcon(lead.property_type)}{getPropertyText(lead.property_type)}</span>
                                         </div>
-                                        
-                                        {/* City and Date */}
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaCalendarAlt className="text-gray-400" />
-                                                تاريخ الطلب:
-                                            </span>
-                                            <span className="text-xs text-gray-500">
-                                                {new Date(lead.created_at).toLocaleDateString('ar-TN')}
-                                            </span>
+                                            <span className="text-gray-500 flex items-center gap-1"><FaCalendarAlt className="text-gray-400" /> تاريخ الطلب:</span>
+                                            <span className="text-xs text-gray-500">{new Date(lead.created_at).toLocaleDateString('ar-TN')}</span>
                                         </div>
-                                        
-                                        {/* Commission - Moved to bottom */}
                                         <div className="flex justify-between text-sm border-t pt-2 mt-2">
-                                            <span className="text-gray-500 flex items-center gap-1">
-                                                <FaMoneyBillWave className="text-purple-600" />
-                                                عمولة المنصة:
-                                            </span>
-                                            <span className="font-bold text-purple-600">
-                                                {formatCurrency(lead.commission_amount)} دينار
-                                            </span>
+                                            <span className="text-gray-500 flex items-center gap-1"><FaMoneyBillWave className="text-purple-600" /> عمولة المنصة:</span>
+                                            <span className="font-bold text-purple-600">{formatCurrency(lead.commission_amount)} دينار</span>
                                         </div>
                                     </div>
                                     
-                                    {/* Lead Score Badge (for non-premium leads) */}
                                     {leadScore < 80 && leadScore >= 40 && (
                                         <div className={`mb-3 p-1 rounded-lg text-center text-xs font-semibold ${scoreLevel.color} text-white`}>
                                             <ScoreIcon className="inline ml-1" /> {scoreLevel.text} - {leadScore} نقطة
@@ -507,66 +446,32 @@ const OperationsDashboard = () => {
                                     )}
                                 </div>
                                 
-                                {/* Footer Actions */}
                                 <div className="bg-gray-50 px-4 py-3 border-t">
                                     <div className="flex gap-2 mb-2">
-                                        <button
-                                            onClick={() => handleCall(lead.phone)}
-                                            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 text-sm"
-                                        >
-                                            <FaPhone /> اتصل
-                                        </button>
-                                        <button
-                                            onClick={() => handleWhatsApp(lead.phone, lead.name)}
-                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm"
-                                        >
-                                            <FaWhatsapp /> واتساب
-                                        </button>
+                                        <button onClick={() => handleCall(lead.phone)} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 text-sm"><FaPhone /> اتصل</button>
+                                        <button onClick={() => handleWhatsApp(lead.phone, lead.name)} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm"><FaWhatsapp /> واتساب</button>
                                     </div>
                                     
                                     {lead.status === 'sent_to_operations' && (
-                                        <button
-                                            onClick={() => {
-                                                setSelectedLead(lead);
-                                                setShowCompanyModal(true);
-                                            }}
-                                            className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm"
-                                        >
-                                            <FaBuilding /> اختر شركة التركيب
-                                        </button>
+                                        <button onClick={() => { setSelectedLead(lead); setShowCompanyModal(true); }} className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm"><FaBuilding /> اختر شركة التركيب</button>
                                     )}
                                     
                                     {lead.status === 'assigned_to_company' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus(lead.id, 'completed')}
-                                            className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm"
-                                        >
-                                            <FaCheck /> إتمام الصفقة
-                                        </button>
+                                        <button onClick={() => handleUpdateStatus(lead.id, 'completed')} disabled={updating} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm"><FaCheck /> إتمام الصفقة</button>
                                     )}
                                     
                                     {lead.status === 'completed' && (
-                                        <div className="text-center text-sm text-green-600 py-2">
-                                            <FaCheckCircle className="inline ml-1" /> تم إكمال التركيب
-                                        </div>
+                                        <div className="text-center text-sm text-green-600 py-2"><FaCheckCircle className="inline ml-1" /> تم إكمال التركيب</div>
                                     )}
                                     
                                     {lead.status === 'cancelled' && (
-                                        <div className="text-center text-sm text-red-600 py-2">
-                                            <FaTimesCircle className="inline ml-1" /> تم رفض الطلب
-                                        </div>
+                                        <div className="text-center text-sm text-red-600 py-2"><FaTimesCircle className="inline ml-1" /> تم رفض الطلب</div>
                                     )}
                                     
-                                    <button
-                                        onClick={() => { setSelectedLead(lead); setNotes(lead.notes || ''); setShowNotesModal(true); }}
-                                        className="w-full mt-2 text-gray-500 hover:text-purple-600 text-xs flex items-center justify-center gap-1"
-                                    >
-                                        <FaEye /> إضافة ملاحظات
-                                    </button>
+                                    <button onClick={() => { setSelectedLead(lead); setNotes(lead.notes || ''); setShowNotesModal(true); }} className="w-full mt-2 text-gray-500 hover:text-purple-600 text-xs flex items-center justify-center gap-1"><FaEye /> إضافة ملاحظات</button>
                                 </div>
                             </div>
-                        );
-                        })}
+                        );})}
                     </div>
                 )}
             </div>
@@ -581,41 +486,19 @@ const OperationsDashboard = () => {
                         <p className="text-gray-500 text-sm mb-4">عمولة المنصة: {formatCurrency(selectedLead.commission_amount)} دينار</p>
                         
                         <label className="block text-gray-700 mb-2">اختر الشركة:</label>
-                        <select
-                            onChange={(e) => setSelectedCompany(e.target.value)}
-                            className="w-full px-4 py-2 border rounded-lg mb-4"
-                            value={selectedCompany}
-                        >
+                        <select onChange={(e) => setSelectedCompany(e.target.value)} className="w-full px-4 py-2 border rounded-lg mb-4" value={selectedCompany}>
                             <option value="">-- اختر شركة --</option>
                             {companies.map((company) => (
-                                <option key={company.id} value={company.id}>
-                                    {company.name} - {company.address || 'عنوان غير محدد'}
-                                </option>
+                                <option key={company.id} value={company.id}>{company.name} - {company.address || 'عنوان غير محدد'}</option>
                             ))}
                         </select>
                         
                         <label className="block text-gray-700 mb-2">ملاحظات للشركة (اختياري):</label>
-                        <textarea
-                            placeholder="أضف ملاحظات للشركة..."
-                            value={assignmentNotes}
-                            onChange={(e) => setAssignmentNotes(e.target.value)}
-                            className="w-full px-4 py-2 border rounded-lg mb-4"
-                            rows="3"
-                        />
+                        <textarea placeholder="أضف ملاحظات للشركة..." value={assignmentNotes} onChange={(e) => setAssignmentNotes(e.target.value)} className="w-full px-4 py-2 border rounded-lg mb-4" rows="3" />
                         
                         <div className="flex gap-3">
-                            <button
-                                onClick={handleAssignToCompany}
-                                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
-                            >
-                                إرسال للشركة
-                            </button>
-                            <button
-                                onClick={() => { setShowCompanyModal(false); setSelectedLead(null); setSelectedCompany(''); setAssignmentNotes(''); }}
-                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
-                            >
-                                إلغاء
-                            </button>
+                            <button onClick={handleAssignToCompany} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">إرسال للشركة</button>
+                            <button onClick={() => { setShowCompanyModal(false); setSelectedLead(null); setSelectedCompany(''); setAssignmentNotes(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
                         </div>
                     </div>
                 </div>
@@ -629,13 +512,7 @@ const OperationsDashboard = () => {
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
                         <p className="text-gray-500 text-sm mb-4">الحالة الحالية: {getStatusText(selectedLead.status)}</p>
                         
-                        <textarea
-                            placeholder="أضف ملاحظات عن العميل أو الشركة..."
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            className="w-full px-4 py-2 border rounded-lg mb-4"
-                            rows="4"
-                        />
+                        <textarea placeholder="أضف ملاحظات عن العميل أو الشركة..." value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-4 py-2 border rounded-lg mb-4" rows="4" />
                         
                         <div className="flex gap-3">
                             <button onClick={handleAddNotes} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">حفظ</button>

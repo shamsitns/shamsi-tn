@@ -107,6 +107,8 @@ const createTablesPostgres = async (pool) => {
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS description TEXT;`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS website VARCHAR(255);`);
     await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo VARCHAR(500);`);
+    // ✅ إضافة عمود commission_rate
+    await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(10,2) DEFAULT 0;`);
     console.log('✅ Updated companies table with all columns');
   } catch (err) {
     console.log('Note: companies table update:', err.message);
@@ -242,6 +244,7 @@ const createTablesPostgres = async (pool) => {
       rating DECIMAL(2,1) DEFAULT 0,
       reviews_count INTEGER DEFAULT 0,
       projects_completed INTEGER DEFAULT 0,
+      commission_rate DECIMAL(10,2) DEFAULT 0,
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -391,7 +394,9 @@ const createTablesSQLite = async (db) => {
       email TEXT,
       address TEXT,
       rating REAL DEFAULT 0,
+      reviews_count INTEGER DEFAULT 0,
       projects_completed INTEGER DEFAULT 0,
+      commission_rate REAL DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -509,7 +514,6 @@ const insertDefaultUsersPostgres = async (pool) => {
     { email: 'operations@shamsi.tn', password: 'operations123', name: 'Operations Manager', role: 'operations_manager', must_change_password: true },
     { email: 'callcenter@shamsi.tn', password: 'call123', name: 'Call Center', role: 'call_center', must_change_password: true },
     { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: true },
-    // ✅ NEW: Test company account
     { email: 'companytest@shamsi.tn', password: 'company123', name: 'شركة اختبار', role: 'company', must_change_password: false }
   ];
   
@@ -534,7 +538,6 @@ const insertDefaultUsersSQLite = async (db) => {
     { email: 'operations@shamsi.tn', password: 'operations123', name: 'Operations Manager', role: 'operations_manager', must_change_password: 1 },
     { email: 'callcenter@shamsi.tn', password: 'call123', name: 'Call Center', role: 'call_center', must_change_password: 1 },
     { email: 'admin@shamsi.tn', password: 'admin123', name: 'Admin', role: 'admin', must_change_password: 1 },
-    // ✅ NEW: Test company account for SQLite
     { email: 'companytest@shamsi.tn', password: 'company123', name: 'شركة اختبار', role: 'company', must_change_password: 0 }
   ];
   
