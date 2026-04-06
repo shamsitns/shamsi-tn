@@ -7,12 +7,12 @@ import {
     FaFileInvoice, FaTachometerAlt, FaSearch, FaHome,
     FaCheckCircle, FaPlug, FaUserPlus, FaRocket, FaMedal
 } from 'react-icons/fa';
-import logo from '../assets/images/logo.svg'; // ✅ استيراد الشعار
+import logo from '../assets/images/logo.svg';
 
 const HomePage = () => {
     return (
         <div className="bg-white">
-            {/* Top Bar */}
+            {/* Top Bar - لم يتغير */}
             <div className="bg-yellow-500 text-gray-900 text-center py-2 text-sm font-medium">
                 ⭐ أكثر من 5000 عميل مهتم بالطاقة الشمسية في تونس - احصل على دراستك التقريبية الآن مجاناً
             </div>
@@ -29,12 +29,15 @@ const HomePage = () => {
                 <div className="absolute inset-0 bg-black/30"></div>
                 
                 <div className="relative z-10 max-w-6xl mx-auto text-center text-white px-4 py-16">
-                    {/* ✅ استبدال أيقونة الشمس بالشعار الكامل */}
+                    {/* ✅ الشعار مع فلتر لتغيير لونه إلى الأصفر الذهبي */}
                     <div className="flex justify-center mb-6">
                         <img 
                             src={logo} 
                             alt="Shamsi.tn" 
                             className="h-16 w-auto drop-shadow-lg"
+                            style={{ 
+                                filter: "brightness(0) saturate(100%) invert(83%) sepia(67%) saturate(1234%) hue-rotate(2deg) brightness(103%) contrast(101%)"
+                            }}
                         />
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
@@ -54,7 +57,6 @@ const HomePage = () => {
                         >
                             ابدأ الحساب التقريبي الآن
                         </Link>
-                        {/* المكان الأول: زر انضم كشركة في الهيرو */}
                         <Link
                             to="/join-as-company"
                             className="inline-block bg-transparent hover:bg-white/20 border-2 border-white text-white font-bold py-3 px-8 rounded-lg text-lg transition transform hover:scale-105 shadow-lg flex items-center gap-2"
@@ -81,7 +83,7 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* باقي المحتوى (لم يتغير) */}
+            {/* باقي المكونات كما هي (لم يتم تغيير أي شيء آخر) */}
             {/* Independent Platform Message */}
             <div className="bg-blue-50 border-b border-blue-200 py-3">
                 <div className="max-w-6xl mx-auto text-center px-4">
@@ -195,7 +197,7 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Call to Action for Companies - المكان الثاني */}
+            {/* Call to Action for Companies */}
             <section className="py-16 px-4 bg-gradient-to-r from-indigo-600 to-purple-600">
                 <div className="max-w-5xl mx-auto text-center text-white">
                     <div className="flex justify-center mb-6">
@@ -446,7 +448,7 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Floating Button for Companies - المكان الثالث (زر عائم) */}
+            {/* Floating Button for Companies */}
             <Link
                 to="/join-as-company"
                 className="fixed bottom-6 right-6 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-110 z-50 flex items-center gap-2 group"
