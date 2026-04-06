@@ -439,7 +439,7 @@ const GeneralManagerDashboard = () => {
             await adminAPI.addUser(userData);
             
             toast.success('✅ تم إضافة المستخدم بنجاح');
-            toast.info('📝 يمكنك الآن اختبار تسجيل الدخول قبل إرسال البيانات للشركة', { duration: 5000 });
+            toast.success('📝 تم إضافة المستخدم بنجاح! يمكنك الآن اختبار تسجيل الدخول.', { duration: 5000 });
             
             setShowUserModal(false);
             setSelectedCompanyForUser(null);
