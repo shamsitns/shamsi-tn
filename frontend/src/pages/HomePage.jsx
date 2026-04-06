@@ -7,6 +7,7 @@ import {
     FaFileInvoice, FaTachometerAlt, FaSearch, FaHome,
     FaCheckCircle, FaPlug, FaUserPlus, FaRocket, FaMedal
 } from 'react-icons/fa';
+import logo from '../assets/images/logo.svg'; // ✅ استيراد الشعار
 
 const HomePage = () => {
     return (
@@ -28,10 +29,13 @@ const HomePage = () => {
                 <div className="absolute inset-0 bg-black/30"></div>
                 
                 <div className="relative z-10 max-w-6xl mx-auto text-center text-white px-4 py-16">
-                                            <div className="flex justify-center mb-6">
-<div className="bg-yellow-500/20 backdrop-blur-sm p-4 rounded-full">
-                            <FaSun className="text-5xl text-yellow-400" />
-                        </div>
+                    {/* ✅ استبدال أيقونة الشمس بالشعار الكامل */}
+                    <div className="flex justify-center mb-6">
+                        <img 
+                            src={logo} 
+                            alt="Shamsi.tn" 
+                            className="h-16 w-auto drop-shadow-lg"
+                        />
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
                         اكتشف كم تحتاج <br />
@@ -77,6 +81,7 @@ const HomePage = () => {
                 </div>
             </section>
 
+            {/* باقي المحتوى (لم يتغير) */}
             {/* Independent Platform Message */}
             <div className="bg-blue-50 border-b border-blue-200 py-3">
                 <div className="max-w-6xl mx-auto text-center px-4">
