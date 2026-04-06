@@ -7,6 +7,9 @@ import {
     FaUniversity, FaCar
 } from 'react-icons/fa';
 
+// ✅ استيراد الشعار (ضع ملف الشعار في frontend/src/assets/images/logo.svg أو logo.png)
+import logo from '../assets/images/logo.svg'; // تأكد من وجود الملف
+
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
@@ -28,33 +31,22 @@ const Navbar = () => {
         { to: '/blog', label: 'المدونة', icon: FaBlog }
     ];
     
-    // الحصول على رابط لوحة التحكم حسب دور المستخدم
     const getDashboardLink = () => {
         if (!user) return null;
-        
         switch(user.role) {
-            case 'owner':
-                return { to: '/owner', label: 'لوحة المالك', icon: FaCrown };
-            case 'general_manager':
-                return { to: '/admin', label: 'لوحة المدير العام', icon: FaUsers };
-            case 'executive_manager':
-                return { to: '/manager', label: 'لوحة المدير التنفيذي', icon: FaUserTie };
-            case 'operations_manager':
-                return { to: '/operations', label: 'لوحة مدير العمليات', icon: FaChartLine };
-            case 'call_center':
-                return { to: '/callcenter', label: 'لوحة مركز الاتصال', icon: FaHeadset };
-            case 'bank_manager':
-                return { to: '/bank', label: 'لوحة مدير البنك', icon: FaUniversity };
-            case 'leasing_manager':
-                return { to: '/leasing', label: 'لوحة مدير التأجير', icon: FaCar };
-            default:
-                return null;
+            case 'owner': return { to: '/owner', label: 'لوحة المالك', icon: FaCrown };
+            case 'general_manager': return { to: '/admin', label: 'لوحة المدير العام', icon: FaUsers };
+            case 'executive_manager': return { to: '/manager', label: 'لوحة المدير التنفيذي', icon: FaUserTie };
+            case 'operations_manager': return { to: '/operations', label: 'لوحة مدير العمليات', icon: FaChartLine };
+            case 'call_center': return { to: '/callcenter', label: 'لوحة مركز الاتصال', icon: FaHeadset };
+            case 'bank_manager': return { to: '/bank', label: 'لوحة مدير البنك', icon: FaUniversity };
+            case 'leasing_manager': return { to: '/leasing', label: 'لوحة مدير التأجير', icon: FaCar };
+            default: return null;
         }
     };
     
     const dashboardLink = getDashboardLink();
     
-    // الحصول على اسم الدور بالعربية
     const getRoleName = (role) => {
         const roles = {
             owner: 'مالك',
@@ -72,17 +64,29 @@ const Navbar = () => {
         <nav className="bg-white shadow-md sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
                 <div className="flex justify-between items-center h-14 sm:h-16">
-                    {/* Logo */}
+                    {/* ✅ Logo + اسم الموقع */}
                     <Link 
                         to="/" 
-                        className="flex items-center gap-1 sm:gap-2 touch-target"
+                        className="flex items-center gap-2 touch-target"
                         onClick={closeMenu}
                     >
-                        <FaSun className="text-yellow-500 text-xl sm:text-2xl" />
+                        {/* ✅ استخدم img للشعار، مع fallback لأيقونة الشمس إذا لم يتم تحميل الصورة */}
+                        <img 
+                            src={logo} 
+                            alt="Shamsi.tn" 
+                            className="h-8 w-auto sm:h-10"
+                            onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                                // إظهار الأيقونة بدلاً من الصورة
+                                e.target.parentElement.querySelector('.fallback-icon').style.display = 'block';
+                            }}
+                        />
+                        <FaSun className="text-yellow-500 text-xl sm:text-2xl fallback-icon" style={{ display: 'none' }} />
                         <span className="font-bold text-base sm:text-xl text-gray-800">Shamsi.tn</span>
                     </Link>
                     
-                    {/* Desktop Menu */}
+                    {/* Desktop Menu - نفس الكود السابق */}
                     <div className="hidden md:flex items-center gap-3 lg:gap-6">
                         {navLinks.map((link) => {
                             const Icon = link.icon;
