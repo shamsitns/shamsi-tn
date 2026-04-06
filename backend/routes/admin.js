@@ -127,7 +127,7 @@ router.post('/users', [
     body('name').notEmpty().withMessage('الاسم مطلوب'),
     body('email').isEmail().withMessage('بريد إلكتروني غير صالح'),
     body('password').isLength({ min: 6 }).withMessage('كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
-    body('role').isIn(['executive_manager', 'call_center', 'bank_manager', 'leasing_manager', 'operations_manager'])
+    body('role').isIn(['executive_manager', 'call_center', 'bank_manager', 'leasing_manager', 'operations_manager', 'company'])
         .withMessage('دور غير صالح'),
     body('phone').optional().isString(),
     validate
@@ -137,7 +137,7 @@ router.put('/users/:id', [
     param('id').isInt(),
     body('name').optional().isString(),
     body('phone').optional().isString(),
-    body('role').optional().isIn(['executive_manager', 'call_center', 'bank_manager', 'leasing_manager', 'operations_manager']),
+    body('role').optional().isIn(['executive_manager', 'call_center', 'bank_manager', 'leasing_manager', 'operations_manager', 'company']),
     body('is_active').optional().isBoolean(),
     validate
 ], updateUser);
