@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 
 // ============================================
-// قائمة الولايات التونسية (مع جربة)
+// قائمة الولايات التونسية
 // ============================================
 const tunisianCities = [
     'تونس', 'أريانة', 'بن عروس', 'منوبة', 'نابل', 'بنزرت', 'باجة', 'جندوبة',
@@ -34,48 +34,7 @@ const prosolBanks = [
 ];
 
 // ============================================
-// أنواع الألواح (للاستخدام الداخلي فقط)
-// ============================================
-const panelTypes = {
-    residential: [
-        { value: 'jinko_445', name: 'Jinko Tiger Neo 445W', power: 0.445, brand: 'Jinko', use: 'منازل - محلات' },
-        { value: 'jinko_480', name: 'Jinko Tiger Neo 480W', power: 0.480, brand: 'Jinko', use: 'منازل - محلات' },
-        { value: 'longi_475', name: 'LONGi Hi-MO 5 475W', power: 0.475, brand: 'LONGi', use: 'منازل - محلات' },
-        { value: 'longi_550', name: 'LONGi Hi-MO 5 550W', power: 0.550, brand: 'LONGi', use: 'منازل - محلات' },
-        { value: 'canadian_475', name: 'Canadian Solar 475W', power: 0.475, brand: 'Canadian Solar', use: 'منازل - محلات' }
-    ],
-    agricultural: [
-        { value: 'jinko_620', name: 'Jinko Tiger Neo 620W', power: 0.620, brand: 'Jinko', use: 'مضخات زراعية - مزارع' },
-        { value: 'jinko_650', name: 'Jinko Tiger Neo 650W', power: 0.650, brand: 'Jinko', use: 'مضخات زراعية - مزارع' },
-        { value: 'jinko_715', name: 'Jinko Tiger Neo 715W', power: 0.715, brand: 'Jinko', use: 'مضخات زراعية - مزارع' },
-        { value: 'longi_650', name: 'LONGi Hi-MO 6 650W', power: 0.650, brand: 'LONGi', use: 'مضخات زراعية - مزارع' },
-        { value: 'longi_715', name: 'LONGi Hi-MO 6 715W', power: 0.715, brand: 'LONGi', use: 'مضخات زراعية - مزارع' }
-    ]
-};
-
-// ============================================
-// أنواع العقار
-// ============================================
-const propertyTypes = [
-    { value: 'house', label: 'منزل', icon: FaHome, desc: 'دار مستقلة', period: 60, type: 'residential', panelCategory: 'residential' },
-    { value: 'apartment', label: 'شقة', icon: FaBuilding, desc: 'في عمارة', period: 60, type: 'residential', panelCategory: 'residential' },
-    { value: 'farm', label: 'مزرعة', icon: FaTractor, desc: 'أرض فلاحية', period: 60, type: 'agricultural', panelCategory: 'agricultural' },
-    { value: 'commercial', label: 'محل تجاري', icon: FaStore, desc: 'محل / مكتب', period: 30, type: 'commercial', panelCategory: 'residential' },
-    { value: 'factory', label: 'مصنع', icon: FaIndustry, desc: 'منشأة صناعية', period: 30, type: 'commercial', panelCategory: 'residential' }
-];
-
-// ============================================
-// مواسم الفاتورة
-// ============================================
-const billSeasons = [
-    { value: 'spring', label: 'الربيع', months: 'أفريل - ماي', icon: '🌸', desc: 'استهلاك معتدل', factor: 1.00 },
-    { value: 'summer', label: 'الصيف', months: 'جوان - أوت', icon: '☀️', desc: 'استهلاك مرتفع (تكييف)', factor: 1.25 },
-    { value: 'autumn', label: 'الخريف', months: 'سبتمبر - أكتوبر', icon: '🍂', desc: 'استهلاك معتدل', factor: 1.00 },
-    { value: 'winter', label: 'الشتاء', months: 'نوفمبر - مارس', icon: '❄️', desc: 'استهلاك مرتفع (تدفئة)', factor: 1.10 }
-];
-
-// ============================================
-// الإشعاع الشمسي حسب الولاية
+// الإشعاع الشمسي حسب الولاية (للمعلومات فقط)
 // ============================================
 const solarRadiation = {
     'تونس': 4.8, 'أريانة': 4.8, 'بن عروس': 4.8, 'منوبة': 4.8,
@@ -88,104 +47,46 @@ const solarRadiation = {
 };
 
 // ============================================
-// شرائح الكهرباء STEG
+// ✅ المعادلة الجديدة (نفس معادلة الخادم)
+// تستخدم لتتناسب مع البيانات المخزنة في قاعدة البيانات
 // ============================================
-const electricityTiers = [
-    { max: 100, rate: 0.181, name: 'الشريحة الأولى (0-100 kWh)' },
-    { max: 300, rate: 0.223, name: 'الشريحة الثانية (101-300 kWh)' },
-    { max: 500, rate: 0.338, name: 'الشريحة الثالثة (301-500 kWh)' },
-    { max: Infinity, rate: 0.419, name: 'الشريحة الرابعة (501+ kWh)' }
-];
-
-// ============================================
-// حساب الاستهلاك من الفاتورة حسب شرائح STEG
-// ============================================
-const calculateConsumption = (billAmount) => {
-    let remaining = billAmount;
-    let totalKwh = 0;
-    let usedTiers = [];
+const calculateSolarSystemBackend = (billAmount, billDays) => {
+    // تحويل قيمة الفاتورة إلى استهلاك شهري بالكيلوواط/ساعة
+    // متوسط سعر الكيلوواط/ساعة في تونس ≈ 0.25 دينار
+    const avgRate = 0.25;
+    const monthlyConsumption = (billAmount / avgRate); // kWh/شهر
+    const monthlyConsumptionAdjusted = monthlyConsumption * (30 / billDays); // ضبط حسب فترة الفاتورة
     
-    for (const tier of electricityTiers) {
-        const tierMaxKwh = tier.max;
-        const tierCost = tierMaxKwh * tier.rate;
-        
-        if (remaining <= tierCost) {
-            const kwh = remaining / tier.rate;
-            totalKwh += kwh;
-            usedTiers.push({ tier: tier.name, kwh: Math.round(kwh), cost: remaining });
-            break;
-        } else {
-            totalKwh += tierMaxKwh;
-            usedTiers.push({ tier: tier.name, kwh: tierMaxKwh, cost: tierCost });
-            remaining -= tierCost;
-        }
-    }
-    return { totalKwh: Math.round(totalKwh), usedTiers };
-};
-
-// ============================================
-// حساب النظام الشمسي الدقيق (بدون أسعار)
-// ============================================
-const calculateSolarSystemAccurate = (billAmount, billDays, season, city, roofArea, panelPower) => {
-    const consumption = calculateConsumption(billAmount);
-    const dailyKwh = consumption.totalKwh / billDays;
-    const annualKwh = dailyKwh * 365;
-    const seasonFactor = billSeasons.find(s => s.value === season)?.factor || 1.00;
-    const adjustedAnnualKwh = annualKwh * seasonFactor;
-    const radiation = solarRadiation[city] || 4.8;
-    const systemEfficiency = 0.85;
-    const requiredKw = adjustedAnnualKwh / (radiation * 365 * systemEfficiency);
-    const roundedKw = Math.round(requiredKw * 10) / 10;
-    const panelsCount = Math.ceil(roundedKw / panelPower);
-    const annualProduction = Math.round(roundedKw * radiation * 365 * systemEfficiency);
-    const annualSavings = Math.round(annualProduction * 0.25);
+    // قاعدة تقريبية: كل 1 كيلوواط ينتج 150 كيلوواط/ساعة شهرياً في تونس
+    const productionPerKw = 150;
+    const requiredKw = Math.ceil(monthlyConsumptionAdjusted / productionPerKw * 10) / 10;
+    
+    // عدد الألواح (باستخدام لوح بقدرة 0.5 كيلوواط تقريباً)
+    const panelsCount = Math.ceil(requiredKw / 0.48);
+    const requiredRoofArea = panelsCount * 2.2;
+    const annualProduction = Math.round(requiredKw * productionPerKw * 12);
+    const annualSavings = Math.round(annualProduction * avgRate);
     const monthlySavings = Math.round(annualSavings / 12);
-    const requiredRoofArea = Math.round(panelsCount * 2.2);
     const co2Saved = Math.round(annualProduction * 0.4);
-    const roofAreaAvailable = roofArea || 0;
-    const roofAreaValid = roofAreaAvailable >= requiredRoofArea;
-    const solarScore = Math.min(100, Math.round((radiation / 5.8) * 80 + (roofAreaValid ? 20 : 0)));
-    const coveragePercent = Math.min(100, Math.round((annualProduction / (consumption.totalKwh * 12)) * 100));
+    
+    // Solar Score (تقديري)
+    const solarScore = Math.min(100, Math.round(requiredRoofArea / 20 * 100));
+    const coveragePercent = Math.min(100, Math.round(monthlyConsumptionAdjusted / (requiredKw * productionPerKw) * 100));
     
     return {
-        required_kw: roundedKw,
+        required_kw: requiredKw,
         panels_count: panelsCount,
         annual_production: annualProduction,
         annual_savings: annualSavings,
         monthly_savings: monthlySavings,
         required_roof_area: requiredRoofArea,
         co2_saved: co2Saved,
-        radiation: radiation,
-        monthly_consumption: consumption.totalKwh,
-        bill_analysis: consumption.usedTiers,
-        roof_area_valid: roofAreaValid,
-        roof_area_available: roofAreaAvailable,
+        radiation: solarRadiation['تونس'] || 4.8,
+        monthly_consumption: monthlyConsumptionAdjusted,
+        roof_area_valid: true,
         solar_score: solarScore,
         coverage_percent: coveragePercent
     };
-};
-
-// ============================================
-// اختيار أفضل لوح تلقائياً
-// ============================================
-const getBestPanel = (requiredKw, propertyType, isAgricultural) => {
-    const panelCategory = isAgricultural ? 'agricultural' : 'residential';
-    const panels = panelTypes[panelCategory];
-    
-    if (requiredKw < 3) {
-        return panels.reduce((prev, curr) => (prev.power < curr.power ? prev : curr));
-    }
-    else if (requiredKw > 10) {
-        return panels.reduce((prev, curr) => (prev.power > curr.power ? prev : curr));
-    }
-    else {
-        const targetPower = isAgricultural ? 0.65 : 0.48;
-        return panels.reduce((prev, curr) => {
-            const prevDiff = Math.abs(prev.power - targetPower);
-            const currDiff = Math.abs(curr.power - targetPower);
-            return currDiff < prevDiff ? curr : prev;
-        });
-    }
 };
 
 // ============================================
@@ -224,7 +125,6 @@ const CalculatorPage = () => {
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
     const [result, setResult] = useState(null);
-    const [selectedPanel, setSelectedPanel] = useState(null);
     const [showLegalModal, setShowLegalModal] = useState(false);
     const [showBankModal, setShowBankModal] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState(null);
@@ -252,6 +152,7 @@ const CalculatorPage = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    // ✅ حساب النظام باستخدام نفس معادلة الخادم
     const handleCalculate = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -264,29 +165,16 @@ const CalculatorPage = () => {
         
         const property = propertyTypes.find(p => p.value === formData.property_type);
         const billDays = property.period;
-        const isAgricultural = formData.property_type === 'farm';
         
-        const bestPanel = getBestPanel(parseFloat(formData.bill_value) / 30, formData.property_type, isAgricultural);
-        setSelectedPanel(bestPanel);
-        
-        const solarData = calculateSolarSystemAccurate(
+        const solarData = calculateSolarSystemBackend(
             parseFloat(formData.bill_value),
-            billDays,
-            formData.bill_season,
-            formData.city,
-            parseFloat(formData.roof_area),
-            bestPanel.power
+            billDays
         );
         
         setResult(solarData);
         setStep(4);
         
-        if (!solarData.roof_area_valid) {
-            toast.warning(`⚠️ المساحة المتوفرة (${formData.roof_area} م²) أقل من المساحة المطلوبة (${solarData.required_roof_area} م²)`);
-        } else {
-            toast.success('✅ تم حساب النظام الشمسي بنجاح!');
-        }
-        
+        toast.success('✅ تم حساب النظام الشمسي بنجاح!');
         setLoading(false);
     };
     
@@ -331,7 +219,16 @@ const CalculatorPage = () => {
             meter_number: formData.meter_number,
             payment_method: selectedPayment,
             preferred_bank: selectedBank?.name || null,
-            additional_info: `مساحة السطح: ${formData.roof_area} م²، نوع السطح: ${formData.roof_type}`
+            additional_info: `مساحة السطح: ${formData.roof_area} م²، نوع السطح: ${formData.roof_type}`,
+            // ✅ إرسال النتائج المحسوبة (نفس التي شاهدها العميل)
+            required_kw: result.required_kw,
+            panels_count: result.panels_count,
+            annual_production: result.annual_production,
+            annual_savings: result.annual_savings,
+            monthly_savings: result.monthly_savings,
+            co2_saved: result.co2_saved,
+            solar_score: result.solar_score,
+            coverage_percent: result.coverage_percent
         };
 
         try {
@@ -346,7 +243,6 @@ const CalculatorPage = () => {
             });
             setSelectedBank(null);
             setSelectedPayment(null);
-            setSelectedPanel(null);
         } catch (error) {
             toast.error('❌ حدث خطأ في إرسال الطلب');
         } finally {
@@ -356,6 +252,15 @@ const CalculatorPage = () => {
 
     const nextStep = () => setStep(step + 1);
     const prevStep = () => setStep(step - 1);
+
+    // تعريف propertyTypes هنا (لأنه مستخدم في دالة handleCalculate و handleConfirmAndSend)
+    const propertyTypes = [
+        { value: 'house', label: 'منزل', icon: FaHome, desc: 'دار مستقلة', period: 60, type: 'residential' },
+        { value: 'apartment', label: 'شقة', icon: FaBuilding, desc: 'في عمارة', period: 60, type: 'residential' },
+        { value: 'farm', label: 'مزرعة', icon: FaTractor, desc: 'أرض فلاحية', period: 60, type: 'agricultural' },
+        { value: 'commercial', label: 'محل تجاري', icon: FaStore, desc: 'محل / مكتب', period: 30, type: 'commercial' },
+        { value: 'factory', label: 'مصنع', icon: FaIndustry, desc: 'منشأة صناعية', period: 30, type: 'commercial' }
+    ];
 
     // ==================== STEP 1 ====================
     const renderStep1 = () => (
@@ -414,18 +319,7 @@ const CalculatorPage = () => {
                     })}
                 </div>
                 <p className="text-xs text-gray-500 text-center">📅 فترة الفاتورة: {selectedProperty.period === 60 ? 'شهرين (60 يوم)' : 'شهر (30 يوم)'}</p>
-                <div className="grid grid-cols-2 gap-2">
-                    {billSeasons.map((season) => (
-                        <button key={season.value} type="button" onClick={() => setFormData({ ...formData, bill_season: season.value })}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition ${formData.bill_season === season.value ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}>
-                            <span className="text-xl">{season.icon}</span>
-                            <span className="font-semibold text-sm">{season.label}</span>
-                            <span className="text-xs text-gray-500">{season.months}</span>
-                        </button>
-                    ))}
-                </div>
                 <input type="number" name="bill_value" value={formData.bill_value} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder={`قيمة الفاتورة (دينار) - ${selectedProperty.period === 60 ? 'شهرين' : 'شهر'} *`} />
-                <p className="text-xs text-gray-500 mt-1">📊 سيتم تحليل فاتورتك حسب شرائح STEG</p>
                 <input type="number" name="roof_area" value={formData.roof_area} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="مساحة السطح (متر مربع) *" />
                 <p className="text-xs text-gray-500 text-center">📐 كل لوح شمسي يحتاج حوالي 2.2 متر مربع</p>
                 
@@ -463,14 +357,6 @@ const CalculatorPage = () => {
                         <div><span className="font-semibold text-gray-700">رقم العداد الكهربائي</span><span className="text-orange-500 text-sm mr-2">(مهم جداً)</span></div>
                     </div>
                     <input type="text" name="meter_number" value={formData.meter_number} onChange={handleChange} className="w-full p-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" placeholder="أدخل رقم العداد (موجود في أعلى يسار الفاتورة)" />
-                    <div className="mt-3 text-sm bg-orange-100 p-3 rounded-lg">
-                        <p className="font-semibold text-orange-800 mb-1">🔢 لماذا رقم العداد مهم؟</p>
-                        <ul className="text-xs text-orange-700 space-y-1 list-disc list-inside">
-                            <li>يساعدنا في تحليل استهلاكك بدقة أكبر</li>
-                            <li>يسرع معاملاتك مع STEG</li>
-                            <li>يمكننا من حساب الاستهلاك الفعلي لآخر 12 شهر</li>
-                        </ul>
-                    </div>
                 </div>
                 
                 <div className="flex gap-3 mt-4">
@@ -483,7 +369,7 @@ const CalculatorPage = () => {
         );
     };
 
-    // ==================== STEP 4 (النتائج - بدون سعر) ====================
+    // ==================== STEP 4 (النتائج) ====================
     const renderResult = () => {
         const property = propertyTypes.find(p => p.value === formData.property_type);
         const isResidential = ['house', 'apartment'].includes(formData.property_type);
@@ -497,15 +383,6 @@ const CalculatorPage = () => {
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800">تحليل النظام الشمسي</h2>
                     <p className="text-gray-500">{formData.city} - {formData.name}</p>
-                </div>
-                
-                {/* Solar Score */}
-                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-2xl text-center text-white">
-                    <div className="text-6xl font-bold mb-2">{result.solar_score}/100</div>
-                    <p className="text-blue-100">☀️ Solar Score - درجة ملاءمة السطح</p>
-                    <div className="mt-3 h-2 bg-white/30 rounded-full overflow-hidden">
-                        <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${result.solar_score}%` }}></div>
-                    </div>
                 </div>
                 
                 <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-2xl text-center text-white">
@@ -525,35 +402,25 @@ const CalculatorPage = () => {
                     <div className="bg-purple-50 p-3 rounded-xl text-center">
                         <div className="text-xl font-bold text-purple-700">{result.required_roof_area} م²</div>
                         <p className="text-xs text-gray-600">المساحة المطلوبة</p>
-                        {!result.roof_area_valid && <p className="text-xs text-red-500">⚠️ المتوفرة: {result.roof_area_available} م²</p>}
                     </div>
                     <div className="bg-emerald-50 p-3 rounded-xl text-center">
                         <div className="text-xl font-bold text-emerald-700">{result.co2_saved.toLocaleString()} كغ</div>
                         <p className="text-xs text-gray-600">توفير CO₂ سنوياً</p>
-                        <p className="text-xs text-emerald-600">≈ {Math.round(result.co2_saved / 21)} شجرة 🌳</p>
                     </div>
                 </div>
                 
                 <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-center">
                     <div className="text-2xl font-bold text-yellow-700">{result.monthly_savings.toLocaleString()} دينار</div>
                     <p className="text-sm text-gray-600">التوفير الشهري المتوقع</p>
-                    <p className="text-xs text-gray-500">(بناءً على سعر الكهرباء الحالي)</p>
                 </div>
                 
                 <div className="bg-gray-50 p-3 rounded-xl text-sm">
                     <div className="grid grid-cols-2 gap-2">
                         <div><FaLeaf className="inline text-green-500 ml-1" /> تخفيض CO₂: <strong>{result.co2_saved.toLocaleString()} كغ/سنة</strong></div>
-                        <div><FaSun className="inline text-orange-500 ml-1" /> الإشعاع الشمسي: <strong>{result.radiation} kWh/m²/يوم</strong></div>
+                        <div><FaSun className="inline text-orange-500 ml-1" /> الإشعاع الشمسي: <strong>{solarRadiation[formData.city] || 4.8} kWh/m²/يوم</strong></div>
                         <div><FaClock className="inline text-blue-500 ml-1" /> فترة الفاتورة: <strong>{property.period === 60 ? 'شهرين' : 'شهر'}</strong></div>
-                        <div><FaCalendarAlt className="inline text-purple-500 ml-1" /> موسم الفاتورة: <strong>{billSeasons.find(s => s.value === formData.bill_season)?.label}</strong></div>
                     </div>
                     {formData.meter_number && <div className="mt-2 pt-2 border-t"><FaIdCard className="inline text-blue-500 ml-1" /> رقم العداد: <strong>{formData.meter_number}</strong></div>}
-                </div>
-                
-                <div className="bg-blue-50 p-3 rounded-xl text-sm border border-blue-200">
-                    <div className="flex items-center gap-2 mb-2"><FaInfoCircle className="text-blue-500" /><span className="font-semibold">تحليل فاتورتك حسب شرائح STEG:</span></div>
-                    {result.bill_analysis?.map((tier, i) => (<div key={i} className="flex justify-between text-xs py-1"><span>{tier.tier}</span><span>{tier.kwh} kWh</span><span>{tier.cost.toFixed(2)} دينار</span></div>))}
-                    <div className="flex justify-between font-semibold mt-2 pt-2 border-t"><span>الإجمالي</span><span>{result.monthly_consumption} kWh</span><span>{formData.bill_value} دينار</span></div>
                 </div>
                 
                 <div className="space-y-2">
