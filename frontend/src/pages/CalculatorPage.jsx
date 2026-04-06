@@ -316,6 +316,7 @@ const CalculatorPage = () => {
         const property = propertyTypes.find(p => p.value === formData.property_type);
         const billDays = property.period;
         
+        // ✅ إضافة جميع الحقول المحسوبة من النتيجة
         const sendData = {
             name: formData.name,
             phone: formData.phone,
@@ -331,7 +332,16 @@ const CalculatorPage = () => {
             meter_number: formData.meter_number,
             payment_method: selectedPayment,
             preferred_bank: selectedBank?.name || null,
-            additional_info: `مساحة السطح: ${formData.roof_area} م²، نوع السطح: ${formData.roof_type}`
+            additional_info: `مساحة السطح: ${formData.roof_area} م²، نوع السطح: ${formData.roof_type}`,
+            // ✅ الحقول المحسوبة (نفس ما شاهده العميل)
+            required_kw: result.required_kw,
+            panels_count: result.panels_count,
+            annual_production: result.annual_production,
+            annual_savings: result.annual_savings,
+            monthly_savings: result.monthly_savings,
+            co2_saved: result.co2_saved,
+            solar_score: result.solar_score,
+            coverage_percent: result.coverage_percent
         };
 
         try {

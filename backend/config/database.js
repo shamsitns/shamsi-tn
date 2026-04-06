@@ -79,7 +79,7 @@ const createTablesPostgres = async (pool) => {
     console.log('Note: could not drop password column:', err.message);
   }
 
-  // إضافة جميع أعمدة leads المفقودة
+  // إضافة جميع أعمدة leads المفقودة (بما فيها الأعمدة الجديدة)
   try {
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS preferred_bank VARCHAR(100);`);
@@ -92,7 +92,16 @@ const createTablesPostgres = async (pool) => {
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS installation_status VARCHAR(50) DEFAULT 'pending';`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
     await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);`);
-    console.log('✅ Updated leads table with all columns');
+    // ✅ الأعمدة الجديدة من الحاسبة
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS roof_type VARCHAR(50);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS installation_timeline VARCHAR(20);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS annual_production DECIMAL(10,2);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS annual_savings DECIMAL(10,2);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS monthly_savings DECIMAL(10,2);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS co2_saved DECIMAL(10,2);`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS solar_score INTEGER;`);
+    await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS coverage_percent INTEGER;`);
+    console.log('✅ Updated leads table with all columns (including calculator fields)');
   } catch (err) {
     console.log('Note: leads table update:', err.message);
   }
@@ -286,7 +295,15 @@ const createTablesPostgres = async (pool) => {
       assigned_at TIMESTAMP,
       notes TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      roof_type VARCHAR(50),
+      installation_timeline VARCHAR(20),
+      annual_production DECIMAL(10,2),
+      annual_savings DECIMAL(10,2),
+      monthly_savings DECIMAL(10,2),
+      co2_saved DECIMAL(10,2),
+      solar_score INTEGER,
+      coverage_percent INTEGER
     )`,
     
     `CREATE TABLE IF NOT EXISTS lead_companies (
@@ -432,7 +449,15 @@ const createTablesSQLite = async (db) => {
       assigned_company_id INTEGER REFERENCES companies(id),
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      roof_type TEXT,
+      installation_timeline TEXT,
+      annual_production REAL,
+      annual_savings REAL,
+      monthly_savings REAL,
+      co2_saved REAL,
+      solar_score INTEGER,
+      coverage_percent INTEGER
     )`,
     
     `CREATE TABLE IF NOT EXISTS lead_history (

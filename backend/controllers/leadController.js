@@ -126,12 +126,21 @@ exports.createLead = async (req, res) => {
             payment_method,
             preferred_bank,
             panel_type,
-            additional_info
+            additional_info,
+            // ✅ الحقول الجديدة من الحاسبة
+            roof_type,
+            installation_timeline,
+            required_kw,          // من الحاسبة (قد يختلف عن solarData.required_kw)
+            panels_count,
+            annual_production,
+            annual_savings,
+            monthly_savings,
+            co2_saved,
+            solar_score,
+            coverage_percent
         } = req.body;
         
         const leadSource = req.headers['x-source'] || 'website';
-        
-        // ✅ الحصول على ID المستخدم الحالي (تمت الإضافة)
         const userId = req.user?.id || null;
         
         if (!name || !phone || !bill_amount) {
@@ -141,6 +150,7 @@ exports.createLead = async (req, res) => {
             });
         }
         
+        // حساب النظام باستخدام الخادم (كاحتياطي، لكننا سنستخدم القيم المرسلة إذا وجدت)
         const solarData = calculateSolarSystem(
             parseFloat(bill_amount),
             parseInt(bill_period_months) || 60,
@@ -148,7 +158,17 @@ exports.createLead = async (req, res) => {
             property_type || 'house'
         );
         
-        const commissionAmount = calculateCommission(solarData.required_kw);
+        // استخدام القيم المرسلة من الحاسبة إذا كانت موجودة، وإلا استخدم القيم المحسوبة من الخادم
+        const finalRequiredKw = required_kw !== undefined ? required_kw : solarData.required_kw;
+        const finalPanelsCount = panels_count !== undefined ? panels_count : solarData.panels_count;
+        const finalAnnualProduction = annual_production !== undefined ? annual_production : solarData.annual_production;
+        const finalAnnualSavings = annual_savings !== undefined ? annual_savings : solarData.annual_savings;
+        const finalMonthlySavings = monthly_savings !== undefined ? monthly_savings : Math.round(finalAnnualSavings / 12);
+        const finalCo2Saved = co2_saved !== undefined ? co2_saved : solarData.co2_saved;
+        const finalSolarScore = solar_score !== undefined ? solar_score : null;
+        const finalCoveragePercent = coverage_percent !== undefined ? coverage_percent : null;
+        
+        const commissionAmount = calculateCommission(finalRequiredKw);
         
         const leadScore = calculateLeadScore({
             bill_amount: parseFloat(bill_amount),
@@ -167,10 +187,15 @@ exports.createLead = async (req, res) => {
         if (additional_info) fullAdditionalInfo += `📋 معلومات إضافية: ${additional_info}\n`;
         if (roof_availability !== undefined) fullAdditionalInfo += `🏠 توفر السطح: ${roof_availability ? 'نعم' : 'لا'}\n`;
         if (roof_area) fullAdditionalInfo += `📐 مساحة السطح: ${roof_area} م²\n`;
+        if (roof_type) fullAdditionalInfo += `🏗️ نوع السطح: ${roof_type === 'terrace' ? 'سطح مسطح' : roof_type === 'inclined' ? 'سطح مائل' : 'أرض / حديقة'}\n`;
+        if (installation_timeline) {
+            const timelineText = installation_timeline === '<3' ? 'أقل من 3 أشهر' : installation_timeline === '3-6' ? '3 - 6 أشهر' : 'أكثر من 6 أشهر';
+            fullAdditionalInfo += `⏱️ خطة التركيب: ${timelineText}\n`;
+        }
         
-        console.log(`📊 Lead data: ${name}, ${phone}, KW: ${solarData.required_kw}, Score: ${leadScore}`);
+        console.log(`📊 Lead data: ${name}, ${phone}, KW: ${finalRequiredKw}, Score: ${leadScore}`);
         
-        // ✅ INSERT مع جميع الأعمدة (تمت إضافة created_by)
+        // ✅ INSERT مع جميع الأعمدة (بما فيها الحقول الجديدة)
         const query = `
             INSERT INTO leads (
                 name, phone, city, property_type, 
@@ -179,8 +204,11 @@ exports.createLead = async (req, res) => {
                 payment_method, preferred_bank, panel_type,
                 lead_source, lead_score,
                 additional_info, required_kw, panels_count, commission_amount,
+                roof_type, installation_timeline,
+                annual_production, annual_savings, monthly_savings,
+                co2_saved, solar_score, coverage_percent,
                 status, created_by, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, CURRENT_TIMESTAMP)
             RETURNING id
         `;
         
@@ -201,11 +229,19 @@ exports.createLead = async (req, res) => {
             leadSource,
             leadScore,
             fullAdditionalInfo || null,
-            solarData.required_kw,
-            solarData.panels_count,
+            finalRequiredKw,
+            finalPanelsCount,
             commissionAmount,
+            roof_type || null,
+            installation_timeline || null,
+            finalAnnualProduction,
+            finalAnnualSavings,
+            finalMonthlySavings,
+            finalCo2Saved,
+            finalSolarScore,
+            finalCoveragePercent,
             'pending',
-            userId  // ✅ تمت إضافة created_by هنا
+            userId
         ];
         
         const result = await db.query(query, values);
@@ -218,22 +254,24 @@ exports.createLead = async (req, res) => {
         );
         
         console.log(`✅ Lead created successfully with ID: ${leadId}`);
-        console.log(`   📊 Required KW: ${solarData.required_kw} kWp`);
+        console.log(`   📊 Required KW: ${finalRequiredKw} kWp`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         console.log(`   ⭐ Lead Score: ${leadScore}`);
         console.log(`   📍 Source: ${leadSource}`);
         console.log(`   👤 Created by: ${userId}`);
+        console.log(`   🏗️ Roof type: ${roof_type || 'غير محدد'}`);
+        console.log(`   ⏱️ Installation timeline: ${installation_timeline || 'غير محدد'}`);
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
             leadId: leadId,
             leadScore: leadScore,
             solarData: {
-                required_kw: solarData.required_kw,
-                panels_count: solarData.panels_count,
-                annual_production: solarData.annual_production,
-                annual_savings: solarData.annual_savings,
-                co2_saved: solarData.co2_saved,
+                required_kw: finalRequiredKw,
+                panels_count: finalPanelsCount,
+                annual_production: finalAnnualProduction,
+                annual_savings: finalAnnualSavings,
+                co2_saved: finalCo2Saved,
                 commission_amount: commissionAmount
             }
         });
