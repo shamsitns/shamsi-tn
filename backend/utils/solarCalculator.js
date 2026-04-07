@@ -32,6 +32,39 @@ const electricityRates = [
 ];
 
 // ============================================
+// متوسط سعر الكهرباء الحقيقي (دينار/kWh)
+// ============================================
+const AVERAGE_ELECTRICITY_RATE = 0.32; // TND/kWh (realistic for most customers)
+
+// ============================================
+// كفاءة النظام الشمسي (بعد خسائر الحرارة، الغبار، الكابلات، الإنفيرتر)
+// ============================================
+const SYSTEM_EFFICIENCY = 0.80; // 80% واقعي في تونس
+
+// ============================================
+// سعر النظام التقريبي (دينار/كيلوواط)
+// ============================================
+const SYSTEM_PRICE_PER_KW = 3500; // TND/kWp (سعر السوق)
+
+// ============================================
+// معامل اتجاه السقف (Orientation)
+// ============================================
+const orientationFactors = {
+    'south': 1.00,
+    'south-east': 0.95,
+    'south-west': 0.95,
+    'east': 0.85,
+    'west': 0.85,
+    'north': 0.60
+};
+
+// ============================================
+// معامل التظليل (Shading)
+// ============================================
+const SHADING_FACTOR_WITHOUT = 1.00;
+const SHADING_FACTOR_WITH = 0.90;
+
+// ============================================
 // حساب الاستهلاك من الفاتورة حسب شرائح STEG
 // ============================================
 function calculateConsumption(billAmount) {
@@ -58,20 +91,14 @@ function calculateConsumption(billAmount) {
 // حساب الاستهلاك السنوي المعدل
 // ============================================
 function calculateAdjustedAnnualConsumption(billAmount, billDays, season, propertyType) {
-    // حساب الاستهلاك الكلي
     const totalKwh = calculateConsumption(billAmount);
-    
-    // الاستهلاك اليومي
     const dailyKwh = totalKwh / billDays;
-    
-    // الاستهلاك السنوي
     const annualKwh = dailyKwh * 365;
     
-    // تعديل الموسم
     const seasonFactor = seasonFactors[season] || 1.00;
     let adjustedAnnualKwh = annualKwh * seasonFactor;
     
-    // تعديل حسب نوع العقار
+    // تعديل حسب نوع العقار (تجاري/صناعي يستهلك أكثر)
     const isCommercial = ['commercial', 'factory'].includes(propertyType);
     if (isCommercial) {
         adjustedAnnualKwh = adjustedAnnualKwh * 1.15;
@@ -83,17 +110,18 @@ function calculateAdjustedAnnualConsumption(billAmount, billDays, season, proper
 // ============================================
 // حساب القدرة المطلوبة (kW)
 // ============================================
-function calculateRequiredKw(adjustedAnnualKwh, city) {
+function calculateRequiredKw(adjustedAnnualKwh, city, orientation = 'south', hasShading = false) {
     const radiation = solarRadiationByCity[city] || 4.8;
-    const systemEfficiency = 0.85;
-    const sunlightHours = 365; // عدد الأيام
+    const orientationFactor = orientationFactors[orientation] || 1.00;
+    const shadingFactor = hasShading ? SHADING_FACTOR_WITH : SHADING_FACTOR_WITHOUT;
     
-    const requiredKw = adjustedAnnualKwh / (radiation * sunlightHours * systemEfficiency);
+    // صيغة القدرة: (الاستهلاك السنوي) / (الإشعاع × 365 × الكفاءة × عامل الاتجاه × عامل التظليل)
+    const requiredKw = adjustedAnnualKwh / (radiation * 365 * SYSTEM_EFFICIENCY * orientationFactor * shadingFactor);
     return Math.round(requiredKw * 10) / 10;
 }
 
 // ============================================
-// حساب عدد الألواح
+// حساب عدد الألواح (لوح 550 واط)
 // ============================================
 function calculatePanelsCount(requiredKw, panelPower = 0.55) {
     return Math.ceil(requiredKw / panelPower);
@@ -102,19 +130,43 @@ function calculatePanelsCount(requiredKw, panelPower = 0.55) {
 // ============================================
 // حساب الإنتاج السنوي (kWh)
 // ============================================
-function calculateAnnualProduction(requiredKw, city) {
+function calculateAnnualProduction(requiredKw, city, orientation = 'south', hasShading = false) {
     const radiation = solarRadiationByCity[city] || 4.8;
-    const systemEfficiency = 0.85;
+    const orientationFactor = orientationFactors[orientation] || 1.00;
+    const shadingFactor = hasShading ? SHADING_FACTOR_WITH : SHADING_FACTOR_WITHOUT;
     const days = 365;
     
-    return Math.round(requiredKw * radiation * days * systemEfficiency);
+    return Math.round(requiredKw * radiation * days * SYSTEM_EFFICIENCY * orientationFactor * shadingFactor);
 }
 
 // ============================================
-// حساب التوفير السنوي (دينار)
+// حساب التوفير السنوي (دينار) - يستخدم متوسط السعر الحقيقي
 // ============================================
-function calculateAnnualSavings(annualProduction, avgRate = 0.25) {
-    return Math.round(annualProduction * avgRate);
+function calculateAnnualSavings(annualProduction) {
+    return Math.round(annualProduction * AVERAGE_ELECTRICITY_RATE);
+}
+
+// ============================================
+// حساب سعر النظام التقريبي (دينار)
+// ============================================
+function calculateSystemPrice(requiredKw) {
+    return Math.round(requiredKw * SYSTEM_PRICE_PER_KW);
+}
+
+// ============================================
+// حساب فترة الاسترداد (سنوات)
+// ============================================
+function calculatePaybackYears(systemPrice, annualSavings) {
+    if (annualSavings === 0) return Infinity;
+    return parseFloat((systemPrice / annualSavings).toFixed(1));
+}
+
+// ============================================
+// حساب العائد على الاستثمار ROI (%)
+// ============================================
+function calculateROI(annualSavings, systemPrice) {
+    if (systemPrice === 0) return 0;
+    return parseFloat(((annualSavings / systemPrice) * 100).toFixed(1));
 }
 
 // ============================================
@@ -139,38 +191,65 @@ function calculateCO2Savings(annualProduction) {
 }
 
 // ============================================
-// حساب النظام الشمسي بشكل كامل
+// هل ينصح ببطاريات؟ (للمحلات والمصانع)
 // ============================================
-function calculateSolarSystem(billAmount, billDays, season, propertyType, city = 'تونس') {
-    // 1. حساب الاستهلاك السنوي المعدل
+function recommendBattery(propertyType) {
+    return ['commercial', 'factory'].includes(propertyType);
+}
+
+// ============================================
+// حساب النظام الشمسي بشكل كامل (مع كل الإضافات الجديدة)
+// ============================================
+function calculateSolarSystem(
+    billAmount, 
+    billDays, 
+    season, 
+    propertyType, 
+    city = 'تونس',
+    orientation = 'south',
+    hasShading = false
+) {
+    // 1. الاستهلاك السنوي المعدل
     const adjustedAnnualConsumption = calculateAdjustedAnnualConsumption(
         billAmount, billDays, season, propertyType
     );
     
-    // 2. حساب القدرة المطلوبة
-    const requiredKw = calculateRequiredKw(adjustedAnnualConsumption, city);
+    // 2. القدرة المطلوبة (مع مراعاة الاتجاه والتظليل)
+    const requiredKw = calculateRequiredKw(adjustedAnnualConsumption, city, orientation, hasShading);
     
-    // 3. حساب عدد الألواح
+    // 3. عدد الألواح
     const panelsCount = calculatePanelsCount(requiredKw);
     
-    // 4. حساب الإنتاج السنوي
-    const annualProduction = calculateAnnualProduction(requiredKw, city);
+    // 4. الإنتاج السنوي
+    const annualProduction = calculateAnnualProduction(requiredKw, city, orientation, hasShading);
     
-    // 5. حساب التوفير السنوي
+    // 5. التوفير السنوي والشهري
     const annualSavings = calculateAnnualSavings(annualProduction);
     const monthlySavings = Math.round(annualSavings / 12);
     
-    // 6. حساب العمولة
+    // 6. سعر النظام التقريبي
+    const systemPrice = calculateSystemPrice(requiredKw);
+    
+    // 7. فترة الاسترداد
+    const paybackYears = calculatePaybackYears(systemPrice, annualSavings);
+    
+    // 8. العائد على الاستثمار
+    const roi = calculateROI(annualSavings, systemPrice);
+    
+    // 9. العمولة
     const commissionAmount = calculateCommission(requiredKw);
     
-    // 7. حساب المساحة المطلوبة
+    // 10. المساحة المطلوبة
     const requiredRoofArea = calculateRequiredRoofArea(panelsCount);
     
-    // 8. حساب توفير CO2
+    // 11. توفير CO2
     const co2Saved = calculateCO2Savings(annualProduction);
     
-    // 9. قدرة العاكس (Inverter)
+    // 12. قدرة العاكس (Inverter) بنسبة 10% إضافية
     const inverterPower = Math.round((requiredKw * 1.1) * 10) / 10;
+    
+    // 13. هل ينصح ببطارية؟
+    const batteryRecommended = recommendBattery(propertyType);
     
     return {
         required_kw: requiredKw,
@@ -185,7 +264,14 @@ function calculateSolarSystem(billAmount, billDays, season, propertyType, city =
         adjusted_annual_consumption: adjustedAnnualConsumption,
         radiation: solarRadiationByCity[city],
         city: city,
-        bill_period_days: billDays
+        bill_period_days: billDays,
+        // الإضافات الجديدة
+        system_price: systemPrice,
+        payback_years: paybackYears,
+        roi_percent: roi,
+        battery_recommended: batteryRecommended,
+        orientation_used: orientation,
+        shading_considered: hasShading
     };
 }
 
@@ -196,7 +282,6 @@ function validateLeadEligibility(billAmount, roofArea, requiredRoofArea, propert
     const errors = [];
     const warnings = [];
     
-    // الحد الأدنى للفاتورة
     const isResidential = ['house', 'apartment', 'farm'].includes(propertyType);
     const minBill = isResidential ? 150 : 200;
     
@@ -206,7 +291,6 @@ function validateLeadEligibility(billAmount, roofArea, requiredRoofArea, propert
         warnings.push(`الفاتورة بين ${minBill} و ${minBill + 50} دينار - الاستثمار مجدي لكن العائد أقل`);
     }
     
-    // التحقق من مساحة السطح
     if (roofArea && requiredRoofArea) {
         if (roofArea < requiredRoofArea) {
             errors.push(`مساحة السطح غير كافية (المطلوب: ${requiredRoofArea} م²، المتوفر: ${roofArea} م²)`);
@@ -238,7 +322,7 @@ function getBillPeriodMonths(propertyType) {
 }
 
 // ============================================
-// تصدير الدوال
+// تصدير الدوال (للاستخدام في الواجهة)
 // ============================================
 module.exports = {
     calculateSolarSystem,
@@ -253,7 +337,17 @@ module.exports = {
     calculateAnnualSavings,
     calculateRequiredRoofArea,
     calculateCO2Savings,
+    calculateSystemPrice,
+    calculatePaybackYears,
+    calculateROI,
+    recommendBattery,
     solarRadiationByCity,
     seasonFactors,
-    electricityRates
+    electricityRates,
+    AVERAGE_ELECTRICITY_RATE,
+    SYSTEM_EFFICIENCY,
+    SYSTEM_PRICE_PER_KW,
+    orientationFactors,
+    SHADING_FACTOR_WITHOUT,
+    SHADING_FACTOR_WITH
 };
