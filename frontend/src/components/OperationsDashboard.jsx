@@ -138,24 +138,27 @@ const OperationsDashboard = () => {
     // Lead Management
     // =============================================
     const handleAssignToCompany = async () => {
-        if (!selectedCompany) {
-            toast.error('يرجى اختيار شركة');
-            return;
-        }
-        try {
-            await managerAPI.assignToCompany(selectedLead.id, selectedCompany, assignmentNotes);
-            toast.success('✅ تم إرسال الطلب للشركة بنجاح');
-            setShowCompanyModal(false);
-            setSelectedLead(null);
-            setSelectedCompany('');
-            setAssignmentNotes('');
-            fetchData();
-            fetchStats();
-        } catch (error) {
-            console.error('Error assigning to company:', error);
-            toast.error('❌ حدث خطأ');
-        }
-    };
+    if (!selectedCompany) {
+        toast.error('يرجى اختيار شركة');
+        return;
+    }
+    try {
+        // ✅ استخدم managerAPI.assignToCompany (المسار الصحيح موجود في api.js)
+        await managerAPI.assignToCompany(selectedLead.id, selectedCompany, assignmentNotes);
+        
+        toast.success('✅ تم إرسال الطلب للشركة بنجاح');
+        setShowCompanyModal(false);
+        setSelectedLead(null);
+        setSelectedCompany('');
+        setAssignmentNotes('');
+        fetchData();
+        fetchStats();
+    } catch (error) {
+        console.error('Error assigning to company:', error);
+        const errorMsg = error.response?.data?.message || 'حدث خطأ';
+        toast.error(`❌ فشل الإرسال: ${errorMsg}`);
+    }
+};
     
     // ✅ Modified: Handle status update with automatic commission calculation for completed leads
     const handleUpdateStatus = async (leadId, newStatus) => {
