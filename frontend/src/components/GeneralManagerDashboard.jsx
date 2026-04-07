@@ -1712,18 +1712,17 @@ const GeneralManagerDashboard = () => {
                             <div>
                                 <label className="block text-gray-700 mb-1">الدور</label>
                                 <select
-                                    value={newUser.role}
-                                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-                                    className="w-full px-4 py-2 border rounded-lg"
-                                >
-                                    <option value="executive_manager">مدير تنفيذي</option>
-                                    <option value="call_center">مركز اتصال</option>
-                                    <option value="bank_manager">مدير بنك</option>
-                                    <option value="leasing_manager">مدير تأجير</option>
-                                    <option value="operations_manager">مدير عمليات</option>
-                                    <option value="general_manager">مدير عام</option>
-                                    <option value="company">شركة</option>
-                                </select>
+    value={newUser.role}
+    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+    className="w-full px-4 py-2 border rounded-lg"
+>
+    <option value="executive_manager">مدير تنفيذي</option>
+    <option value="call_center">مركز اتصال</option>
+    <option value="operations_manager">مدير عمليات</option>
+    <option value="bank_manager">مدير بنك</option>
+    <option value="leasing_manager">مدير تأجير</option>
+    <option value="company">شركة</option>
+</select>
                             </div>
                             <div>
                                 <label className="block text-gray-700 mb-1">رقم الهاتف (اختياري)</label>
