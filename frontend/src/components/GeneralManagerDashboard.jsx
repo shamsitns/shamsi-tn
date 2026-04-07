@@ -396,63 +396,119 @@ const GeneralManagerDashboard = () => {
     // User Management
     // =============================================
     const handleAddUser = async () => {
-        if (!newUser.name || !newUser.email || !newUser.password) {
-            toast.error('يرجى إكمال جميع البيانات المطلوبة');
+    // 1. التحقق من الحقول الأساسية
+    if (!newUser.name || !newUser.email || !newUser.password) {
+        toast.error('❌ الاسم، البريد الإلكتروني، وكلمة المرور مطلوبة');
+        return;
+    }
+
+    // 2. التحقق من طول كلمة المرور (6 أحرف على الأقل)
+    if (newUser.password.length < 6) {
+        toast.error('❌ كلمة المرور يجب أن تكون 6 أحرف أو أكثر');
+        return;
+    }
+
+    // 3. التحقق من صيغة البريد الإلكتروني
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(newUser.email)) {
+        toast.error('❌ البريد الإلكتروني غير صحيح');
+        return;
+    }
+
+    let companyId = null;
+
+    // 4. إذا كان الدور "شركة"، نتحقق من وجود الشركة
+    if (newUser.role === 'company') {
+        let matchingCompany = null;
+        
+        if (selectedCompanyForUser) {
+            matchingCompany = selectedCompanyForUser;
+        } else {
+            matchingCompany = companies.find(c => c.email === newUser.email);
+        }
+        
+        if (matchingCompany) {
+            companyId = matchingCompany.id;
+            console.log('✅ Company found:', matchingCompany.name, 'ID:', companyId);
+        } else {
+            toast.error(
+                `⚠️ لا توجد شركة مسجلة بهذا البريد: ${newUser.email}\n\n` +
+                `يرجى إضافة الشركة أولاً من تبويب "الشركات"`,
+                { duration: 7000 }
+            );
             return;
         }
-        
-        let companyId = null;
-        if (newUser.role === 'company') {
-            let matchingCompany = null;
-            
-            if (selectedCompanyForUser) {
-                matchingCompany = selectedCompanyForUser;
-            } else {
-                matchingCompany = companies.find(c => c.email === newUser.email);
-            }
-            
-            if (matchingCompany) {
-                companyId = matchingCompany.id;
-                console.log('✅ Company found:', matchingCompany.name, 'ID:', companyId);
-            } else {
-                toast.error(
-                    `⚠️ لا توجد شركة مسجلة بهذا البريد: ${newUser.email}\n\n` +
-                    `الرجاء إضافة الشركة أولاً من تبويب "الشركات"`,
-                    { duration: 7000 }
-                );
-                return;
-            }
-        }
-        
-        try {
-            const userData = {
-                name: newUser.name,
-                email: newUser.email,
-                password: newUser.password,
-                role: newUser.role,
-                phone: newUser.phone || '',
-                company_id: companyId
-            };
-            
-            console.log('📤 Sending user data:', userData);
-            
-            await adminAPI.addUser(userData);
-            
-            toast.success('✅ تم إضافة المستخدم بنجاح');
-            toast.success('📝 تم إضافة المستخدم بنجاح! يمكنك الآن اختبار تسجيل الدخول.', { duration: 5000 });
-            
-            setShowUserModal(false);
-            setSelectedCompanyForUser(null);
-            setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '', company_name: '' });
-            fetchUsers();
-            
-        } catch (error) {
-            console.error('Error adding user:', error);
-            const errorMsg = error.response?.data?.message || error.message;
-            toast.error(`❌ حدث خطأ: ${errorMsg}`);
-        }
+    }
+
+    // 5. تجهيز البيانات للإرسال
+    const userData = {
+        name: newUser.name.trim(),
+        email: newUser.email.trim().toLowerCase(),
+        password: newUser.password,
+        role: newUser.role,
+        phone: newUser.phone?.trim() || '',
+        company_id: companyId  // null إذا لم يكن الدور company
     };
 
+    console.log('📤 Sending user data:', userData);
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('https://shamsi-tn.onrender.com/api/admin/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(userData)
+        });
+
+        const responseData = await response.json();
+        console.log('📥 Response status:', response.status);
+        console.log('📥 Response data:', responseData);
+
+        if (!response.ok) {
+            // استخراج رسالة الخطأ من الخادم
+            let errorMsg = 'حدث خطأ غير معروف';
+            if (responseData.message) errorMsg = responseData.message;
+            else if (responseData.error) errorMsg = responseData.error;
+            else if (typeof responseData === 'string') errorMsg = responseData;
+            
+            // رسائل خطأ مفهومة للمستخدم
+            if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
+                toast.error('❌ هذا البريد الإلكتروني مستخدم بالفعل');
+            } else if (errorMsg.includes('password')) {
+                toast.error('❌ كلمة المرور غير مقبولة (يجب أن تكون 6 أحرف على الأقل)');
+            } else {
+                toast.error(`❌ فشل الإضافة: ${errorMsg}`);
+            }
+            return;
+        }
+
+        // نجاح العملية
+        toast.success('✅ تم إضافة المستخدم بنجاح');
+        toast.success('📝 يمكن للمستخدم تسجيل الدخول الآن باستخدام البريد وكلمة المرور', { duration: 5000 });
+        
+        // إغلاق المودال وتفريغ الحقول
+        setShowUserModal(false);
+        setSelectedCompanyForUser(null);
+        setNewUser({ 
+            name: '', 
+            email: '', 
+            password: '', 
+            role: 'executive_manager', 
+            phone: '', 
+            company_name: '' 
+        });
+        
+        // تحديث قائمة المستخدمين
+        fetchUsers();
+        
+    } catch (error) {
+        console.error('❌ Network error:', error);
+        toast.error('❌ خطأ في الاتصال بالخادم. تأكد من اتصالك بالإنترنت');
+    }
+};
     const handleDeleteUser = async (userId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟')) {
             try {
