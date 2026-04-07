@@ -10,11 +10,12 @@ const getFirstRow = (result) => {
     return rows[0] || null;
 };
 
-// الحصول على جميع الشركات
+// الحصول على جميع الشركات (للواجهة العامة)
 exports.getAllCompanies = async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT id, name, email, phone, address, contact_person, is_active, created_at 
+            `SELECT id, name, email, phone, address, contact_person, 
+                    is_active, created_at, established_year, projects_count, license_number, logo
              FROM companies 
              ORDER BY name ASC`
         );
@@ -34,7 +35,8 @@ exports.getCompany = async (req, res) => {
         const { id } = req.params;
         
         const result = await db.query(
-            `SELECT id, name, email, phone, address, contact_person, is_active, created_at 
+            `SELECT id, name, email, phone, address, contact_person, 
+                    is_active, created_at, established_year, projects_count, license_number, logo
              FROM companies 
              WHERE id = $1`,
             [id]
@@ -53,10 +55,13 @@ exports.getCompany = async (req, res) => {
     }
 };
 
-// إضافة شركة جديدة
+// إضافة شركة جديدة (بدون website)
 exports.addCompany = async (req, res) => {
     try {
-        const { name, email, phone, address, contact_person } = req.body;
+        const { 
+            name, email, phone, address, contact_person, 
+            established_year, projects_count, license_number, logo
+        } = req.body;
         
         if (!name || !email) {
             return res.status(400).json({ message: 'الاسم والبريد الإلكتروني مطلوبان' });
@@ -71,9 +76,14 @@ exports.addCompany = async (req, res) => {
         }
         
         await db.query(
-            `INSERT INTO companies (name, email, phone, address, contact_person, is_active, created_at) 
-             VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)`,
-            [name, email, phone || null, address || null, contact_person || null]
+            `INSERT INTO companies 
+             (name, email, phone, address, contact_person, established_year, projects_count, license_number, logo, is_active, created_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, CURRENT_TIMESTAMP)`,
+            [
+                name, email, phone || null, address || null, contact_person || null,
+                established_year || null, projects_count || 0, license_number || null,
+                logo || null
+            ]
         );
         
         console.log(`✅ Company ${name} added successfully`);
@@ -88,11 +98,14 @@ exports.addCompany = async (req, res) => {
     }
 };
 
-// تحديث شركة
+// تحديث شركة (بدون website)
 exports.updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, phone, address, contact_person, is_active } = req.body;
+        const { 
+            name, phone, address, contact_person, is_active,
+            established_year, projects_count, license_number, logo
+        } = req.body;
         
         // Check if company exists
         const existingResult = await db.query('SELECT id FROM companies WHERE id = $1', [id]);
@@ -109,9 +122,18 @@ exports.updateCompany = async (req, res) => {
                  address = $3, 
                  contact_person = $4, 
                  is_active = $5,
+                 established_year = $6,
+                 projects_count = $7,
+                 license_number = $8,
+                 logo = $9,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $6`,
-            [name, phone || null, address || null, contact_person || null, is_active !== undefined ? is_active : true, id]
+             WHERE id = $10`,
+            [
+                name, phone || null, address || null, contact_person || null, 
+                is_active !== undefined ? is_active : true,
+                established_year || null, projects_count || 0, license_number || null,
+                logo || null, id
+            ]
         );
         
         console.log(`✅ Company ${id} updated successfully`);
@@ -329,6 +351,10 @@ exports.getCompaniesStats = async (req, res) => {
                 c.email,
                 c.phone,
                 c.is_active,
+                c.established_year,
+                c.projects_count,
+                c.license_number,
+                c.logo,
                 COUNT(lc.lead_id) as total_leads,
                 COUNT(CASE WHEN lc.status = 'completed' THEN 1 END) as completed_leads,
                 COUNT(CASE WHEN lc.status = 'accepted' THEN 1 END) as accepted_leads,
