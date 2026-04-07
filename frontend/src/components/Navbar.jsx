@@ -7,8 +7,8 @@ import {
     FaUniversity, FaCar
 } from 'react-icons/fa';
 
-// ✅ استيراد الشعار
-import logo from '../assets/images/logo.svg';
+// ✅ استيراد الشعار الجديد (PNG)
+import logo from '../assets/images/logo-black.png';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -64,7 +64,7 @@ const Navbar = () => {
         <nav className="bg-white shadow-md sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
                 <div className="flex justify-between items-center h-14 sm:h-16">
-                    {/* ✅ Logo only (no duplicate text) */}
+                    {/* ✅ Logo with new PNG file */}
                     <Link 
                         to="/" 
                         className="flex items-center gap-2 touch-target"
@@ -81,7 +81,6 @@ const Navbar = () => {
                             }}
                         />
                         <FaSun className="text-yellow-500 text-xl sm:text-2xl fallback-icon" style={{ display: 'none' }} />
-                        {/* ❌ Removed the duplicate text span */}
                     </Link>
                     
                     {/* Desktop Menu */}
