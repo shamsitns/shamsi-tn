@@ -73,7 +73,7 @@ const Navbar = () => {
                         <img 
                             src={logo} 
                             alt="Shamsi.tn" 
-                            className="h-8 w-auto sm:h-10"
+                            className="h-10 w-auto sm:h-12 md:h-14"
                             onError={(e) => {
                                 e.target.onerror = null;
                                 e.target.style.display = 'none';
