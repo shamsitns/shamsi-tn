@@ -12,7 +12,7 @@ import logo from '../assets/images/logo.svg';
 const HomePage = () => {
     return (
         <div className="bg-white">
-            {/* Top Bar - لم يتغير */}
+            {/* Top Bar */}
             <div className="bg-yellow-500 text-gray-900 text-center py-2 text-sm font-medium">
                 ⭐ أكثر من 5000 عميل مهتم بالطاقة الشمسية في تونس - احصل على دراستك التقريبية الآن مجاناً
             </div>
@@ -29,15 +29,12 @@ const HomePage = () => {
                 <div className="absolute inset-0 bg-black/30"></div>
                 
                 <div className="relative z-10 max-w-6xl mx-auto text-center text-white px-4 py-16">
-                    {/* ✅ الشعار مع فلتر لتغيير لونه إلى الأصفر الذهبي */}
+                    {/* ✅ الشعار في المنتصف (تم إزالة الفلتر الأصفر) */}
                     <div className="flex justify-center mb-6">
                         <img 
                             src={logo} 
                             alt="Shamsi.tn" 
                             className="h-16 w-auto drop-shadow-lg"
-                            style={{ 
-                                filter: "brightness(0) saturate(100%) invert(83%) sepia(67%) saturate(1234%) hue-rotate(2deg) brightness(103%) contrast(101%)"
-                            }}
                         />
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">

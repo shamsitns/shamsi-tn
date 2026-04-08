@@ -20,7 +20,20 @@ const CompaniesPage = () => {
     const fetchCompanies = async () => {
         try {
             const response = await companiesAPI.getAll();
-            setCompanies(response.data || []);
+            const companiesData = response.data || [];
+            
+            // التحقق من وجود الحقول المطلوبة وتسجيل تحذير إذا كانت مفقودة
+            if (companiesData.length > 0) {
+                const sample = companiesData[0];
+                if (sample.established_year === undefined || sample.projects_count === undefined) {
+                    console.warn(
+                        '⚠️ البيانات المرسلة من الخادم لا تحتوي على established_year أو projects_count. ' +
+                        'يرجى تعديل نقطة النهاية /api/companies لتشمل هذه الحقول.'
+                    );
+                }
+            }
+            
+            setCompanies(companiesData);
         } catch (error) {
             console.error('Error fetching companies:', error);
             toast.error('حدث خطأ في جلب الشركات');
@@ -31,9 +44,14 @@ const CompaniesPage = () => {
 
     const renderStars = (rating) => {
         const stars = [];
-        const fullStars = Math.floor(rating);
+        const fullStars = Math.floor(rating || 0);
         for (let i = 0; i < fullStars; i++) {
             stars.push(<FaStar key={i} className="text-yellow-500" />);
+        }
+        // إضافة نجوم فارغة إذا لزم الأمر
+        const emptyStars = 5 - fullStars;
+        for (let i = 0; i < emptyStars; i++) {
+            stars.push(<FaStar key={`empty-${i}`} className="text-gray-300" />);
         }
         return stars;
     };
@@ -59,75 +77,83 @@ const CompaniesPage = () => {
 
                 {/* Companies Grid */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {companies.map((company) => (
-                        <div key={company.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
-                            {/* Company Logo */}
-                            <div className="h-40 overflow-hidden bg-gradient-to-r from-orange-500 to-orange-600 flex items-center justify-center">
-                                {company.logo ? (
-                                    <img 
-                                        src={company.logo} 
-                                        alt={company.name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            e.target.onerror = null;
-                                            e.target.src = 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(company.name);
-                                        }}
-                                    />
-                                ) : (
-                                    <div className="text-center text-white">
-                                        <FaBuilding className="text-5xl mx-auto mb-2" />
-                                        <span className="text-xl font-bold">{company.name}</span>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {/* Company Info - بدون معلومات الاتصال */}
-                            <div className="p-6">
-                                <div className="flex justify-between items-start mb-3">
-                                    <h2 className="text-xl font-bold text-gray-800">{company.name}</h2>
-                                    <div className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded-full">
-                                        {renderStars(company.rating || 4.5)}
-                                        <span className="text-sm font-semibold text-green-700 mr-1">{company.rating || 4.5}</span>
-                                    </div>
-                                </div>
-                                
-                                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                                    {company.description || 'شركة متخصصة في تركيب أنظمة الطاقة الشمسية في تونس'}
-                                </p>
-                                
-                                <div className="space-y-2 mb-4">
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                                        <FaMapMarkerAlt className="text-orange-500" />
-                                        <span>{company.address || 'تونس'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                                        <FaCalendarAlt className="text-blue-500" />
-                                        <span>تأسست: {company.established_year || '2015'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                                        <FaCertificate className="text-green-500" />
-                                        <span>شركة معتمدة من STEG</span>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex justify-between items-center pt-4 border-t">
-                                    <div className="text-sm">
-                                        <span className="text-gray-500">مشاريع منجزة:</span>
-                                        <span className="font-bold text-green-600 mr-1">{company.projects_count || 0}</span>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setSelectedCompany(company);
-                                            setShowModal(true);
-                                        }}
-                                        className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-                                    >
-                                        تفاصيل أكثر
-                                    </button>
-                                </div>
-                            </div>
+                    {companies.length === 0 ? (
+                        <div className="col-span-3 text-center py-12">
+                            <p className="text-gray-500">لا توجد شركات مسجلة حالياً</p>
                         </div>
-                    ))}
+                    ) : (
+                        companies.map((company) => (
+                            <div key={company.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
+                                {/* Company Logo */}
+                                <div className="h-40 overflow-hidden bg-gradient-to-r from-orange-500 to-orange-600 flex items-center justify-center">
+                                    {company.logo ? (
+                                        <img 
+                                            src={company.logo} 
+                                            alt={company.name}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = 'https://via.placeholder.com/400x200?text=' + encodeURIComponent(company.name);
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="text-center text-white">
+                                            <FaBuilding className="text-5xl mx-auto mb-2" />
+                                            <span className="text-xl font-bold">{company.name}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Company Info */}
+                                <div className="p-6">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <h2 className="text-xl font-bold text-gray-800">{company.name}</h2>
+                                        <div className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded-full">
+                                            {renderStars(company.rating || 4.5)}
+                                            <span className="text-sm font-semibold text-green-700 mr-1">{company.rating || 4.5}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                                        {company.description || 'شركة متخصصة في تركيب أنظمة الطاقة الشمسية في تونس'}
+                                    </p>
+                                    
+                                    <div className="space-y-2 mb-4">
+                                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                                            <FaMapMarkerAlt className="text-orange-500" />
+                                            <span>{company.address || 'تونس'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                                            <FaCalendarAlt className="text-blue-500" />
+                                            <span>تأسست: {company.established_year || 'غير محدد'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                                            <FaCertificate className="text-green-500" />
+                                            <span>شركة معتمدة من STEG</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex justify-between items-center pt-4 border-t">
+                                        <div className="text-sm">
+                                            <span className="text-gray-500">مشاريع منجزة:</span>
+                                            <span className="font-bold text-green-600 mr-1">
+                                                {company.projects_count !== undefined ? company.projects_count : 'غير محدد'}
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCompany(company);
+                                                setShowModal(true);
+                                            }}
+                                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                                        >
+                                            تفاصيل أكثر
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 {/* CTA Section */}
@@ -143,7 +169,7 @@ const CompaniesPage = () => {
                 </div>
             </div>
 
-            {/* Company Details Modal - بدون معلومات الاتصال المباشرة */}
+            {/* Company Details Modal */}
             {showModal && selectedCompany && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -188,7 +214,7 @@ const CompaniesPage = () => {
                                 {selectedCompany.description || 'شركة متخصصة في تركيب أنظمة الطاقة الشمسية في تونس'}
                             </p>
                             
-                            {/* Details Grid - بدون هاتف/بريد/موقع */}
+                            {/* Details Grid */}
                             <div className="grid gap-4 mb-6">
                                 <div className="bg-gray-50 p-3 rounded-lg">
                                     <p className="text-xs text-gray-500">العنوان</p>
@@ -200,7 +226,9 @@ const CompaniesPage = () => {
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
                                     <p className="text-xs text-gray-500">المشاريع المنجزة</p>
-                                    <p className="font-medium text-green-600">{selectedCompany.projects_count || 0} مشروع</p>
+                                    <p className="font-medium text-green-600">
+                                        {selectedCompany.projects_count !== undefined ? selectedCompany.projects_count : 'غير محدد'} مشروع
+                                    </p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
                                     <p className="text-xs text-gray-500">رقم الترخيص</p>
@@ -218,7 +246,7 @@ const CompaniesPage = () => {
                                 </p>
                             </div>
                             
-                            {/* Action Buttons - فقط زر طلب دراسة */}
+                            {/* Action Buttons */}
                             <div className="flex gap-3">
                                 <Link
                                     to="/calculator"
