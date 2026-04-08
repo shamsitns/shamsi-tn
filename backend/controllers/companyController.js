@@ -10,12 +10,11 @@ const getFirstRow = (result) => {
     return rows[0] || null;
 };
 
-// الحصول على جميع الشركات (للواجهة العامة)
+// الحصول على جميع الشركات (للواجهة العامة) - بدون الأعمدة غير الموجودة
 exports.getAllCompanies = async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT id, name, email, phone, address, contact_person, 
-                    is_active, created_at, established_year, projects_count, license_number, logo
+            `SELECT id, name, email, phone, address, contact_person, is_active, created_at
              FROM companies 
              ORDER BY name ASC`
         );
@@ -29,14 +28,13 @@ exports.getAllCompanies = async (req, res) => {
     }
 };
 
-// الحصول على شركة محددة
+// الحصول على شركة محددة - بدون الأعمدة غير الموجودة
 exports.getCompany = async (req, res) => {
     try {
         const { id } = req.params;
         
         const result = await db.query(
-            `SELECT id, name, email, phone, address, contact_person, 
-                    is_active, created_at, established_year, projects_count, license_number, logo
+            `SELECT id, name, email, phone, address, contact_person, is_active, created_at
              FROM companies 
              WHERE id = $1`,
             [id]
@@ -55,13 +53,10 @@ exports.getCompany = async (req, res) => {
     }
 };
 
-// إضافة شركة جديدة (بدون website)
+// إضافة شركة جديدة (بدون الحقول الإضافية)
 exports.addCompany = async (req, res) => {
     try {
-        const { 
-            name, email, phone, address, contact_person, 
-            established_year, projects_count, license_number, logo
-        } = req.body;
+        const { name, email, phone, address, contact_person } = req.body;
         
         if (!name || !email) {
             return res.status(400).json({ message: 'الاسم والبريد الإلكتروني مطلوبان' });
@@ -76,14 +71,9 @@ exports.addCompany = async (req, res) => {
         }
         
         await db.query(
-            `INSERT INTO companies 
-             (name, email, phone, address, contact_person, established_year, projects_count, license_number, logo, is_active, created_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, CURRENT_TIMESTAMP)`,
-            [
-                name, email, phone || null, address || null, contact_person || null,
-                established_year || null, projects_count || 0, license_number || null,
-                logo || null
-            ]
+            `INSERT INTO companies (name, email, phone, address, contact_person, is_active, created_at) 
+             VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)`,
+            [name, email, phone || null, address || null, contact_person || null]
         );
         
         console.log(`✅ Company ${name} added successfully`);
@@ -98,14 +88,11 @@ exports.addCompany = async (req, res) => {
     }
 };
 
-// تحديث شركة (بدون website)
+// تحديث شركة (بدون الحقول الإضافية)
 exports.updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
-        const { 
-            name, phone, address, contact_person, is_active,
-            established_year, projects_count, license_number, logo
-        } = req.body;
+        const { name, phone, address, contact_person, is_active } = req.body;
         
         // Check if company exists
         const existingResult = await db.query('SELECT id FROM companies WHERE id = $1', [id]);
@@ -122,18 +109,9 @@ exports.updateCompany = async (req, res) => {
                  address = $3, 
                  contact_person = $4, 
                  is_active = $5,
-                 established_year = $6,
-                 projects_count = $7,
-                 license_number = $8,
-                 logo = $9,
                  updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $10`,
-            [
-                name, phone || null, address || null, contact_person || null, 
-                is_active !== undefined ? is_active : true,
-                established_year || null, projects_count || 0, license_number || null,
-                logo || null, id
-            ]
+             WHERE id = $6`,
+            [name, phone || null, address || null, contact_person || null, is_active !== undefined ? is_active : true, id]
         );
         
         console.log(`✅ Company ${id} updated successfully`);
@@ -341,7 +319,7 @@ exports.updateLeadAssignmentStatus = async (req, res) => {
     }
 };
 
-// الحصول على إحصائيات الشركات
+// الحصول على إحصائيات الشركات - بدون الأعمدة الإضافية
 exports.getCompaniesStats = async (req, res) => {
     try {
         const result = await db.query(`
@@ -351,10 +329,6 @@ exports.getCompaniesStats = async (req, res) => {
                 c.email,
                 c.phone,
                 c.is_active,
-                c.established_year,
-                c.projects_count,
-                c.license_number,
-                c.logo,
                 COUNT(lc.lead_id) as total_leads,
                 COUNT(CASE WHEN lc.status = 'completed' THEN 1 END) as completed_leads,
                 COUNT(CASE WHEN lc.status = 'accepted' THEN 1 END) as accepted_leads,
