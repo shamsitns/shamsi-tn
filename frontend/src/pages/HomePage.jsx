@@ -7,7 +7,7 @@ import {
     FaFileInvoice, FaTachometerAlt, FaSearch, FaHome,
     FaCheckCircle, FaPlug, FaUserPlus, FaRocket, FaMedal
 } from 'react-icons/fa';
-import logo from '../assets/images/logo.svg';
+import logo from '../assets/images/logo.svg'; // (غير مستخدم لكن تم الاحتفاظ به)
 
 const HomePage = () => {
     return (
@@ -29,13 +29,11 @@ const HomePage = () => {
                 <div className="absolute inset-0 bg-black/30"></div>
                 
                 <div className="relative z-10 max-w-6xl mx-auto text-center text-white px-4 py-16">
-                    {/* ✅ الشعار في المنتصف (تم إزالة الفلتر الأصفر) */}
+                    {/* ✅ الشعار المطور - أيقونة شمس متدرجة مع نبض */}
                     <div className="flex justify-center mb-6">
-                        <img 
-                            src={logo} 
-                            alt="Shamsi.tn" 
-                            className="h-16 w-auto drop-shadow-lg"
-                        />
+                        <div className="bg-gradient-to-br from-yellow-400 to-orange-500 p-5 rounded-full shadow-2xl shadow-yellow-500/50 animate-pulse">
+                            <FaSun className="text-6xl text-white drop-shadow-lg" />
+                        </div>
                     </div>
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
                         اكتشف كم تحتاج <br />
