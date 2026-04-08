@@ -8,7 +8,8 @@ import {
     FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaBuilding,
     FaHome, FaIndustry, FaTractor, FaStore, FaIdCard,
     FaUniversity, FaHandHoldingHeart, FaInfoCircle, FaSearch,
-    FaFilter, FaFire, FaTrophy, FaBell, FaStar
+    FaFilter, FaFire, FaTrophy, FaBell, FaStar, FaLeaf,
+    FaChevronDown, FaChevronUp
 } from 'react-icons/fa';
 
 const ExecutiveManagerDashboard = () => {
@@ -26,10 +27,12 @@ const ExecutiveManagerDashboard = () => {
     const [selectedLead, setSelectedLead] = useState(null);
     const [showNotesModal, setShowNotesModal] = useState(false);
     const [showSendModal, setShowSendModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [notes, setNotes] = useState('');
     const [sendNotes, setSendNotes] = useState('');
     const [showNotification, setShowNotification] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
+    const [expandedLeadId, setExpandedLeadId] = useState(null);
     
     // =============================================
     // Fetch Data
@@ -65,7 +68,6 @@ const ExecutiveManagerDashboard = () => {
     const fetchStats = async () => {
         try {
             const response = await managerAPI.getMyStats();
-            console.log('📊 Stats data:', response.data);
             setStats(response.data);
         } catch (error) {
             console.error('Error fetching stats:', error);
@@ -159,6 +161,10 @@ const ExecutiveManagerDashboard = () => {
         setTimeout(() => setShowNotification(false), 3000);
     };
     
+    const toggleExpand = (leadId) => {
+        setExpandedLeadId(expandedLeadId === leadId ? null : leadId);
+    };
+    
     // =============================================
     // Contact Client
     // =============================================
@@ -172,7 +178,7 @@ const ExecutiveManagerDashboard = () => {
     };
     
     // =============================================
-    // Parse additional info
+    // Parse additional info (JSON or text)
     // =============================================
     const parseAdditionalInfo = (info) => {
         if (!info) return {};
@@ -186,6 +192,8 @@ const ExecutiveManagerDashboard = () => {
                 payment_method: null,
                 preferred_bank: null,
                 roof_area: null,
+                roof_type: null,
+                installation_timeline: null,
                 other: info
             };
             
@@ -200,6 +208,12 @@ const ExecutiveManagerDashboard = () => {
             
             const roofMatch = info.match(/مساحة السطح[:\s]+([^\n]+)/i);
             if (roofMatch) result.roof_area = roofMatch[1];
+            
+            const roofTypeMatch = info.match(/نوع السطح[:\s]+([^\n]+)/i);
+            if (roofTypeMatch) result.roof_type = roofTypeMatch[1];
+            
+            const timelineMatch = info.match(/الجدول الزمني[:\s]+([^\n]+)/i);
+            if (timelineMatch) result.installation_timeline = timelineMatch[1];
             
             return result;
         }
@@ -320,6 +334,16 @@ const ExecutiveManagerDashboard = () => {
         return <FaMoneyBillWave className="text-gray-600" />;
     };
     
+    const getTimelineText = (timeline) => {
+        if (!timeline) return 'غير محدد';
+        switch(timeline) {
+            case '<3': return 'أقل من 3 أشهر';
+            case '3-6': return '3 - 6 أشهر';
+            case '>6': return 'أكثر من 6 أشهر';
+            default: return timeline;
+        }
+    };
+    
     const advancedStats = {
         totalLeads: filteredLeads.length,
         hotLeads: filteredLeads.filter(l => isHotLead(l)).length,
@@ -351,7 +375,7 @@ const ExecutiveManagerDashboard = () => {
                                 <FaSun className="text-yellow-300" />
                                 لوحة تحكم المدير التنفيذي
                             </h1>
-                            <p className="text-green-100 mt-1">إدارة الطلبات والتواصل مع العملاء</p>
+                            <p className="text-green-100 mt-1">إدارة الطلبات والتواصل مع العملاء – جميع التفاصيل من الحاسبة</p>
                         </div>
                     </div>
                 </div>
@@ -481,6 +505,7 @@ const ExecutiveManagerDashboard = () => {
                             const priority = getLeadPriority(lead);
                             const hot = isHotLead(lead);
                             const progress = getProgressPercentage(lead.status);
+                            const isExpanded = expandedLeadId === lead.id;
                             
                             return (
                             <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition border-t-4 border-t-yellow-500">
@@ -523,7 +548,8 @@ const ExecutiveManagerDashboard = () => {
                                 </div>
                                 
                                 <div className="p-4">
-                                    <div className="space-y-2 mb-4">
+                                    {/* المعلومات الأساسية */}
+                                    <div className="space-y-2 mb-3">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">رقم الهاتف:</span>
                                             <span className="font-medium" dir="ltr">{lead.phone}</span>
@@ -555,13 +581,13 @@ const ExecutiveManagerDashboard = () => {
                                             </span>
                                         </div>
                                         
-                                        {additionalInfo.meter_number && (
+                                        {lead.meter_number && (
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-500 flex items-center gap-1">
                                                     <FaIdCard className="text-blue-500" />
                                                     رقم العداد:
                                                 </span>
-                                                <span className="font-medium" dir="ltr">{additionalInfo.meter_number}</span>
+                                                <span className="font-medium" dir="ltr">{lead.meter_number}</span>
                                             </div>
                                         )}
                                         
@@ -575,6 +601,103 @@ const ExecutiveManagerDashboard = () => {
                                             </span>
                                         </div>
                                     </div>
+                                    
+                                    {/* زر عرض التفاصيل الإضافية */}
+                                    <button
+                                        onClick={() => toggleExpand(lead.id)}
+                                        className="w-full text-center text-sm text-orange-600 hover:text-orange-700 flex items-center justify-center gap-1 mt-2 py-1 border-t border-gray-100"
+                                    >
+                                        {isExpanded ? <><FaChevronUp /> إخفاء التفاصيل</> : <><FaChevronDown /> عرض جميع تفاصيل العميل والحساب</>}
+                                    </button>
+                                    
+                                    {/* قسم التفاصيل الإضافية (يظهر عند النقر) */}
+                                    {isExpanded && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                                            <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                                <FaInfoCircle className="text-blue-500" /> معلومات إضافية من الحاسبة
+                                            </div>
+                                            
+                                            {/* مساحة السطح ونوعه */}
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div className="flex items-center gap-1">
+                                                    <FaRuler className="text-purple-500" />
+                                                    <span className="text-gray-500">مساحة السطح:</span>
+                                                    <span className="font-medium">{lead.roof_area || additionalInfo.roof_area || 'غير محدد'} م²</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <FaBuilding className="text-blue-500" />
+                                                    <span className="text-gray-500">نوع السطح:</span>
+                                                    <span className="font-medium">
+                                                        {lead.roof_type === 'terrace' ? 'سطح مسطح' : 
+                                                         lead.roof_type === 'inclined' ? 'سطح مائل' :
+                                                         lead.roof_type === 'ground' ? 'أرض / حديقة' : additionalInfo.roof_type || 'غير محدد'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* الجدول الزمني وطريقة الدفع */}
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div className="flex items-center gap-1">
+                                                    <FaClock className="text-green-500" />
+                                                    <span className="text-gray-500">الجدول الزمني:</span>
+                                                    <span className="font-medium">{getTimelineText(lead.installation_timeline || additionalInfo.installation_timeline)}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {getPaymentMethodIcon(lead.payment_method || additionalInfo.payment_method)}
+                                                    <span className="text-gray-500">طريقة الدفع:</span>
+                                                    <span className="font-medium">{lead.payment_method || additionalInfo.payment_method || 'غير محدد'}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* البنك المفضل إن وجد */}
+                                            {(lead.preferred_bank || additionalInfo.preferred_bank) && (
+                                                <div className="flex items-center gap-1 text-sm">
+                                                    <FaUniversity className="text-indigo-500" />
+                                                    <span className="text-gray-500">البنك المفضل:</span>
+                                                    <span className="font-medium">{lead.preferred_bank || additionalInfo.preferred_bank}</span>
+                                                </div>
+                                            )}
+                                            
+                                            {/* نتائج الحساب الإضافية */}
+                                            <div className="bg-gray-50 p-3 rounded-lg mt-2 space-y-2">
+                                                <div className="text-xs font-semibold text-gray-600">📊 نتائج الحساب التفصيلية:</div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div className="flex items-center gap-1">
+                                                        <FaSun className="text-orange-500" />
+                                                        <span>الإنتاج السنوي:</span>
+                                                        <span className="font-bold">{lead.annual_production?.toLocaleString() || 'غير محدد'} kWh</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <FaMoneyBillWave className="text-green-500" />
+                                                        <span>التوفير الشهري:</span>
+                                                        <span className="font-bold">{lead.monthly_savings?.toLocaleString() || 'غير محدد'} دينار</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <FaLeaf className="text-green-600" />
+                                                        <span>توفير CO₂:</span>
+                                                        <span className="font-bold">{lead.co2_saved?.toLocaleString() || 'غير محدد'} كغ/سنة</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <FaChartLine className="text-blue-500" />
+                                                        <span>Solar Score:</span>
+                                                        <span className="font-bold">{lead.solar_score || 'غير محدد'}/100</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 col-span-2">
+                                                        <FaCheckCircle className="text-green-500" />
+                                                        <span>نسبة تغطية الاستهلاك:</span>
+                                                        <span className="font-bold">{lead.coverage_percent || 'غير محدد'}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* معلومات إضافية نصية إن وجدت */}
+                                            {lead.additional_info && lead.additional_info !== '{}' && (
+                                                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                                    <span className="font-semibold">📝 ملاحظات إضافية:</span> {lead.additional_info}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 <div className="bg-gray-50 px-4 py-3 border-t">
@@ -640,6 +763,7 @@ const ExecutiveManagerDashboard = () => {
                 )}
             </div>
             
+            {/* Modal للملاحظات (نفس السابق) */}
             {showNotesModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -662,6 +786,7 @@ const ExecutiveManagerDashboard = () => {
                 </div>
             )}
             
+            {/* Modal لإرسال لمدير العمليات (نفس السابق) */}
             {showSendModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
