@@ -63,8 +63,9 @@ const Navbar = () => {
     return (
         <nav className="bg-white shadow-md sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-                <div className="flex justify-between items-center h-14 sm:h-16">
-                    {/* ✅ Logo with new PNG file */}
+                {/* ✅ زيادة ارتفاع الشريط قليلاً ليتناسب مع الشعار الأكبر */}
+                <div className="flex justify-between items-center h-16 sm:h-18 md:h-20">
+                    {/* ✅ Logo with new PNG file - حجم متوسط (أكبر قليلاً من الأصلي) */}
                     <Link 
                         to="/" 
                         className="flex items-center gap-2 touch-target"
@@ -83,7 +84,7 @@ const Navbar = () => {
                         <FaSun className="text-yellow-500 text-xl sm:text-2xl fallback-icon" style={{ display: 'none' }} />
                     </Link>
                     
-                    {/* Desktop Menu */}
+                    {/* Desktop Menu - لم يتغير */}
                     <div className="hidden md:flex items-center gap-3 lg:gap-6">
                         {navLinks.map((link) => {
                             const Icon = link.icon;
@@ -145,7 +146,7 @@ const Navbar = () => {
                     </button>
                 </div>
                 
-                {/* Mobile Menu */}
+                {/* Mobile Menu - لم يتغير */}
                 {isOpen && (
                     <div className="md:hidden py-3 border-t animate-fadeIn">
                         <div className="flex flex-col gap-1">
