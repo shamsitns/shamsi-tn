@@ -19,6 +19,7 @@ const CallCenterDashboard = () => {
     const [selectedLead, setSelectedLead] = useState(null);
     const [showNoteModal, setShowNoteModal] = useState(false);
     const [noteText, setNoteText] = useState('');
+    const [sendingLeadId, setSendingLeadId] = useState(null); // Track which lead is being sent
     
     // =============================================
     // Fetch Data
@@ -30,7 +31,6 @@ const CallCenterDashboard = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // جلب الطلبات المعينة لمركز الاتصال
             const params = filter !== 'all' ? { status: filter } : {};
             const response = await managerAPI.getLeads(params);
             console.log('📊 Call Center leads data:', response.data);
@@ -47,13 +47,20 @@ const CallCenterDashboard = () => {
     // Update Lead Status
     // =============================================
     const handleUpdateStatus = async (leadId, newStatus, notes = '') => {
+        // Prevent multiple clicks
+        if (sendingLeadId === leadId) return;
+        
+        setSendingLeadId(leadId);
         try {
             await managerAPI.updateLeadStatus(leadId, newStatus, notes);
             toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
-            fetchData();
+            // Refresh the leads list
+            await fetchData();
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('❌ حدث خطأ في تحديث الحالة');
+        } finally {
+            setSendingLeadId(null);
         }
     };
     
@@ -250,7 +257,9 @@ const CallCenterDashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {leads.map((lead) => (
+                        {leads.map((lead) => {
+                            const isSending = sendingLeadId === lead.id;
+                            return (
                             <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
                                 {/* Header */}
                                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b">
@@ -343,18 +352,20 @@ const CallCenterDashboard = () => {
                                     {lead.status === 'pending' && (
                                         <button
                                             onClick={() => handleUpdateStatus(lead.id, 'contacted', 'تم التواصل مع العميل بواسطة مركز الاتصال')}
-                                            className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm"
+                                            disabled={isSending}
+                                            className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                                         >
-                                            <FaUserCheck /> تم التواصل مع العميل
+                                            {isSending ? 'جاري الإرسال...' : <><FaUserCheck /> تم التواصل مع العميل</>}
                                         </button>
                                     )}
                                     
                                     {lead.status === 'contacted' && (
                                         <button
                                             onClick={() => handleUpdateStatus(lead.id, 'sent_to_operations', 'تم جمع جميع المعلومات وإرسالها لمدير العمليات')}
-                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm"
+                                            disabled={isSending}
+                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                                         >
-                                            <FaPaperPlane /> إرسال لمدير العمليات
+                                            {isSending ? 'جاري الإرسال...' : <><FaPaperPlane /> إرسال لمدير العمليات</>}
                                         </button>
                                     )}
                                     
@@ -366,7 +377,8 @@ const CallCenterDashboard = () => {
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
