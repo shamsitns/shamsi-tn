@@ -60,7 +60,7 @@ router.post('/leads/:id/notes', addLeadNote);
 // =============================================
 // مسارات للمدير التنفيذي فقط
 // =============================================
-router.post('/leads/:id/send-to-operations', isExecutiveManager, sendToOperationsManager);
+router.post('/leads/:id/send-to-operations', isManager, sendToOperationsManager);
 router.post('/leads/:id/accept', isExecutiveManager, acceptLeadAndSendToOperations);
 
 // =============================================
