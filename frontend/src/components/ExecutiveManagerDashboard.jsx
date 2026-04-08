@@ -33,6 +33,7 @@ const ExecutiveManagerDashboard = () => {
     const [showNotification, setShowNotification] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [expandedLeadId, setExpandedLeadId] = useState(null);
+    const [sendingLeadId, setSendingLeadId] = useState(null); // ✅ جديد: لمنع الضغط المتكرر
     
     // =============================================
     // Fetch Data
@@ -122,7 +123,9 @@ const ExecutiveManagerDashboard = () => {
     
     const handleSendToOperations = async () => {
         if (!selectedLead) return;
+        if (sendingLeadId === selectedLead.id) return; // منع التكرار
         
+        setSendingLeadId(selectedLead.id);
         try {
             await managerAPI.sendToOperationsManager(selectedLead.id, sendNotes);
             toast.success('✅ تم إرسال الطلب لمدير العمليات');
@@ -135,6 +138,8 @@ const ExecutiveManagerDashboard = () => {
         } catch (error) {
             console.error('Error sending to operations:', error);
             toast.error('❌ حدث خطأ');
+        } finally {
+            setSendingLeadId(null);
         }
     };
     
@@ -733,15 +738,17 @@ const ExecutiveManagerDashboard = () => {
                                         </div>
                                     )}
                                     
-                                    {(lead.status === 'contacted' || lead.status === 'approved') && (
+                                    {/* ✅ زر إرسال لمدير العمليات – يظهر لعدة حالات (pending, contacted, approved) */}
+                                    {['pending', 'contacted', 'approved'].includes(lead.status) && (
                                         <button
                                             onClick={() => {
                                                 setSelectedLead(lead);
                                                 setShowSendModal(true);
                                             }}
-                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm"
+                                            disabled={sendingLeadId === lead.id}
+                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                                         >
-                                            <FaPaperPlane /> إرسال لمدير العمليات
+                                            {sendingLeadId === lead.id ? 'جاري الإرسال...' : <><FaPaperPlane /> إرسال لمدير العمليات</>}
                                         </button>
                                     )}
                                     
@@ -763,7 +770,7 @@ const ExecutiveManagerDashboard = () => {
                 )}
             </div>
             
-            {/* Modal للملاحظات (نفس السابق) */}
+            {/* Modal للملاحظات */}
             {showNotesModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -786,7 +793,7 @@ const ExecutiveManagerDashboard = () => {
                 </div>
             )}
             
-            {/* Modal لإرسال لمدير العمليات (نفس السابق) */}
+            {/* Modal لإرسال لمدير العمليات */}
             {showSendModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -805,8 +812,12 @@ const ExecutiveManagerDashboard = () => {
                         />
                         
                         <div className="flex gap-3">
-                            <button onClick={handleSendToOperations} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
-                                <FaPaperPlane /> إرسال
+                            <button 
+                                onClick={handleSendToOperations} 
+                                disabled={sendingLeadId === selectedLead.id}
+                                className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {sendingLeadId === selectedLead.id ? 'جاري الإرسال...' : <><FaPaperPlane /> إرسال</>}
                             </button>
                             <button onClick={() => { setShowSendModal(false); setSelectedLead(null); setSendNotes(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
                         </div>
