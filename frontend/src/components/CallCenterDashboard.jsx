@@ -20,7 +20,7 @@ const CallCenterDashboard = () => {
     const [showNoteModal, setShowNoteModal] = useState(false);
     const [noteText, setNoteText] = useState('');
     const [sendingLeadId, setSendingLeadId] = useState(null); // Track which lead is being sent
-    
+     
     // =============================================
     // Fetch Data
     // =============================================
@@ -46,6 +46,20 @@ const CallCenterDashboard = () => {
     // =============================================
     // Update Lead Status
     // =============================================
+    const handleSendToOperations = async (leadId) => {
+    if (sendingLeadId === leadId) return;
+    setSendingLeadId(leadId);
+    try {
+        await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
+        toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
+        await fetchData(); // تحديث القائمة
+    } catch (error) {
+        console.error('Error sending to operations:', error);
+        toast.error('❌ حدث خطأ أثناء الإرسال');
+    } finally {
+        setSendingLeadId(null);
+    }
+};
     const handleUpdateStatus = async (leadId, newStatus, notes = '') => {
         // Prevent multiple clicks
         if (sendingLeadId === leadId) return;
