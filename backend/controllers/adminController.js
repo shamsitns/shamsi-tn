@@ -319,53 +319,55 @@ exports.rejectLead = async (req, res) => {
 // تعيين الطلبات
 // =============================================
 
-// تعيين طلب للمدير التنفيذي (نسخة معدلة - بدون manager_assignments)
+// ✅ تعيين طلب للمدير التنفيذي (يستخدم ID المستلم من الواجهة)
 exports.assignToExecutive = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const { notes } = req.body;
+        const { executiveId, notes } = req.body;  // استقبال ID من الواجهة
         const adminId = req.user.id;
         
-        console.log(`📨 Admin ${adminId} assigning lead ${leadId}`);
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to executive ${executiveId}`);
         
+        if (!executiveId) {
+            return res.status(400).json({ message: 'يرجى تحديد المدير التنفيذي' });
+        }
+        
+        // التحقق من وجود المستخدم وصلاحية executive_manager
         const executiveResult = await db.query(
-            "SELECT id, name FROM users WHERE role = 'executive_manager' AND is_active = true LIMIT 1"
+            "SELECT id, name FROM users WHERE id = $1 AND role = 'executive_manager' AND is_active = true",
+            [executiveId]
         );
         const executive = getFirstRow(executiveResult);
         
         if (!executive) {
-            return res.status(404).json({ 
-                message: 'لا يوجد مدير تنفيذي في النظام' 
-            });
+            return res.status(404).json({ message: 'المدير التنفيذي المحدد غير موجود' });
         }
         
-        const executiveId = executive.id;
+        console.log(`✅ Found executive: ${executive.name} (ID: ${executive.id})`);
         
-        console.log(`✅ Found executive: ${executive.name} (ID: ${executiveId})`);
-        
+        // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
+        // تحديث الطلب: تغيير الحالة وتعيينه للمدير التنفيذي المختار
         await db.query(
             `UPDATE leads 
              SET status = 'contacted', 
                  assigned_to = $1,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
-            [executiveId, leadId]
+            [executive.id, leadId]
         );
         
-        console.log(`📝 Assignment recorded for lead ${leadId} to executive ${executive.name} (ID: ${executiveId})`);
-        
-        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
+        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executive.id})`);
         
         res.json({ 
             message: `تم إرسال الطلب للمدير التنفيذي: ${executive.name}`,
             leadId,
-            executiveId,
+            executiveId: executive.id,
             executiveName: executive.name
         });
         
