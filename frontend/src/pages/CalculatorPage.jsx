@@ -145,7 +145,7 @@ const calculateSolarSystemAccurate = (billAmount, billDays, season, city, roofAr
     const roofAreaAvailable = roofArea || 0;
     const roofAreaValid = roofAreaAvailable >= requiredRoofArea;
     const solarScore = Math.min(100, Math.round((radiation / 5.8) * 80 + (roofAreaValid ? 20 : 0)));
-    const coveragePercent = Math.min(100, Math.round((annualProduction / (consumption.totalKwh * 12)) * 100));
+    const coveragePercent = Math.min(100, Math.round((annualProduction / annualKwh) * 100));
     
     return {
         required_kw: roundedKw,
