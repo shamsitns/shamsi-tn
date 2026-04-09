@@ -179,46 +179,43 @@ exports.getManagerStats = async (req, res) => {
 // =============================================
 // إرسال طلب لشركة (لـ Operations Manager)
 // =============================================
+// إرسال طلب لشركة (لـ Operations Manager) – نسخة معدلة لتجنب خطأ المفتاح الأجنبي
 exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
         const { companyId, notes } = req.body;
-        let managerId = req.user.id;
+        let managerId = req.user?.id;
         
         console.log(`🏢 Assigning lead ${leadId} to company ${companyId} by user ${managerId}`);
         
-        // التحقق من وجود المستخدم في جدول users
-        const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
-        let validUserId = managerId;
-        if (getRows(userCheck).length === 0) {
-            console.warn(`⚠️ User ${managerId} not found in users table. Using fallback.`);
-            // استخدام أول مستخدم لديه صلاحية مدير عام أو أي مستخدم موجود
-            const fallbackUser = await db.query('SELECT id FROM users WHERE role = $1 LIMIT 1', ['general_manager']);
-            const fallback = getFirstRow(fallbackUser);
-            if (fallback) {
-                validUserId = fallback.id;
-                console.log(`🔄 Using fallback user ID: ${validUserId}`);
-            } else {
-                // إذا لم يوجد أي مستخدم، نجعلها NULL (إذا كان العمود يسمح بذلك)
-                validUserId = null;
+        // إذا كان managerId غير معرف أو المستخدم غير موجود، استخدم معرف مدير عمليات افتراضي (مثلاً 4)
+        if (!managerId) {
+            console.warn('⚠️ No user ID in token, using fallback operations manager ID 4');
+            managerId = 4;
+        } else {
+            // تحقق من وجود المستخدم في جدول users
+            const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
+            if (getRows(userCheck).length === 0) {
+                console.warn(`⚠️ User ${managerId} not found, using fallback ID 4`);
+                managerId = 4;
             }
         }
         
         // التحقق من وجود الطلب
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const lead = getFirstRow(resultLead);
+        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(leadResult);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // التحقق من وجود الشركة
-        const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
-        const company = getFirstRow(resultCompany);
+        const companyResult = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
+        const company = getFirstRow(companyResult);
         if (!company) {
             return res.status(404).json({ message: 'الشركة غير موجودة' });
         }
         
-        // تحديث الطلب
+        // تحديث الطلب: تعيين الشركة وتغيير الحالة
         await db.query(
             `UPDATE leads 
              SET status = 'assigned_to_company', 
@@ -230,30 +227,28 @@ exports.assignToCompany = async (req, res) => {
         );
         
         // التعامل مع lead_companies (إدراج أو تحديث)
-        const resultExisting = await db.query(
-            `SELECT id FROM lead_companies 
-             WHERE lead_id = $1 AND company_id = $2`,
+        const existingAssignment = await db.query(
+            'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
             [leadId, companyId]
         );
-        const existing = getRows(resultExisting);
+        const existing = getRows(existingAssignment);
         
-        if (existing && existing.length > 0) {
+        if (existing.length > 0) {
             await db.query(
                 `UPDATE lead_companies 
                  SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
                  WHERE lead_id = $3 AND company_id = $4`,
-                [validUserId, notes || null, leadId, companyId]
+                [managerId, notes || null, leadId, companyId]
             );
         } else {
-            // إذا كان validUserId null، نستخدم NULL (يجب أن يسمح العمود بذلك)
             await db.query(
                 `INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
-                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-                [leadId, companyId, validUserId, notes || null, 'assigned']
+                 VALUES ($1, $2, $3, $4, 'assigned', CURRENT_TIMESTAMP)`,
+                [leadId, companyId, managerId, notes || null]
             );
         }
         
-        console.log(`✅ Lead ${leadId} assigned to company ${company.name}`);
+        console.log(`✅ Lead ${leadId} assigned to company ${company.name} by user ${managerId}`);
         res.json({ 
             message: `تم إرسال الطلب للشركة: ${company.name}`,
             leadId,
