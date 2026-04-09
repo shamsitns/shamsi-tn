@@ -10,17 +10,18 @@ const getFirstRow = (result) => {
     return rows[0] || null;
 };
 
-// الحصول على جميع الشركات (للواجهة العامة) - بدون الأعمدة غير الموجودة
+// الحصول على جميع الشركات (للواجهة العامة) - فقط النشطة
 exports.getAllCompanies = async (req, res) => {
     try {
         const result = await db.query(
             `SELECT id, name, email, phone, address, contact_person, is_active, created_at
              FROM companies 
+             WHERE is_active = 1
              ORDER BY name ASC`
         );
         const companies = getRows(result);
         
-        console.log(`🏢 Found ${companies?.length || 0} companies`);
+        console.log(`🏢 Found ${companies?.length || 0} active companies`);
         res.json(companies || []);
     } catch (error) {
         console.error('❌ Error getting companies:', error);
