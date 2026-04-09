@@ -33,7 +33,11 @@ const ExecutiveManagerDashboard = () => {
     const [showNotification, setShowNotification] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [expandedLeadId, setExpandedLeadId] = useState(null);
-    const [sendingLeadId, setSendingLeadId] = useState(null); // ✅ جديد: لمنع الضغط المتكرر
+    const [sendingLeadId, setSendingLeadId] = useState(null);
+    
+    // ✅ State لإدارة مدراء العمليات
+    const [operationsManagers, setOperationsManagers] = useState([]);
+    const [selectedOpsManagerId, setSelectedOpsManagerId] = useState('');
     
     // =============================================
     // Fetch Data
@@ -41,6 +45,7 @@ const ExecutiveManagerDashboard = () => {
     useEffect(() => {
         fetchData();
         fetchStats();
+        fetchOperationsManagers(); // جلب مدراء العمليات
     }, [filter]);
     
     useEffect(() => {
@@ -73,6 +78,22 @@ const ExecutiveManagerDashboard = () => {
         } catch (error) {
             console.error('Error fetching stats:', error);
             setStats({ pending: 0, approved: 0, contacted: 0, completed: 0, cancelled: 0, total_commission: 0 });
+        }
+    };
+    
+    // ✅ جلب قائمة مدراء العمليات
+    const fetchOperationsManagers = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('https://shamsi-tn.onrender.com/api/admin/users?role=operations_manager', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            const managers = data.data || data.users || [];
+            setOperationsManagers(managers);
+            if (managers.length > 0) setSelectedOpsManagerId(managers[0].id);
+        } catch (error) {
+            console.error('Failed to fetch operations managers:', error);
         }
     };
     
@@ -121,13 +142,18 @@ const ExecutiveManagerDashboard = () => {
         }
     };
     
+    // ✅ تعديل دالة الإرسال لاستخدام المدير المختار
     const handleSendToOperations = async () => {
         if (!selectedLead) return;
-        if (sendingLeadId === selectedLead.id) return; // منع التكرار
+        if (!selectedOpsManagerId) {
+            toast.error('يرجى اختيار مدير العمليات');
+            return;
+        }
+        if (sendingLeadId === selectedLead.id) return;
         
         setSendingLeadId(selectedLead.id);
         try {
-            await managerAPI.sendToOperationsManager(selectedLead.id, sendNotes);
+            await managerAPI.sendToOperationsManager(selectedLead.id, sendNotes, selectedOpsManagerId);
             toast.success('✅ تم إرسال الطلب لمدير العمليات');
             showNotificationMessage('تم إرسال الطلب لمدير العمليات');
             fetchData();
@@ -793,7 +819,7 @@ const ExecutiveManagerDashboard = () => {
                 </div>
             )}
             
-            {/* Modal لإرسال لمدير العمليات */}
+            {/* Modal لإرسال لمدير العمليات – مع قائمة منسدلة لاختيار المدير */}
             {showSendModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -801,6 +827,21 @@ const ExecutiveManagerDashboard = () => {
                             <FaPaperPlane className="text-indigo-600" /> إرسال الطلب لمدير العمليات
                         </h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
+                        
+                        {/* ✅ قائمة منسدلة لاختيار مدير العمليات */}
+                        <label className="block text-gray-700 mb-2">اختر مدير العمليات:</label>
+                        <select
+                            value={selectedOpsManagerId}
+                            onChange={(e) => setSelectedOpsManagerId(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                        >
+                            <option value="">-- اختر مدير عمليات --</option>
+                            {operationsManagers.map(manager => (
+                                <option key={manager.id} value={manager.id}>
+                                    {manager.name} - {manager.email}
+                                </option>
+                            ))}
+                        </select>
                         
                         <label className="block text-gray-700 mb-2">ملاحظات إضافية (اختياري):</label>
                         <textarea
