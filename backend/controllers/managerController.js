@@ -180,21 +180,15 @@ exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
         const { companyId, notes } = req.body;
-        let managerId = req.user?.id;
+        let managerId = req.user?.id || 4; // ✅ استخدام معرف افتراضي (4) إذا كان غير صالح
 
-        // ✅ إذا كان managerId غير صالح، استخدم معرف مدير العمليات الافتراضي (4)
-        if (!managerId) {
-            console.warn('⚠️ No user ID in token, using fallback operations manager ID 4');
+        // التأكد من وجود managerId صالح
+        const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
+        if (getRows(userCheck).length === 0) {
             managerId = 4;
-        } else {
-            const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
-            if (getRows(userCheck).length === 0) {
-                console.warn(`⚠️ User ${managerId} not found, using fallback ID 4`);
-                managerId = 4;
-            }
         }
 
-        // تحديث الطلب: تعيين الشركة وتغيير الحالة
+        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET status = 'assigned_to_company', 
@@ -210,7 +204,7 @@ exports.assignToCompany = async (req, res) => {
             'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
             [leadId, companyId]
         );
-        if (existing.rows?.length > 0 || existing.length > 0) {
+        if (getRows(existing).length > 0) {
             await db.query(
                 `UPDATE lead_companies 
                  SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
