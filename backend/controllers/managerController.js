@@ -86,7 +86,7 @@ exports.getMyLeads = async (req, res) => {
 // =============================================
 exports.updateLeadStatus = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.id || req.params.leadId; // دعم كلا الاسمين
         const { status, notes } = req.body;
         const managerId = req.user.id;
         
@@ -181,7 +181,7 @@ exports.getManagerStats = async (req, res) => {
 // =============================================
 exports.assignToCompany = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.id || req.params.leadId; // دعم كلا الاسمين
         const { companyId, notes } = req.body;
         const managerId = req.user.id;
         
@@ -250,7 +250,7 @@ exports.assignToCompany = async (req, res) => {
 // =============================================
 exports.getLeadDetails = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.id || req.params.leadId;
         
         const result = await db.query(`
             SELECT l.*, 
@@ -307,7 +307,7 @@ exports.sendToOperationsManager = async (req, res) => {
     console.log('👤 req.user:', req.user);
     
     try {
-        const leadId = req.params.id;
+        const leadId = req.params.id || req.params.leadId;
         const { notes } = req.body;
         const executiveId = req.user.id;
         
@@ -365,7 +365,7 @@ exports.sendToOperationsManager = async (req, res) => {
 // =============================================
 exports.acceptLeadAndSendToOperations = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.id || req.params.leadId;
         const { notes } = req.body;
         const executiveId = req.user.id;
         
@@ -421,7 +421,7 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
 // =============================================
 exports.addLeadNote = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.id || req.params.leadId;
         const { notes } = req.body;
         const managerId = req.user.id;
         
@@ -459,7 +459,7 @@ exports.addLeadNote = async (req, res) => {
 // قبول الطلب وإرساله (اختصار)
 exports.acceptLeadAndSend = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.id || req.params.leadId;
         const { notes } = req.body;
         const executiveId = req.user.id;
         
@@ -502,15 +502,15 @@ exports.acceptLeadAndSend = async (req, res) => {
 // =============================================
 exports.markAsContacted = async (req, res) => {
     try {
-        const { id } = req.params;
+        const leadId = req.params.id; // المسار هو /leads/:id/contact
         const { notes } = req.body;
         const userId = req.user.id;
         
-        console.log(`📞 User ${userId} marking lead ${id} as contacted`);
+        console.log(`📞 User ${userId} marking lead ${leadId} as contacted`);
         
         const resultLead = await db.query(
             'SELECT * FROM leads WHERE id = $1',
-            [id]
+            [leadId]
         );
         const lead = getFirstRow(resultLead);
         
@@ -526,13 +526,13 @@ exports.markAsContacted = async (req, res) => {
                  notes = COALESCE(notes, '') || '\n' || $2,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $3`,
-            [userId, `[${new Date().toISOString()}] تم التواصل مع العميل: ${notes || 'تم التواصل بنجاح'}`, id]
+            [userId, `[${new Date().toISOString()}] تم التواصل مع العميل: ${notes || 'تم التواصل بنجاح'}`, leadId]
         );
         
-        console.log(`✅ Lead ${id} marked as contacted by user ${userId}`);
+        console.log(`✅ Lead ${leadId} marked as contacted by user ${userId}`);
         res.json({ 
             message: 'تم تسجيل التواصل مع العميل بنجاح',
-            leadId: id,
+            leadId: leadId,
             status: 'contacted'
         });
         
@@ -625,7 +625,7 @@ exports.getCompanyCommissionRate = async (req, res) => {
 // =============================================
 exports.updateLeadCommission = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.leadId; // المسار يستخدم :leadId
         const { commission } = req.body;
         
         if (commission === undefined || commission < 0) {
