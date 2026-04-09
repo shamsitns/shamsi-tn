@@ -84,10 +84,9 @@ const ExecutiveManagerDashboard = () => {
     // ✅ جلب قائمة مدراء العمليات
     const fetchOperationsManagers = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('https://shamsi-tn.onrender.com/api/admin/users?role=operations_manager', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await fetch('https://shamsi-tn.onrender.com/api/manager/operations-managers', {
+    headers: { 'Authorization': `Bearer ${token}` }
+});
             const data = await response.json();
             const managers = data.data || data.users || [];
             setOperationsManagers(managers);
