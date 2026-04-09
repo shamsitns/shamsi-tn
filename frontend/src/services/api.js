@@ -293,9 +293,10 @@ export const managerAPI = {
         return api.get('/manager/companies/available');
     },
     
-    sendToOperationsManager: (leadId, notes) => {
+    // ✅ Modified: Now accepts operations_manager_id as third parameter
+    sendToOperationsManager: (leadId, notes, operations_manager_id) => {
         console.log('📤 Sending lead to operations manager:', leadId);
-        return api.post(`/manager/leads/${leadId}/send-to-operations`, { notes });
+        return api.post(`/manager/leads/${leadId}/send-to-operations`, { notes, operations_manager_id });
     },
     
     acceptLeadAndSend: (leadId, notes) => {
