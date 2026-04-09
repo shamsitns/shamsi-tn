@@ -155,26 +155,41 @@ exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
         const { companyId, notes } = req.body;
-        const managerId = 4; // ✅ معرف مدير العمليات الثابت
+        const managerId = req.user?.id;
 
-        console.log(`🏢 Assigning lead ${leadId} to company ${companyId} by user ${managerId}`);
+        // التحقق من وجود managerId
+        if (!managerId) {
+            return res.status(401).json({
+                message: "غير مصرح به. يرجى تسجيل الدخول مرة أخرى."
+            });
+        }
 
-        await db.query(
-            `UPDATE leads SET status = 'assigned_to_company', assigned_company_id = $1, assigned_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-            [companyId, leadId]
+        // تحديث lead
+        await db.query(`
+            UPDATE leads 
+            SET status = 'assigned_to_company', 
+                assigned_company_id = $1, 
+                assigned_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = $2
+        `, [companyId, leadId]);
+
+        // إدراج أو تحديث lead_companies
+        const existing = await db.query(
+            'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
+            [leadId, companyId]
         );
-
-        const existing = await db.query('SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2', [leadId, companyId]);
         if (getRows(existing).length > 0) {
-            await db.query(
-                `UPDATE lead_companies SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP WHERE lead_id = $3 AND company_id = $4`,
-                [managerId, notes || null, leadId, companyId]
-            );
+            await db.query(`
+                UPDATE lead_companies 
+                SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
+                WHERE lead_id = $3 AND company_id = $4
+            `, [managerId, notes || null, leadId, companyId]);
         } else {
-            await db.query(
-                `INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) VALUES ($1, $2, $3, $4, 'assigned', CURRENT_TIMESTAMP)`,
-                [leadId, companyId, managerId, notes || null]
-            );
+            await db.query(`
+                INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
+                VALUES ($1, $2, $3, $4, 'assigned', CURRENT_TIMESTAMP)
+            `, [leadId, companyId, managerId, notes || null]);
         }
 
         res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
