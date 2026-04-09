@@ -207,22 +207,23 @@ exports.getAllUsers = async (req, res) => {
 exports.addUser = async (req, res) => {
     try {
         const { name, email, password, role, phone, company_id } = req.body; // ✅ أضف company_id
-        
+
+        // التحقق من وجود البريد
         const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
         if (getRows(existing).length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
         }
-        
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        
+
+        // ✅ أضف company_id إلى الإدراج
         await db.query(
             `INSERT INTO users (name, email, password, role, phone, company_id, is_active) 
              VALUES ($1, $2, $3, $4, $5, $6, true)`,
             [name, email, hashedPassword, role, phone || null, company_id || null]
         );
-        
+
         res.status(201).json({ message: 'تم إضافة المستخدم بنجاح' });
-        
     } catch (error) {
         console.error('❌ Error adding user:', error);
         res.status(500).json({ message: 'حدث خطأ في إضافة المستخدم', error: error.message });
