@@ -215,7 +215,6 @@ exports.addUser = async (req, res) => {
         
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        // ✅ أضف company_id إلى INSERT
         await db.query(
             `INSERT INTO users (name, email, password, role, phone, company_id, is_active) 
              VALUES ($1, $2, $3, $4, $5, $6, true)`,
