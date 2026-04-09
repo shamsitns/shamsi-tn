@@ -149,7 +149,7 @@ exports.getManagerStats = async (req, res) => {
 };
 
 // =============================================
-// إرسال طلب لشركة (لـ Operations Manager)
+// إرسال طلب لشركة (لـ Operations Manager) - النسخة الصحيحة
 // =============================================
 exports.assignToCompany = async (req, res) => {
     try {
@@ -157,10 +157,21 @@ exports.assignToCompany = async (req, res) => {
         const { companyId, notes } = req.body;
         const managerId = req.user?.id;
 
-        // التحقق من وجود managerId
+        // ✅ التحقق من وجود المستخدم في الطلب
         if (!managerId) {
-            return res.status(401).json({
-                message: "غير مصرح به. يرجى تسجيل الدخول مرة أخرى."
+            return res.status(401).json({ 
+                message: 'غير مصرح به. يرجى تسجيل الدخول مرة أخرى.' 
+            });
+        }
+
+        // ✅ التحقق من أن المستخدم موجود بالفعل في قاعدة البيانات
+        const userCheck = await db.query(
+            'SELECT id FROM users WHERE id = $1 AND is_active = true',
+            [managerId]
+        );
+        if (getRows(userCheck).length === 0) {
+            return res.status(400).json({ 
+                message: 'المستخدم غير موجود في قاعدة البيانات أو غير نشط.' 
             });
         }
 
@@ -194,8 +205,11 @@ exports.assignToCompany = async (req, res) => {
 
         res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
     } catch (error) {
-        console.error('❌ Error assigning to company:', error);
-        res.status(500).json({ message: 'حدث خطأ في إرسال الطلب للشركة', error: error.message });
+        console.error('❌ Error in assignToCompany:', error);
+        res.status(500).json({ 
+            message: 'حدث خطأ في إرسال الطلب للشركة', 
+            error: error.message 
+        });
     }
 };
 
