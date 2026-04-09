@@ -18,12 +18,12 @@ const router = express.Router();
 // حساب النظام الشمسي (بدون حفظ)
 router.post('/calculate', calculateLead);
 
+// ✅ إنشاء طلب جديد (بدون مصادقة – للزوار)
+router.post('/', createLead);
+
 // =============================================
 // المسارات المحمية (تتطلب مصادقة)
 // =============================================
-
-// ✅ أضف authenticate إلى إنشاء طلب جديد
-router.post('/', authenticate, createLead);
 
 // جلب طلبات المستخدم الحالي (للمديرين)
 router.get('/my-leads', authenticate, getMyLeads);
