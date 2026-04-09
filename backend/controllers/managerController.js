@@ -176,45 +176,24 @@ exports.getManagerStats = async (req, res) => {
     }
 };
 
-// =============================================
-// إرسال طلب لشركة (لـ Operations Manager)
-// =============================================
-// إرسال طلب لشركة (لـ Operations Manager) – نسخة معدلة لتجنب خطأ المفتاح الأجنبي
 exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
         const { companyId, notes } = req.body;
         let managerId = req.user?.id;
-        
-        console.log(`🏢 Assigning lead ${leadId} to company ${companyId} by user ${managerId}`);
-        
-        // إذا كان managerId غير معرف أو المستخدم غير موجود، استخدم معرف مدير عمليات افتراضي (مثلاً 4)
+
+        // ✅ إذا كان managerId غير صالح، استخدم معرف مدير العمليات الافتراضي (4)
         if (!managerId) {
             console.warn('⚠️ No user ID in token, using fallback operations manager ID 4');
             managerId = 4;
         } else {
-            // تحقق من وجود المستخدم في جدول users
             const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
             if (getRows(userCheck).length === 0) {
                 console.warn(`⚠️ User ${managerId} not found, using fallback ID 4`);
                 managerId = 4;
             }
         }
-        
-        // التحقق من وجود الطلب
-        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const lead = getFirstRow(leadResult);
-        if (!lead) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
-        }
-        
-        // التحقق من وجود الشركة
-        const companyResult = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
-        const company = getFirstRow(companyResult);
-        if (!company) {
-            return res.status(404).json({ message: 'الشركة غير موجودة' });
-        }
-        
+
         // تحديث الطلب: تعيين الشركة وتغيير الحالة
         await db.query(
             `UPDATE leads 
@@ -225,15 +204,13 @@ exports.assignToCompany = async (req, res) => {
              WHERE id = $2`,
             [companyId, leadId]
         );
-        
-        // التعامل مع lead_companies (إدراج أو تحديث)
-        const existingAssignment = await db.query(
+
+        // إدراج أو تحديث lead_companies
+        const existing = await db.query(
             'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
             [leadId, companyId]
         );
-        const existing = getRows(existingAssignment);
-        
-        if (existing.length > 0) {
+        if (existing.rows?.length > 0 || existing.length > 0) {
             await db.query(
                 `UPDATE lead_companies 
                  SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
@@ -247,17 +224,9 @@ exports.assignToCompany = async (req, res) => {
                 [leadId, companyId, managerId, notes || null]
             );
         }
-        
-        console.log(`✅ Lead ${leadId} assigned to company ${company.name} by user ${managerId}`);
-        res.json({ 
-            message: `تم إرسال الطلب للشركة: ${company.name}`,
-            leadId,
-            companyId,
-            companyName: company.name
-        });
-        
+
+        res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
     } catch (error) {
-        console.error('❌ Error assigning to company:', error);
         res.status(500).json({ message: 'حدث خطأ في إرسال الطلب للشركة', error: error.message });
     }
 };
