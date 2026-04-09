@@ -51,6 +51,23 @@ router.get('/stats', getManagerStats);
 router.get('/companies/available', getAvailableCompanies);
 
 // =============================================
+// ✅ NEW: جلب قائمة مدراء العمليات (للمدير التنفيذي ومركز الاتصال)
+// =============================================
+router.get('/operations-managers', isManager, async (req, res) => {
+    try {
+        const db = require('../config/database');
+        const result = await db.query(
+            "SELECT id, name, email FROM users WHERE role = 'operations_manager' AND is_active = true ORDER BY name ASC"
+        );
+        const rows = result.rows || result;
+        res.json(rows);
+    } catch (error) {
+        console.error('❌ Error fetching operations managers:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب مدراء العمليات' });
+    }
+});
+
+// =============================================
 // مسارات عامة للمديرين (مع ID) - REST style
 // =============================================
 router.get('/leads/:id', getLeadDetails);
