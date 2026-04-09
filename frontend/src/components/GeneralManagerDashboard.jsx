@@ -49,6 +49,10 @@ const GeneralManagerDashboard = () => {
     const [cities, setCities] = useState([]);
     const [selectedCompanyForUser, setSelectedCompanyForUser] = useState(null);
     
+    // ✅ إضافة حالتين لاختيار الشركة عند إضافة مستخدم من نوع company
+    const [companiesList, setCompaniesList] = useState([]);
+    const [selectedCompanyId, setSelectedCompanyId] = useState('');
+    
     const [newUser, setNewUser] = useState({
         name: '',
         email: '',
@@ -110,6 +114,29 @@ const GeneralManagerDashboard = () => {
         }
     }, [showAssignModal]);
 
+    // ✅ جلب قائمة الشركات عند فتح مودال إضافة مستخدم
+    useEffect(() => {
+        if (showUserModal) {
+            fetchCompaniesList();
+        } else {
+            // إعادة تعيين الاختيار عند إغلاق المودال
+            setSelectedCompanyId('');
+        }
+    }, [showUserModal]);
+
+    const fetchCompaniesList = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('https://shamsi-tn.onrender.com/api/admin/companies', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            setCompaniesList(data);
+        } catch (error) {
+            console.error('Failed to fetch companies:', error);
+        }
+    };
+
     const showNotificationMessage = (message) => {
         setNotificationMessage(message);
         setShowNotification(true);
@@ -121,7 +148,6 @@ const GeneralManagerDashboard = () => {
     try {
         const params = filter !== 'all' ? { status: filter } : {};
         
-        // ✅ استخدام fetch مباشرة بدلاً من adminAPI
         const token = localStorage.getItem('token');
         const queryString = new URLSearchParams(params).toString();
         const url = `https://shamsi-tn.onrender.com/api/admin/leads${queryString ? `?${queryString}` : ''}`;
@@ -417,27 +443,13 @@ const GeneralManagerDashboard = () => {
 
     let companyId = null;
 
-    // 4. إذا كان الدور "شركة"، نتحقق من وجود الشركة
+    // 4. إذا كان الدور "شركة"، نتحقق من اختيار الشركة من القائمة
     if (newUser.role === 'company') {
-        let matchingCompany = null;
-        
-        if (selectedCompanyForUser) {
-            matchingCompany = selectedCompanyForUser;
-        } else {
-            matchingCompany = companies.find(c => c.email === newUser.email);
-        }
-        
-        if (matchingCompany) {
-            companyId = matchingCompany.id;
-            console.log('✅ Company found:', matchingCompany.name, 'ID:', companyId);
-        } else {
-            toast.error(
-                `⚠️ لا توجد شركة مسجلة بهذا البريد: ${newUser.email}\n\n` +
-                `يرجى إضافة الشركة أولاً من تبويب "الشركات"`,
-                { duration: 7000 }
-            );
+        if (!selectedCompanyId) {
+            toast.error('⚠️ يرجى اختيار الشركة من القائمة');
             return;
         }
+        companyId = selectedCompanyId;
     }
 
     // 5. تجهيز البيانات للإرسال
@@ -447,7 +459,7 @@ const GeneralManagerDashboard = () => {
         password: newUser.password,
         role: newUser.role,
         phone: newUser.phone?.trim() || '',
-        company_id: companyId  // null إذا لم يكن الدور company
+        company_id: companyId
     };
 
     console.log('📤 Sending user data:', userData);
@@ -468,13 +480,11 @@ const GeneralManagerDashboard = () => {
         console.log('📥 Response data:', responseData);
 
         if (!response.ok) {
-            // استخراج رسالة الخطأ من الخادم
             let errorMsg = 'حدث خطأ غير معروف';
             if (responseData.message) errorMsg = responseData.message;
             else if (responseData.error) errorMsg = responseData.error;
             else if (typeof responseData === 'string') errorMsg = responseData;
             
-            // رسائل خطأ مفهومة للمستخدم
             if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
                 toast.error('❌ هذا البريد الإلكتروني مستخدم بالفعل');
             } else if (errorMsg.includes('password')) {
@@ -485,13 +495,12 @@ const GeneralManagerDashboard = () => {
             return;
         }
 
-        // نجاح العملية
         toast.success('✅ تم إضافة المستخدم بنجاح');
         toast.success('📝 يمكن للمستخدم تسجيل الدخول الآن باستخدام البريد وكلمة المرور', { duration: 5000 });
         
-        // إغلاق المودال وتفريغ الحقول
         setShowUserModal(false);
         setSelectedCompanyForUser(null);
+        setSelectedCompanyId('');
         setNewUser({ 
             name: '', 
             email: '', 
@@ -501,7 +510,6 @@ const GeneralManagerDashboard = () => {
             company_name: '' 
         });
         
-        // تحديث قائمة المستخدمين
         fetchUsers();
         
     } catch (error) {
@@ -509,6 +517,7 @@ const GeneralManagerDashboard = () => {
         toast.error('❌ خطأ في الاتصال بالخادم. تأكد من اتصالك بالإنترنت');
     }
 };
+
     const handleDeleteUser = async (userId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟')) {
             try {
@@ -590,6 +599,7 @@ const GeneralManagerDashboard = () => {
             company_name: company.name
         });
         setSelectedCompanyForUser(company);
+        setSelectedCompanyId(company.id);
         setShowUserModal(true);
     };
 
@@ -1712,18 +1722,37 @@ const GeneralManagerDashboard = () => {
                             <div>
                                 <label className="block text-gray-700 mb-1">الدور</label>
                                 <select
-    value={newUser.role}
-    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-    className="w-full px-4 py-2 border rounded-lg"
->
-    <option value="executive_manager">مدير تنفيذي</option>
-    <option value="call_center">مركز اتصال</option>
-    <option value="operations_manager">مدير عمليات</option>
-    <option value="bank_manager">مدير بنك</option>
-    <option value="leasing_manager">مدير تأجير</option>
-    <option value="company">شركة</option>
-</select>
+                                    value={newUser.role}
+                                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                >
+                                    <option value="executive_manager">مدير تنفيذي</option>
+                                    <option value="call_center">مركز اتصال</option>
+                                    <option value="operations_manager">مدير عمليات</option>
+                                    <option value="bank_manager">مدير بنك</option>
+                                    <option value="leasing_manager">مدير تأجير</option>
+                                    <option value="company">شركة</option>
+                                </select>
                             </div>
+                            {/* ✅ إضافة قائمة منسدلة لاختيار الشركة عند اختيار دور company */}
+                            {newUser.role === 'company' && (
+                                <div>
+                                    <label className="block text-gray-700 mb-1">اختر الشركة *</label>
+                                    <select
+                                        value={selectedCompanyId}
+                                        onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                        className="w-full px-4 py-2 border rounded-lg"
+                                        required
+                                    >
+                                        <option value="">-- اختر شركة --</option>
+                                        {companiesList.map(company => (
+                                            <option key={company.id} value={company.id}>
+                                                {company.name} - {company.email}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-gray-700 mb-1">رقم الهاتف (اختياري)</label>
                                 <input
@@ -1746,6 +1775,7 @@ const GeneralManagerDashboard = () => {
                                 onClick={() => {
                                     setShowUserModal(false);
                                     setSelectedCompanyForUser(null);
+                                    setSelectedCompanyId('');
                                     setNewUser({ name: '', email: '', password: '', role: 'executive_manager', phone: '', company_name: '' });
                                 }}
                                 className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
