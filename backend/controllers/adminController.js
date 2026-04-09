@@ -206,7 +206,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
     try {
-        const { name, email, password, role, phone } = req.body;
+        const { name, email, password, role, phone, company_id } = req.body; // ✅ أضف company_id
         
         const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
         if (getRows(existing).length > 0) {
@@ -215,10 +215,11 @@ exports.addUser = async (req, res) => {
         
         const hashedPassword = await bcrypt.hash(password, 10);
         
+        // ✅ أضف company_id إلى INSERT
         await db.query(
-            `INSERT INTO users (name, email, password, role, phone, is_active) 
-             VALUES ($1, $2, $3, $4, $5, true)`,
-            [name, email, hashedPassword, role, phone || null]
+            `INSERT INTO users (name, email, password, role, phone, company_id, is_active) 
+             VALUES ($1, $2, $3, $4, $5, $6, true)`,
+            [name, email, hashedPassword, role, phone || null, company_id || null]
         );
         
         res.status(201).json({ message: 'تم إضافة المستخدم بنجاح' });
