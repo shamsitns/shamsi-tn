@@ -237,18 +237,21 @@ exports.getAvailableCompanies = async (req, res) => {
 exports.sendToOperationsManager = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
-        const { notes, operations_manager_id } = req.body; // ✅ أضف operations_manager_id
+        const { notes, operations_manager_id } = req.body;
         const executiveId = req.user.id;
 
         let targetOpsManagerId = operations_manager_id;
         if (!targetOpsManagerId) {
-            // إذا لم يُرسل، خذ أول مدير عمليات
             const opsResult = await db.query("SELECT id FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1");
             targetOpsManagerId = getFirstRow(opsResult)?.id;
             if (!targetOpsManagerId) return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
 
-        // تحديث lead
+        // جلب بيانات الطلب
+        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(leadResult);
+        if (!lead) return res.status(404).json({ message: 'الطلب غير موجود' });
+
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
@@ -261,9 +264,15 @@ exports.sendToOperationsManager = async (req, res) => {
         );
 
         const commission = lead.commission_amount || (lead.required_kw * 150);
-        res.json({ message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`, leadId, commission });
+        res.json({ 
+            message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`, 
+            leadId: parseInt(leadId),
+            commission: commission,
+            operationsManagerId: targetOpsManagerId
+        });
     } catch (error) {
-        res.status(500).json({ message: 'حدث خطأ' });
+        console.error('❌ Error in sendToOperationsManager:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
 
