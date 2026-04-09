@@ -176,19 +176,40 @@ exports.getManagerStats = async (req, res) => {
     }
 };
 
+// =============================================
+// إرسال طلب لشركة (لـ Operations Manager)
+// =============================================
 exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
         const { companyId, notes } = req.body;
-        let managerId = req.user?.id || 4; // ✅ استخدام معرف افتراضي (4) إذا كان غير صالح
+        let managerId = req.user?.id;
 
-        // التأكد من وجود managerId صالح
-        const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
-        if (getRows(userCheck).length === 0) {
-            managerId = 4;
+        // ✅ التأكد من أن managerId صالح (موجود في جدول users)
+        if (!managerId) {
+            // إذا لم يكن هناك معرف، جلب أول مدير عمليات نشط
+            const fallback = await db.query(
+                "SELECT id FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1"
+            );
+            managerId = getFirstRow(fallback)?.id;
+            if (!managerId) {
+                // إذا لم يوجد أي مدير عمليات، استخدم معرف افتراضي (4)
+                managerId = 4;
+            }
+        } else {
+            const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
+            if (getRows(userCheck).length === 0) {
+                // المعرف غير موجود، جلب أول مدير عمليات نشط
+                const fallback = await db.query(
+                    "SELECT id FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1"
+                );
+                managerId = getFirstRow(fallback)?.id || 4;
+            }
         }
 
-        // تحديث الطلب
+        console.log(`🏢 Assigning lead ${leadId} to company ${companyId} by user ${managerId}`);
+
+        // تحديث الطلب: تعيين الشركة وتغيير الحالة
         await db.query(
             `UPDATE leads 
              SET status = 'assigned_to_company', 
@@ -219,8 +240,10 @@ exports.assignToCompany = async (req, res) => {
             );
         }
 
+        console.log(`✅ Lead ${leadId} assigned to company ${companyId} by user ${managerId}`);
         res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
     } catch (error) {
+        console.error('❌ Error assigning to company:', error);
         res.status(500).json({ message: 'حدث خطأ في إرسال الطلب للشركة', error: error.message });
     }
 };
