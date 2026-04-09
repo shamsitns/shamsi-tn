@@ -206,9 +206,8 @@ exports.getAllUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
     try {
-        const { name, email, password, role, phone, company_id } = req.body; // ✅ أضف company_id
+        const { name, email, password, role, phone, company_id } = req.body; // أضف company_id
 
-        // التحقق من وجود البريد
         const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
         if (getRows(existing).length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
@@ -216,7 +215,6 @@ exports.addUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // ✅ أضف company_id إلى الإدراج
         await db.query(
             `INSERT INTO users (name, email, password, role, phone, company_id, is_active) 
              VALUES ($1, $2, $3, $4, $5, $6, true)`,
