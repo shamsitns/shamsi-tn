@@ -139,73 +139,11 @@ exports.updateLeadStatus = async (req, res) => {
 // =============================================
 // الحصول على إحصائيات المدير (مع العمولة)
 // =============================================
-exports.getManagerStats = async (req, res) => {
-    try {
-        const managerId = req.user.id;
-        const role = req.user.role;
-        
-        console.log(`📈 Getting stats for manager ${managerId} (${role})`);
-        
-        let query = `
-            SELECT 
-                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-                COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
-                COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
-                COUNT(CASE WHEN status = 'sent_to_operations' THEN 1 END) as sent_to_operations,
-                COUNT(CASE WHEN status = 'assigned_to_company' THEN 1 END) as assigned_to_company,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-                COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled,
-                COALESCE(SUM(CASE WHEN status = 'completed' THEN commission_amount ELSE 0 END), 0) as total_commission
-            FROM leads
-            WHERE created_by = $1 OR assigned_to = $1
-        `;
-        
-        const result = await db.query(query, [managerId]);
-        const stats = getFirstRow(result) || { 
-            pending: 0, approved: 0, contacted: 0,
-            sent_to_operations: 0, assigned_to_company: 0,
-            completed: 0, cancelled: 0, total_commission: 0
-        };
-        
-        console.log(`📊 Stats: pending=${stats.pending}, completed=${stats.completed}, commission=${stats.total_commission}`);
-        res.json(stats);
-        
-    } catch (error) {
-        console.error('❌ Error getting manager stats:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب الإحصائيات', error: error.message });
-    }
-};
-
-// =============================================
-// إرسال طلب لشركة (لـ Operations Manager)
-// =============================================
 exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
         const { companyId, notes } = req.body;
-        let managerId = req.user?.id;
-
-        // ✅ التأكد من أن managerId صالح (موجود في جدول users)
-        if (!managerId) {
-            // إذا لم يكن هناك معرف، جلب أول مدير عمليات نشط
-            const fallback = await db.query(
-                "SELECT id FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1"
-            );
-            managerId = getFirstRow(fallback)?.id;
-            if (!managerId) {
-                // إذا لم يوجد أي مدير عمليات، استخدم معرف افتراضي (4)
-                managerId = 4;
-            }
-        } else {
-            const userCheck = await db.query('SELECT id FROM users WHERE id = $1', [managerId]);
-            if (getRows(userCheck).length === 0) {
-                // المعرف غير موجود، جلب أول مدير عمليات نشط
-                const fallback = await db.query(
-                    "SELECT id FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1"
-                );
-                managerId = getFirstRow(fallback)?.id || 4;
-            }
-        }
+        const managerId = 4; // ✅ استخدم المعرف الثابت لمدير العمليات
 
         console.log(`🏢 Assigning lead ${leadId} to company ${companyId} by user ${managerId}`);
 
