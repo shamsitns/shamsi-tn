@@ -81,18 +81,21 @@ const ExecutiveManagerDashboard = () => {
         }
     };
     
-    // ✅ جلب قائمة مدراء العمليات
+    // ✅ جلب قائمة مدراء العمليات (تم إصلاح تعريف token ومعالجة الاستجابة)
     const fetchOperationsManagers = async () => {
         try {
+            const token = localStorage.getItem('token'); // ✅ تم إضافة تعريف token
             const response = await fetch('https://shamsi-tn.onrender.com/api/manager/operations-managers', {
-    headers: { 'Authorization': `Bearer ${token}` }
-});
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const data = await response.json();
-            const managers = data.data || data.users || [];
+            // ✅ البيانات تأتي كمصفوفة مباشرة
+            const managers = Array.isArray(data) ? data : (data.data || data.users || []);
             setOperationsManagers(managers);
             if (managers.length > 0) setSelectedOpsManagerId(managers[0].id);
         } catch (error) {
             console.error('Failed to fetch operations managers:', error);
+            toast.error('حدث خطأ في جلب مدراء العمليات');
         }
     };
     
