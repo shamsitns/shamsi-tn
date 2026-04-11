@@ -9,7 +9,7 @@ import {
     FaHome, FaIndustry, FaTractor, FaStore, FaIdCard,
     FaUniversity, FaHandHoldingHeart, FaInfoCircle, FaSearch,
     FaFilter, FaFire, FaTrophy, FaBell, FaStar, FaLeaf,
-    FaChevronDown, FaChevronUp
+    FaChevronDown, FaChevronUp, FaImage
 } from 'react-icons/fa';
 
 const ExecutiveManagerDashboard = () => {
@@ -45,7 +45,7 @@ const ExecutiveManagerDashboard = () => {
     useEffect(() => {
         fetchData();
         fetchStats();
-        fetchOperationsManagers(); // جلب مدراء العمليات
+        fetchOperationsManagers();
     }, [filter]);
     
     useEffect(() => {
@@ -81,15 +81,13 @@ const ExecutiveManagerDashboard = () => {
         }
     };
     
-    // ✅ جلب قائمة مدراء العمليات (تم إصلاح تعريف token ومعالجة الاستجابة)
     const fetchOperationsManagers = async () => {
         try {
-            const token = localStorage.getItem('token'); // ✅ تم إضافة تعريف token
+            const token = localStorage.getItem('token');
             const response = await fetch('https://shamsi-tn.onrender.com/api/manager/operations-managers', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
-            // ✅ البيانات تأتي كمصفوفة مباشرة
             const managers = Array.isArray(data) ? data : (data.data || data.users || []);
             setOperationsManagers(managers);
             if (managers.length > 0) setSelectedOpsManagerId(managers[0].id);
@@ -144,7 +142,6 @@ const ExecutiveManagerDashboard = () => {
         }
     };
     
-    // ✅ تعديل دالة الإرسال لاستخدام المدير المختار
     const handleSendToOperations = async () => {
         if (!selectedLead) return;
         if (!selectedOpsManagerId) {
@@ -211,7 +208,7 @@ const ExecutiveManagerDashboard = () => {
     };
     
     // =============================================
-    // Parse additional info (JSON or text)
+    // Parse additional info
     // =============================================
     const parseAdditionalInfo = (info) => {
         if (!info) return {};
@@ -635,6 +632,30 @@ const ExecutiveManagerDashboard = () => {
                                         </div>
                                     </div>
                                     
+                                    {/* ✅ عرض صورة الفاتورة إذا وجدت */}
+                                    {lead.invoice_image_url && (
+                                        <div className="mt-2 pt-2 border-t border-gray-100">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-gray-500 text-xs flex items-center gap-1">
+                                                    <FaImage className="text-blue-500" />
+                                                    صورة الفاتورة:
+                                                </span>
+                                                <button 
+                                                    onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                                    className="text-blue-500 text-xs hover:underline"
+                                                >
+                                                    عرض الصورة
+                                                </button>
+                                            </div>
+                                            <img 
+                                                src={`${lead.invoice_image_url}?tr=w-100,h-100,f-webp,q-80`}
+                                                alt="Invoice"
+                                                className="w-full h-24 object-cover rounded-lg cursor-pointer border"
+                                                onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                            />
+                                        </div>
+                                    )}
+                                    
                                     {/* زر عرض التفاصيل الإضافية */}
                                     <button
                                         onClick={() => toggleExpand(lead.id)}
@@ -650,7 +671,6 @@ const ExecutiveManagerDashboard = () => {
                                                 <FaInfoCircle className="text-blue-500" /> معلومات إضافية من الحاسبة
                                             </div>
                                             
-                                            {/* مساحة السطح ونوعه */}
                                             <div className="grid grid-cols-2 gap-2 text-sm">
                                                 <div className="flex items-center gap-1">
                                                     <FaRuler className="text-purple-500" />
@@ -668,7 +688,6 @@ const ExecutiveManagerDashboard = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* الجدول الزمني وطريقة الدفع */}
                                             <div className="grid grid-cols-2 gap-2 text-sm">
                                                 <div className="flex items-center gap-1">
                                                     <FaClock className="text-green-500" />
@@ -682,7 +701,6 @@ const ExecutiveManagerDashboard = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* البنك المفضل إن وجد */}
                                             {(lead.preferred_bank || additionalInfo.preferred_bank) && (
                                                 <div className="flex items-center gap-1 text-sm">
                                                     <FaUniversity className="text-indigo-500" />
@@ -691,7 +709,6 @@ const ExecutiveManagerDashboard = () => {
                                                 </div>
                                             )}
                                             
-                                            {/* نتائج الحساب الإضافية */}
                                             <div className="bg-gray-50 p-3 rounded-lg mt-2 space-y-2">
                                                 <div className="text-xs font-semibold text-gray-600">📊 نتائج الحساب التفصيلية:</div>
                                                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -723,7 +740,6 @@ const ExecutiveManagerDashboard = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* معلومات إضافية نصية إن وجدت */}
                                             {lead.additional_info && lead.additional_info !== '{}' && (
                                                 <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
                                                     <span className="font-semibold">📝 ملاحظات إضافية:</span> {lead.additional_info}
@@ -766,7 +782,6 @@ const ExecutiveManagerDashboard = () => {
                                         </div>
                                     )}
                                     
-                                    {/* ✅ زر إرسال لمدير العمليات – يظهر لعدة حالات (pending, contacted, approved) */}
                                     {['pending', 'contacted', 'approved'].includes(lead.status) && (
                                         <button
                                             onClick={() => {
@@ -821,7 +836,7 @@ const ExecutiveManagerDashboard = () => {
                 </div>
             )}
             
-            {/* Modal لإرسال لمدير العمليات – مع قائمة منسدلة لاختيار المدير */}
+            {/* Modal لإرسال لمدير العمليات */}
             {showSendModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -830,7 +845,6 @@ const ExecutiveManagerDashboard = () => {
                         </h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
                         
-                        {/* ✅ قائمة منسدلة لاختيار مدير العمليات */}
                         <label className="block text-gray-700 mb-2">اختر مدير العمليات:</label>
                         <select
                             value={selectedOpsManagerId}
