@@ -8,7 +8,8 @@ import {
     FaUser, FaPhone, FaMapMarkerAlt, FaCalculator,
     FaCalendarAlt, FaLeaf, FaIdCard, FaClock,
     FaInfoCircle, FaUniversity, FaHandHoldingHeart, FaSolarPanel,
-    FaPaperPlane, FaCheckCircle, FaTree, FaChartLine, FaStar, FaFire
+    FaPaperPlane, FaCheckCircle, FaTree, FaChartLine, FaStar, FaFire,
+    FaImage, FaUpload, FaTrash
 } from 'react-icons/fa';
 
 // ============================================
@@ -229,6 +230,9 @@ const CalculatorPage = () => {
     const [showBankModal, setShowBankModal] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState(null);
     const [selectedBank, setSelectedBank] = useState(null);
+    const [invoiceImage, setInvoiceImage] = useState(null);
+    const [invoiceImagePreview, setInvoiceImagePreview] = useState(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
@@ -240,8 +244,7 @@ const CalculatorPage = () => {
         bill_value: '',
         roof_area: '',
         roof_type: 'terrace',
-        installation_timeline: '3-6',
-        payment_method: 'cash'
+        installation_timeline: '3-6'
     });
 
     useEffect(() => {
@@ -250,6 +253,47 @@ const CalculatorPage = () => {
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // ✅ دالة معالجة رفع الصورة
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // التحقق من حجم الصورة (5MB كحد أقصى)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت');
+            return;
+        }
+        
+        // التحقق من نوع الصورة
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+            toast.error('نوع الصورة غير مدعوم. الأنواع المدعومة: JPEG, PNG, WEBP, GIF');
+            return;
+        }
+        
+        setUploadingImage(true);
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setInvoiceImage(reader.result);
+            setInvoiceImagePreview(reader.result);
+            setUploadingImage(false);
+            toast.success('تم رفع الصورة بنجاح');
+        };
+        reader.onerror = () => {
+            setUploadingImage(false);
+            toast.error('حدث خطأ في قراءة الصورة');
+        };
+        reader.readAsDataURL(file);
+    };
+    
+    // ✅ دالة حذف الصورة
+    const handleRemoveImage = () => {
+        setInvoiceImage(null);
+        setInvoiceImagePreview(null);
+        toast.success('تم حذف الصورة');
     };
 
     const handleCalculate = async (e) => {
@@ -310,13 +354,19 @@ const CalculatorPage = () => {
     };
     
     const handleConfirmAndSend = async () => {
+        // ✅ التحقق من اختيار طريقة الدفع
+        if (!selectedPayment) {
+            toast.error('يرجى اختيار طريقة الدفع أولاً');
+            return;
+        }
+        
         setSending(true);
         setShowLegalModal(false);
         
         const property = propertyTypes.find(p => p.value === formData.property_type);
         const billDays = property.period;
         
-        // ✅ إضافة جميع الحقول المحسوبة من النتيجة
+        // ✅ إضافة جميع الحقول المحسوبة من النتيجة مع صورة الفاتورة
         const sendData = {
             name: formData.name,
             phone: formData.phone,
@@ -341,7 +391,9 @@ const CalculatorPage = () => {
             monthly_savings: result.monthly_savings,
             co2_saved: result.co2_saved,
             solar_score: result.solar_score,
-            coverage_percent: result.coverage_percent
+            coverage_percent: result.coverage_percent,
+            // ✅ صورة الفاتورة
+            invoiceImage: invoiceImage
         };
 
         try {
@@ -352,11 +404,13 @@ const CalculatorPage = () => {
             setFormData({
                 name: '', phone: '', city: '', property_type: 'house',
                 bill_period: 60, bill_season: 'spring', meter_number: '', bill_value: '',
-                roof_area: '', roof_type: 'terrace', installation_timeline: '3-6', payment_method: 'cash'
+                roof_area: '', roof_type: 'terrace', installation_timeline: '3-6'
             });
             setSelectedBank(null);
             setSelectedPayment(null);
             setSelectedPanel(null);
+            setInvoiceImage(null);
+            setInvoiceImagePreview(null);
         } catch (error) {
             toast.error('❌ حدث خطأ في إرسال الطلب');
         } finally {
@@ -410,6 +464,33 @@ const CalculatorPage = () => {
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800">معلومات العقار والكهرباء</h2>
                 </div>
+                
+                {/* ✅ رفع صورة الفاتورة */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <FaImage className="text-blue-500 text-xl" />
+                        <span className="font-semibold text-gray-700">صورة فاتورة الكهرباء</span>
+                        <span className="text-xs text-gray-500">(اختياري)</span>
+                    </div>
+                    
+                    {!invoiceImagePreview ? (
+                        <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:border-blue-500 transition cursor-pointer" onClick={() => document.getElementById('invoice-upload').click()}>
+                            <FaUpload className="text-3xl text-blue-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">اضغط لرفع صورة الفاتورة</p>
+                            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF (حد أقصى 5MB)</p>
+                            <input type="file" id="invoice-upload" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleImageUpload} className="hidden" />
+                        </div>
+                    ) : (
+                        <div className="relative">
+                            <img src={invoiceImagePreview} alt="Invoice Preview" className="w-full max-h-48 object-contain rounded-lg border" />
+                            <button onClick={handleRemoveImage} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition shadow-lg">
+                                <FaTrash />
+                            </button>
+                        </div>
+                    )}
+                    {uploadingImage && <p className="text-center text-blue-500 mt-2">جاري رفع الصورة...</p>}
+                </div>
+                
                 <div className="grid grid-cols-2 gap-2">
                     {propertyTypes.map((type) => {
                         const Icon = type.icon;
@@ -493,11 +574,12 @@ const CalculatorPage = () => {
         );
     };
 
-    // ==================== STEP 4 (النتائج - بدون سعر) ====================
+    // ==================== STEP 4 (النتائج) ====================
     const renderResult = () => {
         const property = propertyTypes.find(p => p.value === formData.property_type);
         const isResidential = ['house', 'apartment'].includes(formData.property_type);
         const isAgricultural = formData.property_type === 'farm';
+        const paymentOptions = getPaymentOptions(formData.property_type);
         
         return (
             <div className="space-y-4">
@@ -566,36 +648,49 @@ const CalculatorPage = () => {
                     <div className="flex justify-between font-semibold mt-2 pt-2 border-t"><span>الإجمالي</span><span>{result.monthly_consumption} kWh</span><span>{formData.bill_value} دينار</span></div>
                 </div>
                 
+                {/* ✅ اختيار طريقة الدفع - إجباري */}
                 <div className="space-y-2">
-                    <button onClick={() => handlePaymentClick('cash')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right">
-                        <FaMoneyBillWave className="text-2xl text-green-600" />
-                        <div className="flex-1"><div className="font-semibold">دفع نقدي</div><div className="text-xs text-gray-500">الدفع الكامل للمبلغ عند التركيب</div></div>
-                        <div className="text-green-600">✓</div>
-                    </button>
-                    <button onClick={() => handlePaymentClick('steg')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right">
-                        <FaBolt className="text-2xl text-green-600" />
-                        <div className="flex-1"><div className="font-semibold">تمويل STEG</div><div className="text-xs text-gray-500">تقسيط عبر فاتورة الكهرباء حتى 7 سنوات</div></div>
-                        <div className="text-green-600">✓</div>
-                    </button>
-                    {isResidential && <button onClick={() => handlePaymentClick('prosol')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right">
-                        <FaHandHoldingHeart className="text-2xl text-green-600" />
-                        <div className="flex-1"><div className="font-semibold">قرض PROSOL</div><div className="text-xs text-gray-500">قرض مدعوم من الدولة بفائدة 3%</div></div>
-                        <div className="text-green-600">✓</div>
-                    </button>}
-                    {!isResidential && !isAgricultural && <button onClick={() => handlePaymentClick('bank')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right">
-                        <FaUniversity className="text-2xl text-green-600" />
-                        <div className="flex-1"><div className="font-semibold">قرض بنكي</div><div className="text-xs text-gray-500">تمويل بنكي بفائدة مخفضة</div></div>
-                        <div className="text-green-600">✓</div>
-                    </button>}
-                    {!isResidential && <button onClick={() => handlePaymentClick('leasing')} className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-gray-300 hover:border-orange-500 hover:bg-orange-50 transition text-right">
-                        <FaBuilding className="text-2xl text-green-600" />
-                        <div className="flex-1"><div className="font-semibold">إيجار تمويلي</div><div className="text-xs text-gray-500">تأجير النظام مع أحقية التمليك</div></div>
-                        <div className="text-green-600">✓</div>
-                    </button>}
+                    <p className="text-gray-700 font-semibold mb-2">اختر طريقة الدفع *</p>
+                    {paymentOptions.map((option) => {
+                        const Icon = option.icon;
+                        const isSelected = selectedPayment === option.value;
+                        return (
+                            <button
+                                key={option.value}
+                                onClick={() => handlePaymentClick(option.value)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition text-right ${
+                                    isSelected 
+                                        ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' 
+                                        : 'border-gray-300 hover:border-orange-500 hover:bg-orange-50'
+                                }`}
+                            >
+                                <Icon className={`text-2xl ${isSelected ? 'text-orange-600' : 'text-green-600'}`} />
+                                <div className="flex-1">
+                                    <div className="font-semibold flex items-center gap-2">
+                                        {option.label}
+                                        {isSelected && <FaCheckCircle className="text-orange-500 text-sm" />}
+                                    </div>
+                                    <div className="text-xs text-gray-500">{option.description}</div>
+                                </div>
+                                <div className={`text-xl ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>✓</div>
+                            </button>
+                        );
+                    })}
                 </div>
                 
+                {/* ✅ عرض رسالة إذا لم يتم اختيار طريقة الدفع */}
+                {!selectedPayment && (
+                    <div className="bg-red-50 border border-red-300 rounded-xl p-3 text-center">
+                        <p className="text-red-600 text-sm">⚠️ يرجى اختيار طريقة الدفع قبل إرسال الطلب</p>
+                    </div>
+                )}
+                
                 <div className="mt-4 p-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg">
-                    <button onClick={handleConfirmAndSend} disabled={sending} className="w-full bg-white text-orange-600 py-4 rounded-xl font-bold text-xl flex items-center justify-center gap-3 hover:shadow-xl transition-all transform hover:scale-[1.02] disabled:opacity-50">
+                    <button 
+                        onClick={handleConfirmAndSend} 
+                        disabled={sending || !selectedPayment} 
+                        className={`w-full bg-white text-orange-600 py-4 rounded-xl font-bold text-xl flex items-center justify-center gap-3 hover:shadow-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none`}
+                    >
                         {sending ? <><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div> جاري إرسال طلبك...</> : <><FaPaperPlane className="text-2xl" /> احصل على دراسة مجانية</>}
                     </button>
                     <p className="text-center text-white/90 text-sm mt-3 flex items-center justify-center gap-2"><span>✓ دراسة مجانية</span><span>✓ بدون أي التزام</span><span>✓ استشارة فنية</span></p>
