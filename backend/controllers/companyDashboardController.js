@@ -51,74 +51,68 @@ exports.getMyLeads = async (req, res) => {
     }
 };
 
-// تحديث حالة الطلب
+// تحديث حالة الطلب (نسخة مبسطة وخالية من الأخطاء)
 exports.updateLeadStatus = async (req, res) => {
     try {
         const { leadId } = req.params;
         const { status, notes } = req.body;
-        const userId = req.user.id;
         const userEmail = req.user.email;
-        
+
         const validStatuses = ['pending', 'accepted', 'rejected', 'in_progress', 'completed'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'حالة غير صالحة' });
         }
-        
-        // جلب company_id من جدول companies
-        const companyResult = await db.query(`
-            SELECT id FROM companies WHERE email = $1
-        `, [userEmail]);
-        
-        const companyId = getFirstRow(companyResult)?.id;
-        
+
+        // 1. الحصول على company_id
+        const companyResult = await db.query(`SELECT id FROM companies WHERE email = $1`, [userEmail]);
+        const companyId = companyResult.rows?.[0]?.id;
+
         if (!companyId) {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
         }
-        
-        // تحديث lead_companies
-        await db.query(`
-            UPDATE lead_companies 
-            SET status = $1, 
-                notes = COALESCE(notes, '') || CASE WHEN $2 IS NOT NULL THEN E'\n' || $2 ELSE '' END,
-                updated_at = CURRENT_TIMESTAMP 
-            WHERE lead_id = $3 AND company_id = $4
-        `, [status, notes || null, leadId, companyId]);
-        
-        // تحديث leads.status بناءً على الحالة
+
+        // 2. تحديث lead_companies (بشكل مبسط)
+        if (notes) {
+            // مع وجود ملاحظات
+            await db.query(
+                `UPDATE lead_companies 
+                 SET status = $1, 
+                     notes = COALESCE(notes, '') || E'\n' || $2,
+                     updated_at = CURRENT_TIMESTAMP 
+                 WHERE lead_id = $3 AND company_id = $4`,
+                [status, notes, leadId, companyId]
+            );
+        } else {
+            // بدون ملاحظات
+            await db.query(
+                `UPDATE lead_companies 
+                 SET status = $1, 
+                     updated_at = CURRENT_TIMESTAMP 
+                 WHERE lead_id = $2 AND company_id = $3`,
+                [status, leadId, companyId]
+            );
+        }
+
+        // 3. تحديث leads.status إذا لزم الأمر
         let leadStatus = null;
-        if (status === 'accepted') {
-            leadStatus = 'assigned_to_company';
-        } else if (status === 'rejected') {
-            leadStatus = 'cancelled';
-        } else if (status === 'in_progress') {
-            leadStatus = 'in_progress';
-        } else if (status === 'completed') {
-            leadStatus = 'completed';
-        }
-        
+        if (status === 'accepted') leadStatus = 'assigned_to_company';
+        else if (status === 'rejected') leadStatus = 'cancelled';
+        else if (status === 'in_progress') leadStatus = 'in_progress';
+        else if (status === 'completed') leadStatus = 'completed';
+
         if (leadStatus) {
-            await db.query(`
-                UPDATE leads 
-                SET status = $1, 
-                    updated_at = CURRENT_TIMESTAMP 
-                WHERE id = $2
-            `, [leadStatus, leadId]);
+            await db.query(
+                `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                [leadStatus, leadId]
+            );
         }
-        
+
         console.log(`✅ Lead ${leadId} status updated to ${status} by company ${companyId}`);
-        
-        res.json({ 
-            message: 'تم تحديث الحالة بنجاح',
-            status: status,
-            leadId: leadId
-        });
-        
+        res.json({ message: 'تم تحديث الحالة بنجاح', status, leadId });
+
     } catch (error) {
         console.error('Error updating lead status:', error);
-        res.status(500).json({ 
-            message: 'حدث خطأ في تحديث الحالة',
-            error: error.message 
-        });
+        res.status(500).json({ message: 'حدث خطأ في تحديث الحالة', error: error.message });
     }
 };
 
