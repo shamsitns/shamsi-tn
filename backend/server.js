@@ -26,7 +26,7 @@ const managerRoutes = require('./routes/manager');
 const companyRoutes = require('./routes/companies');
 const bankRoutes = require('./routes/bank');
 const leasingRoutes = require('./routes/leasing');
-const companyDashboardRoutes = require('./routes/companyDashboard'); // ✅ إضافة مسار الشركة الجديد
+const companyDashboardRoutes = require('./routes/companyDashboard');
 
 // ✅ NEW: Import company requests routes
 const companyRequestsRoutes = require('./routes/companyRequests');
@@ -81,7 +81,7 @@ app.use(compression());
 
 // CORS (محدد حسب البيئة)
 const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? ['https://shamsi.tn', 'https://www.shamsi.tn', 'https://shamsi-tns.onrender.com']
+    ? ['https://shamsi.tn', 'https://www.shamsi.tn', 'https://shamsi-tns.onrender.com', 'https://shamsi-tn.onrender.com']
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
 
 app.use(cors({
@@ -95,8 +95,8 @@ app.use(cors({
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Body parsing (حدود أصغر للأمان)
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '5mb' })); // زيادة الحد لاستقبال الصور
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Cache Control
 app.use((req, res, next) => {
@@ -120,10 +120,151 @@ app.use(`${API_PREFIX}/manager`, managerRoutes);
 app.use(`${API_PREFIX}/companies`, companyRoutes);
 app.use(`${API_PREFIX}/bank`, bankRoutes);
 app.use(`${API_PREFIX}/leasing`, leasingRoutes);
-app.use(`${API_PREFIX}/company`, companyDashboardRoutes); // ✅ إضافة مسار الشركة الجديد
+app.use(`${API_PREFIX}/company`, companyDashboardRoutes);
 
 // ✅ NEW: Company Requests Routes (لصفحة JoinAsCompany)
 app.use(`${API_PREFIX}/company-requests`, companyRequestsRoutes);
+
+// =============================================
+// ✅ Create New Lead (POST /api/leads)
+// =============================================
+app.post(`${API_PREFIX}/leads`, async (req, res) => {
+    try {
+        console.log('📝 Creating new lead via server.js');
+        console.log('📦 Request body keys:', Object.keys(req.body));
+        
+        const {
+            name, phone, city, property_type, bill_amount,
+            bill_period_months, bill_season, roof_availability,
+            roof_area, meter_number, payment_method, preferred_bank,
+            panel_type, additional_info, roof_type, installation_timeline,
+            required_kw, panels_count, annual_production, annual_savings,
+            monthly_savings, co2_saved, solar_score, coverage_percent,
+            invoiceImage
+        } = req.body;
+        
+        const userId = req.user?.id || null;
+        
+        if (!name || !phone || !bill_amount) {
+            return res.status(400).json({ 
+                message: 'البيانات غير كاملة',
+                errors: ['الاسم، الهاتف، وقيمة الفاتورة مطلوبة']
+            });
+        }
+        
+        // حساب العمولة (افتراضي 150 دينار لكل كيلوواط)
+        const commissionAmount = (required_kw || 0) * 150;
+        
+        // حساب lead score بسيط
+        let leadScore = 0;
+        if (bill_amount > 500) leadScore += 30;
+        else if (bill_amount > 300) leadScore += 20;
+        else if (bill_amount > 150) leadScore += 10;
+        
+        // رفع الصورة إذا وجدت
+        let invoiceImageUrl = null;
+        let invoiceImageFileId = null;
+        
+        if (invoiceImage) {
+            try {
+                const { uploadImage, FOLDERS, validateImage } = require('./utils/imagekit');
+                const validation = validateImage(invoiceImage, 5);
+                if (validation.valid) {
+                    const uploadResult = await uploadImage(
+                        invoiceImage,
+                        `invoice_${Date.now()}_${userId || 'guest'}.jpg`,
+                        FOLDERS.INVOICES
+                    );
+                    if (uploadResult.success) {
+                        invoiceImageUrl = uploadResult.url;
+                        invoiceImageFileId = uploadResult.fileId;
+                        console.log(`✅ Invoice image uploaded: ${invoiceImageUrl}`);
+                    } else {
+                        console.error('❌ Upload failed:', uploadResult.error);
+                    }
+                } else {
+                    console.error('❌ Validation failed:', validation.error);
+                }
+            } catch (error) {
+                console.error('❌ Image upload error:', error);
+            }
+        }
+        
+        const db = getDb();
+        
+        const query = `
+            INSERT INTO leads (
+                name, phone, city, property_type, bill_amount,
+                bill_period_months, bill_season, roof_availability, roof_area,
+                meter_number, payment_method, preferred_bank, panel_type,
+                additional_info, roof_type, installation_timeline,
+                required_kw, panels_count, annual_production, annual_savings,
+                monthly_savings, co2_saved, solar_score, coverage_percent,
+                commission_amount, lead_score, invoice_image_url, invoice_image_file_id,
+                status, created_by, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, CURRENT_TIMESTAMP)
+            RETURNING id
+        `;
+        
+        const values = [
+            name, 
+            phone, 
+            city || null, 
+            property_type || 'house', 
+            parseFloat(bill_amount),
+            parseInt(bill_period_months) || 60, 
+            bill_season || 'spring',
+            roof_availability !== undefined ? roof_availability : true,
+            roof_area ? parseFloat(roof_area) : null, 
+            meter_number || null,
+            payment_method || null, 
+            preferred_bank || null, 
+            panel_type || null,
+            additional_info || null, 
+            roof_type || null, 
+            installation_timeline || null,
+            required_kw || null, 
+            panels_count || null, 
+            annual_production || null,
+            annual_savings || null, 
+            monthly_savings || null, 
+            co2_saved || null,
+            solar_score || null, 
+            coverage_percent || null,
+            commissionAmount, 
+            leadScore,
+            invoiceImageUrl, 
+            invoiceImageFileId,
+            'pending', 
+            userId
+        ];
+        
+        const result = await db.query(query, values);
+        const leadId = result.rows?.[0]?.id;
+        
+        console.log(`✅ Lead created successfully with ID: ${leadId}`);
+        console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
+        console.log(`   💰 Commission: ${commissionAmount} DT`);
+        
+        res.status(201).json({
+            message: 'تم إرسال الطلب بنجاح',
+            leadId: leadId,
+            invoiceImageUrl: invoiceImageUrl,
+            solarData: {
+                required_kw: required_kw,
+                panels_count: panels_count,
+                commission_amount: commissionAmount
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creating lead:', error);
+        res.status(500).json({
+            message: 'حدث خطأ في إنشاء الطلب',
+            error: error.message
+        });
+    }
+});
 
 // =============================================
 // Health Check
@@ -465,7 +606,7 @@ const startServer = async () => {
         app.listen(PORT, () => {
             console.log(`
     ════════════════════════════════════════════════════════
-    🚀 Shamsi.tn Backend Server Starteddd
+    🚀 Shamsi.tn Backend Server Started
     ════════════════════════════════════════════════════════
     📡 Port: ${PORT}
     🌐 URL: http://localhost:${PORT}
@@ -477,6 +618,7 @@ const startServer = async () => {
     🔒 Rate Limiting: Disabled (temporarily)
     📝 Request ID: Enabled
     ✅ Company Requests API: Enabled (/api/company-requests)
+    ✅ POST /api/leads: Enabled (for lead creation with images)
     ════════════════════════════════════════════════════════
             `);
         });
