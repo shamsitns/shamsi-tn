@@ -10,15 +10,15 @@ const getFirstRow = (result) => {
     return rows[0] || null;
 };
 
-// الحصول على طلبات الشركة
+// الحصول على طلبات الشركة (المعدل لمنع التكرار)
 exports.getMyLeads = async (req, res) => {
     try {
         const userEmail = req.user.email;
         
         // جلب company_id من جدول companies باستخدام البريد الإلكتروني
         const companyResult = await db.query(`
-    SELECT id FROM companies WHERE email = $1 OR user_id = $2
-`, [userEmail, req.user.id]);
+            SELECT id FROM companies WHERE email = $1
+        `, [userEmail]);
         
         const companyId = getFirstRow(companyResult)?.id;
         
@@ -26,19 +26,28 @@ exports.getMyLeads = async (req, res) => {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
         }
         
+        // ✅ استخدام DISTINCT ON لمنع التكرار
         const result = await db.query(`
-            SELECT l.*, lc.assigned_at, lc.status as assignment_status, lc.commission_rate as company_commission_rate
+            SELECT DISTINCT ON (l.id) 
+                l.*, 
+                lc.assigned_at, 
+                lc.status as assignment_status,
+                lc.notes as assignment_notes
             FROM leads l
-            JOIN lead_companies lc ON l.id = lc.lead_id
+            INNER JOIN lead_companies lc ON l.id = lc.lead_id
             WHERE lc.company_id = $1
-            ORDER BY lc.assigned_at DESC
+            ORDER BY l.id, lc.assigned_at DESC
         `, [companyId]);
         
         const leads = getRows(result);
         res.json({ leads });
+        
     } catch (error) {
         console.error('Error fetching my leads:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب الطلبات', error: error.message });
+        res.status(500).json({ 
+            message: 'حدث خطأ في جلب الطلبات', 
+            error: error.message 
+        });
     }
 };
 
@@ -67,41 +76,36 @@ exports.updateLeadStatus = async (req, res) => {
         }
         
         // تحديث lead_companies
-        let updateQuery = `
+        await db.query(`
             UPDATE lead_companies 
             SET status = $1, 
-                updated_at = CURRENT_TIMESTAMP
-        `;
-        const queryParams = [status, leadId, companyId];
+                notes = COALESCE(notes, '') || CASE WHEN $2 IS NOT NULL THEN E'\n' || $2 ELSE '' END,
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE lead_id = $3 AND company_id = $4
+        `, [status, notes || null, leadId, companyId]);
         
-        // إضافة notes إذا وجدت
-        if (notes) {
-            updateQuery += `, notes = COALESCE(notes, '') || '\n' || $4`;
-            queryParams.push(`[${new Date().toISOString()}] ${notes}`);
-        }
-        
-        updateQuery += ` WHERE lead_id = $2 AND company_id = $3`;
-        
-        await db.query(updateQuery, queryParams);
-        
-        // تحديث lead status بناءً على الحالة
+        // تحديث leads.status بناءً على الحالة
         let leadStatus = null;
         if (status === 'accepted') {
             leadStatus = 'assigned_to_company';
         } else if (status === 'rejected') {
             leadStatus = 'cancelled';
         } else if (status === 'in_progress') {
-            leadStatus = 'assigned_to_company';  // الحفاظ على نفس الحالة
+            leadStatus = 'in_progress';
         } else if (status === 'completed') {
             leadStatus = 'completed';
         }
         
         if (leadStatus) {
-            await db.query(
-                `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-                [leadStatus, leadId]
-            );
+            await db.query(`
+                UPDATE leads 
+                SET status = $1, 
+                    updated_at = CURRENT_TIMESTAMP 
+                WHERE id = $2
+            `, [leadStatus, leadId]);
         }
+        
+        console.log(`✅ Lead ${leadId} status updated to ${status} by company ${companyId}`);
         
         res.json({ 
             message: 'تم تحديث الحالة بنجاح',
@@ -124,8 +128,8 @@ exports.getMyStats = async (req, res) => {
         const userEmail = req.user.email;
         
         const companyResult = await db.query(`
-            SELECT id FROM companies WHERE email = $1 OR user_id = $2
-        `, [userEmail, req.user.id]);
+            SELECT id FROM companies WHERE email = $1
+        `, [userEmail]);
         
         const companyId = getFirstRow(companyResult)?.id;
         
@@ -200,14 +204,14 @@ exports.updateCommission = async (req, res) => {
     }
 };
 
-// ✅ NEW: الحصول على نسبة العمولة للشركة (دينار/كيلوواط)
+// الحصول على نسبة العمولة للشركة (دينار/كيلوواط)
 exports.getCommissionRate = async (req, res) => {
     try {
         const userEmail = req.user.email;
         
         const companyResult = await db.query(`
-            SELECT id FROM companies WHERE email = $1 OR user_id = $2
-        `, [userEmail, req.user.id]);
+            SELECT id FROM companies WHERE email = $1
+        `, [userEmail]);
         
         const companyId = getFirstRow(companyResult)?.id;
         
@@ -224,7 +228,7 @@ exports.getCommissionRate = async (req, res) => {
     }
 };
 
-// ✅ NEW: تحديث نسبة العمولة للشركة
+// تحديث نسبة العمولة للشركة
 exports.updateCommissionRate = async (req, res) => {
     try {
         const { commission_rate } = req.body;
@@ -235,8 +239,8 @@ exports.updateCommissionRate = async (req, res) => {
         const userEmail = req.user.email;
         
         const companyResult = await db.query(`
-            SELECT id FROM companies WHERE email = $1 OR user_id = $2
-        `, [userEmail, req.user.id]);
+            SELECT id FROM companies WHERE email = $1
+        `, [userEmail]);
         
         const companyId = getFirstRow(companyResult)?.id;
         
