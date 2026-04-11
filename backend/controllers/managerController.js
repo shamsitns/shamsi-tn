@@ -284,13 +284,12 @@ exports.getAvailableCompanies = async (req, res) => {
         const result = await db.query(`
             SELECT id, name, phone, address, contact_person, is_active 
             FROM companies 
-            WHERE is_active = 1
+            WHERE is_active = true
             ORDER BY name ASC
         `);
         
         const companies = getRows(result);
         res.json(companies || []);
-        
     } catch (error) {
         console.error('❌ Error getting available companies:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب الشركات', error: error.message });
