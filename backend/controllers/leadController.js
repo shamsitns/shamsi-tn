@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { calculateSolarSystem } = require('../utils/solarCalculator');
 const { COMMISSION_PER_KW, COMMISSION_TIERS } = require('../config/commission');
+const { uploadImage, deleteImage, FOLDERS, validateImage, getOptimizedUrl } = require('../utils/imagekit');
 
 // Helper function to handle both PostgreSQL and SQLite results
 const getRows = (result) => {
@@ -106,7 +107,7 @@ exports.calculateLead = async (req, res) => {
 };
 
 // =============================================
-// إنشاء طلب جديد (حفظ) - مع جميع المعلومات
+// إنشاء طلب جديد (حفظ) - مع جميع المعلومات وصورة الفاتورة
 // =============================================
 exports.createLead = async (req, res) => {
     try {
@@ -137,7 +138,9 @@ exports.createLead = async (req, res) => {
             monthly_savings,
             co2_saved,
             solar_score,
-            coverage_percent
+            coverage_percent,
+            // ✅ صورة الفاتورة
+            invoiceImage
         } = req.body;
         
         const leadSource = req.headers['x-source'] || 'website';
@@ -179,6 +182,33 @@ exports.createLead = async (req, res) => {
             meter_number: meter_number
         });
         
+        // ✅ رفع صورة الفاتورة إلى ImageKit إذا وجدت
+        let invoiceImageUrl = null;
+        let invoiceImageFileId = null;
+        
+        if (invoiceImage) {
+            const validation = validateImage(invoiceImage, 5);
+            if (!validation.valid) {
+                return res.status(400).json({ message: validation.error });
+            }
+            
+            const uploadResult = await uploadImage(
+                invoiceImage,
+                `invoice_${Date.now()}_${userId || 'guest'}.jpg`,
+                FOLDERS.INVOICES,
+                { tags: ['invoice', `lead_${Date.now()}`] }
+            );
+            
+            if (uploadResult.success) {
+                invoiceImageUrl = uploadResult.url;
+                invoiceImageFileId = uploadResult.fileId;
+                console.log(`✅ Invoice image uploaded: ${invoiceImageUrl}`);
+            } else {
+                console.error('❌ Failed to upload invoice image:', uploadResult.error);
+                // لا نمنع إنشاء الطلب إذا فشل رفع الصورة، فقط نسجل الخطأ
+            }
+        }
+        
         let fullAdditionalInfo = '';
         if (meter_number) fullAdditionalInfo += `🔢 رقم العداد: ${meter_number}\n`;
         if (payment_method) fullAdditionalInfo += `💰 طريقة الدفع: ${payment_method}\n`;
@@ -195,7 +225,7 @@ exports.createLead = async (req, res) => {
         
         console.log(`📊 Lead data: ${name}, ${phone}, KW: ${finalRequiredKw}, Score: ${leadScore}`);
         
-        // ✅ INSERT مع جميع الأعمدة (بما فيها الحقول الجديدة)
+        // ✅ INSERT مع جميع الأعمدة (بما فيها أعمدة الصور)
         const query = `
             INSERT INTO leads (
                 name, phone, city, property_type, 
@@ -207,8 +237,9 @@ exports.createLead = async (req, res) => {
                 roof_type, installation_timeline,
                 annual_production, annual_savings, monthly_savings,
                 co2_saved, solar_score, coverage_percent,
+                invoice_image_url, invoice_image_file_id,
                 status, created_by, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, CURRENT_TIMESTAMP)
             RETURNING id
         `;
         
@@ -240,6 +271,8 @@ exports.createLead = async (req, res) => {
             finalCo2Saved,
             finalSolarScore,
             finalCoveragePercent,
+            invoiceImageUrl,
+            invoiceImageFileId,
             'pending',
             userId
         ];
@@ -261,11 +294,13 @@ exports.createLead = async (req, res) => {
         console.log(`   👤 Created by: ${userId}`);
         console.log(`   🏗️ Roof type: ${roof_type || 'غير محدد'}`);
         console.log(`   ⏱️ Installation timeline: ${installation_timeline || 'غير محدد'}`);
+        console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
             leadId: leadId,
             leadScore: leadScore,
+            invoiceImageUrl: invoiceImageUrl,
             solarData: {
                 required_kw: finalRequiredKw,
                 panels_count: finalPanelsCount,
@@ -282,6 +317,80 @@ exports.createLead = async (req, res) => {
             message: 'حدث خطأ في الخادم',
             error: error.message 
         });
+    }
+};
+
+// =============================================
+// حذف طلب (مع حذف الصورة المرتبطة)
+// =============================================
+exports.deleteLead = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // جلب معلومات الصورة قبل حذف الطلب
+        const leadResult = await db.query(
+            'SELECT invoice_image_file_id FROM leads WHERE id = $1',
+            [id]
+        );
+        const lead = getFirstRow(leadResult);
+        
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        // حذف الصورة من ImageKit إذا وجدت
+        if (lead.invoice_image_file_id) {
+            const deleteResult = await deleteImage(lead.invoice_image_file_id);
+            if (deleteResult.success) {
+                console.log(`✅ Deleted invoice image for lead ${id}`);
+            } else {
+                console.error(`❌ Failed to delete invoice image for lead ${id}:`, deleteResult.error);
+            }
+        }
+        
+        // حذف الطلب من قاعدة البيانات
+        await db.query('DELETE FROM leads WHERE id = $1', [id]);
+        
+        console.log(`✅ Lead ${id} deleted successfully`);
+        res.json({ message: 'تم حذف الطلب بنجاح' });
+        
+    } catch (error) {
+        console.error('❌ Error deleting lead:', error);
+        res.status(500).json({ message: 'حدث خطأ في حذف الطلب', error: error.message });
+    }
+};
+
+// =============================================
+// الحصول على صورة فاتورة محسنة
+// =============================================
+exports.getInvoiceImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { width = 800, quality = 80 } = req.query;
+        
+        const result = await db.query(
+            'SELECT invoice_image_url, invoice_image_file_id FROM leads WHERE id = $1',
+            [id]
+        );
+        
+        const lead = getFirstRow(result);
+        if (!lead?.invoice_image_url) {
+            return res.status(404).json({ message: 'لا توجد صورة فاتورة لهذا الطلب' });
+        }
+        
+        const optimizedUrl = getOptimizedUrl(lead.invoice_image_url, {
+            width: parseInt(width),
+            quality: parseInt(quality)
+        });
+        
+        res.json({ 
+            url: optimizedUrl,
+            fileId: lead.invoice_image_file_id
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting invoice image:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب الصورة', error: error.message });
     }
 };
 
@@ -546,6 +655,8 @@ exports.sendToOperations = async (req, res) => {
 module.exports = {
     calculateLead: exports.calculateLead,
     createLead: exports.createLead,
+    deleteLead: exports.deleteLead,
+    getInvoiceImage: exports.getInvoiceImage,
     getLead: exports.getLead,
     updateLeadStatus: exports.updateLeadStatus,
     getMyLeads: exports.getMyLeads,
