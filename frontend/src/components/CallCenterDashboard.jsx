@@ -6,7 +6,8 @@ import {
     FaMoneyBillWave, FaBolt, FaCalendarAlt, FaWhatsapp,
     FaFileAlt, FaUpload, FaEye, FaPaperPlane, FaSun,
     FaBuilding, FaHome, FaIndustry, FaTractor, FaStore,
-    FaClock, FaComment, FaEnvelope, FaUserCheck, FaSync
+    FaClock, FaComment, FaEnvelope, FaUserCheck, FaSync,
+    FaImage
 } from 'react-icons/fa';
 
 const CallCenterDashboard = () => {
@@ -47,28 +48,27 @@ const CallCenterDashboard = () => {
     // Update Lead Status
     // =============================================
     const handleSendToOperations = async (leadId) => {
-    if (sendingLeadId === leadId) return;
-    setSendingLeadId(leadId);
-    try {
-        await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
-        toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
-        await fetchData(); // تحديث القائمة
-    } catch (error) {
-        console.error('Error sending to operations:', error);
-        toast.error('❌ حدث خطأ أثناء الإرسال');
-    } finally {
-        setSendingLeadId(null);
-    }
-};
+        if (sendingLeadId === leadId) return;
+        setSendingLeadId(leadId);
+        try {
+            await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
+            toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
+            await fetchData();
+        } catch (error) {
+            console.error('Error sending to operations:', error);
+            toast.error('❌ حدث خطأ أثناء الإرسال');
+        } finally {
+            setSendingLeadId(null);
+        }
+    };
+    
     const handleUpdateStatus = async (leadId, newStatus, notes = '') => {
-        // Prevent multiple clicks
         if (sendingLeadId === leadId) return;
         
         setSendingLeadId(leadId);
         try {
             await managerAPI.updateLeadStatus(leadId, newStatus, notes);
             toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
-            // Refresh the leads list
             await fetchData();
         } catch (error) {
             console.error('Error updating status:', error);
@@ -337,6 +337,30 @@ const CallCenterDashboard = () => {
                                             </span>
                                         </div>
                                     </div>
+                                    
+                                    {/* ✅ صورة الفاتورة */}
+                                    {lead.invoice_image_url && (
+                                        <div className="mb-4 p-2 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-gray-500 text-xs flex items-center gap-1">
+                                                    <FaImage className="text-blue-500" />
+                                                    صورة الفاتورة:
+                                                </span>
+                                                <button 
+                                                    onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                                    className="text-blue-500 text-xs hover:underline"
+                                                >
+                                                    عرض الصورة
+                                                </button>
+                                            </div>
+                                            <img 
+                                                src={`${lead.invoice_image_url}?tr=w-100,h-100,f-webp,q-80`}
+                                                alt="Invoice"
+                                                className="w-full h-24 object-cover rounded-lg cursor-pointer border"
+                                                onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                            />
+                                        </div>
+                                    )}
                                     
                                     {lead.notes && (
                                         <div className="mb-4 p-2 bg-gray-50 rounded-lg text-sm border-r-4 border-indigo-400">
