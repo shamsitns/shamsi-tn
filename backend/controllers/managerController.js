@@ -181,66 +181,46 @@ exports.getManagerStats = async (req, res) => {
 // =============================================
 exports.assignToCompany = async (req, res) => {
     try {
-        const { leadId } = req.params;
+        const leadId = req.params.leadId || req.params.id;
         const { companyId, notes } = req.body;
-        const managerId = req.user.id;
-        
-        console.log(`🏢 Assigning lead ${leadId} to company ${companyId}`);
-        
-        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const lead = getFirstRow(resultLead);
-        if (!lead) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
+        const managerId = req.user?.id;
+
+        if (!managerId) {
+            return res.status(401).json({ message: 'غير مصرح به' });
         }
-        
-        const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
-        const company = getFirstRow(resultCompany);
-        if (!company) {
-            return res.status(404).json({ message: 'الشركة غير موجودة' });
-        }
-        
-        await db.query(
-            `UPDATE leads 
-             SET status = 'assigned_to_company', 
-                 assigned_company_id = $1, 
-                 assigned_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [companyId, leadId]
-        );
-        
-        const resultExisting = await db.query(
-            `SELECT id FROM lead_companies 
-             WHERE lead_id = $1 AND company_id = $2`,
+
+        // تحديث الطلب
+        await db.query(`
+            UPDATE leads 
+            SET status = 'assigned_to_company', 
+                assigned_company_id = $1, 
+                assigned_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = $2
+        `, [companyId, leadId]);
+
+        // إدراج في lead_companies
+        const existing = await db.query(
+            'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
             [leadId, companyId]
         );
-        const existing = getRows(resultExisting);
         
-        if (existing && existing.length > 0) {
-            await db.query(
-                `UPDATE lead_companies 
-                 SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
-                 WHERE lead_id = $3 AND company_id = $4`,
-                [managerId, notes || null, leadId, companyId]
-            );
+        if (getRows(existing).length > 0) {
+            await db.query(`
+                UPDATE lead_companies 
+                SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
+                WHERE lead_id = $3 AND company_id = $4
+            `, [managerId, notes || null, leadId, companyId]);
         } else {
-            await db.query(
-                `INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
-                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-                [leadId, companyId, managerId, notes || null, 'assigned']
-            );
+            await db.query(`
+                INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
+                VALUES ($1, $2, $3, $4, 'assigned', CURRENT_TIMESTAMP)
+            `, [leadId, companyId, managerId, notes || null]);
         }
-        
-        console.log(`✅ Lead ${leadId} assigned to company ${company.name}`);
-        res.json({ 
-            message: `تم إرسال الطلب للشركة: ${company.name}`,
-            leadId,
-            companyId,
-            companyName: company.name
-        });
-        
+
+        res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
     } catch (error) {
-        console.error('❌ Error assigning to company:', error);
+        console.error('❌ Error in assignToCompany:', error);
         res.status(500).json({ message: 'حدث خطأ في إرسال الطلب للشركة', error: error.message });
     }
 };
