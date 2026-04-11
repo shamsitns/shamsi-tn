@@ -2,116 +2,79 @@ import React, { useState, useEffect } from 'react';
 import { managerAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import { 
-    FaCheck, FaTimes, FaPhone, FaBuilding, FaSun, 
-    FaMoneyBillWave, FaUser, FaMapMarkerAlt, FaCalendarAlt, 
-    FaBolt, FaWhatsapp, FaEye, FaPaperPlane,
-    FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf,
-    FaIndustry, FaHome, FaStore, FaTractor, FaSync,
-    FaFire, FaStar, FaChartLine, FaPercentage, FaTrophy
+    FaCheck, FaTimes, FaChartLine, FaPhone, FaMoneyBillWave, 
+    FaBolt, FaSun, FaCalendarAlt, FaUser, FaMapMarkerAlt, 
+    FaRuler, FaPaperPlane, FaWhatsapp, FaEye, FaClock,
+    FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaBuilding,
+    FaHome, FaIndustry, FaTractor, FaStore, FaIdCard,
+    FaUniversity, FaHandHoldingHeart, FaInfoCircle, FaSearch,
+    FaFilter, FaFire, FaTrophy, FaBell, FaStar, FaLeaf,
+    FaChevronDown, FaChevronUp, FaImage, FaBuilding as FaCompany
 } from 'react-icons/fa';
 
-const OperationsDashboard = () => {
+const OperationsManagerDashboard = () => {
     // =============================================
     // State
     // =============================================
     const [leads, setLeads] = useState([]);
-    const [companies, setCompanies] = useState([]);
+    const [filteredLeads, setFilteredLeads] = useState([]);
+    const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [showCompanyModal, setShowCompanyModal] = useState(false);
-    const [selectedLead, setSelectedLead] = useState(null);
-    const [selectedCompany, setSelectedCompany] = useState('');
-    const [assignmentNotes, setAssignmentNotes] = useState('');
     const [filter, setFilter] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [cityFilter, setCityFilter] = useState('all');
+    const [cities, setCities] = useState([]);
+    const [selectedLead, setSelectedLead] = useState(null);
+    const [showAssignModal, setShowAssignModal] = useState(false);
     const [showNotesModal, setShowNotesModal] = useState(false);
     const [notes, setNotes] = useState('');
-    const [stats, setStats] = useState(null);
-    const [userRole, setUserRole] = useState('operations');
-    const [updating, setUpdating] = useState(false);
-    
-    // =============================================
-    // Helper Functions
-    // =============================================
-    
-    const calculateLeadScore = (billAmount, propertyType, monthlyConsumption) => {
-        let score = 0;
-        
-        if (billAmount > 200) score += 50;
-        else if (billAmount > 150) score += 40;
-        else if (billAmount > 100) score += 30;
-        else if (billAmount > 70) score += 20;
-        else score += 10;
-        
-        switch(propertyType) {
-            case 'factory': score += 35; break;
-            case 'commercial': score += 25; break;
-            case 'farm': score += 20; break;
-            case 'house': score += 15; break;
-            case 'apartment': score += 10; break;
-            default: score += 5;
-        }
-        
-        if (monthlyConsumption > 500) score += 30;
-        else if (monthlyConsumption > 300) score += 20;
-        else if (monthlyConsumption > 150) score += 10;
-        
-        return Math.min(score, 100);
-    };
-    
-    const getLeadScoreLevel = (score) => {
-        if (score >= 80) return { level: 'Premium', color: 'bg-gradient-to-r from-yellow-500 to-orange-500', icon: FaTrophy, text: 'عميل ممتاز' };
-        if (score >= 60) return { level: 'High', color: 'bg-gradient-to-r from-green-500 to-teal-500', icon: FaStar, text: 'عميل واعد جداً' };
-        if (score >= 40) return { level: 'Medium', color: 'bg-gradient-to-r from-blue-500 to-indigo-500', icon: FaChartLine, text: 'عميل متوسط' };
-        return { level: 'Low', color: 'bg-gradient-to-r from-gray-500 to-gray-600', icon: FaPercentage, text: 'عميل عادي' };
-    };
-    
-    const sanitizeLeadData = (lead, role) => {
-        if (role === 'client') {
-            const { commission_amount, system_price, company_price, platform_fee, ...safeLead } = lead;
-            return safeLead;
-        }
-        return lead;
-    };
-    
-    const calculateAdvancedStats = (leadsData) => {
-        const totalLeads = leadsData.length;
-        const assignedLeads = leadsData.filter(l => l.status === 'assigned_to_company').length;
-        const completedLeads = leadsData.filter(l => l.status === 'completed').length;
-        const rejectedLeads = leadsData.filter(l => l.status === 'cancelled').length;
-        const pendingLeads = leadsData.filter(l => l.status === 'sent_to_operations').length;
-        
-        const totalKW = leadsData.reduce((sum, l) => sum + (parseFloat(l.required_kw) || 0), 0);
-        const averageKW = totalLeads > 0 ? (totalKW / totalLeads).toFixed(1) : 0;
-        const conversionRate = totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(1) : 0;
-        const totalCommission = leadsData.reduce((sum, l) => sum + (parseFloat(l.commission_amount) || 0), 0);
-        const totalBillAmount = leadsData.reduce((sum, l) => sum + (parseFloat(l.bill_amount) || 0), 0);
-        const averageBill = totalLeads > 0 ? (totalBillAmount / totalLeads).toFixed(0) : 0;
-        
-        return { totalLeads, assignedLeads, completedLeads, rejectedLeads, pendingLeads, averageKW, conversionRate, totalCommission, averageBill };
-    };
+    const [assignNotes, setAssignNotes] = useState('');
+    const [selectedCompanyId, setSelectedCompanyId] = useState('');
+    const [companies, setCompanies] = useState([]);
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
+    const [expandedLeadId, setExpandedLeadId] = useState(null);
+    const [assigningLeadId, setAssigningLeadId] = useState(null);
     
     // =============================================
     // Fetch Data
     // =============================================
     useEffect(() => {
         fetchData();
-        fetchCompanies();
         fetchStats();
-        const role = localStorage.getItem('userRole') || 'operations';
-        setUserRole(role);
+        fetchCompanies();
     }, [filter]);
+    
+    useEffect(() => {
+        filterLeads();
+    }, [leads, searchTerm, cityFilter, filter]);
     
     const fetchData = async () => {
         setLoading(true);
         try {
             const params = filter !== 'all' ? { status: filter } : {};
-            const response = await managerAPI.getLeads(params);
-            const sanitizedLeads = (response.data.leads || []).map(lead => sanitizeLeadData(lead, userRole));
-            setLeads(sanitizedLeads);
+            const response = await managerAPI.getMyLeads(params);
+            console.log('📊 Leads data:', response.data);
+            const leadsData = response.data.leads || [];
+            setLeads(leadsData);
+            
+            const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
+            setCities(uniqueCities);
         } catch (error) {
             console.error('Error fetching leads:', error);
             toast.error('حدث خطأ في جلب البيانات');
         } finally {
             setLoading(false);
+        }
+    };
+    
+    const fetchStats = async () => {
+        try {
+            const response = await managerAPI.getMyStats();
+            setStats(response.data);
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+            setStats({ pending: 0, approved: 0, contacted: 0, completed: 0, cancelled: 0, total_commission: 0 });
         }
     };
     
@@ -121,103 +84,89 @@ const OperationsDashboard = () => {
             setCompanies(response.data || []);
         } catch (error) {
             console.error('Error fetching companies:', error);
+            toast.error('حدث خطأ في جلب الشركات');
         }
     };
     
-    const fetchStats = async () => {
-        try {
-            const response = await managerAPI.getStats();
-            setStats(response.data);
-        } catch (error) {
-            console.error('Error fetching stats:', error);
+    // =============================================
+    // Filtering Logic
+    // =============================================
+    const filterLeads = () => {
+        let filtered = [...leads];
+        
+        if (filter !== 'all') {
+            filtered = filtered.filter(lead => lead.status === filter);
         }
+        
+        if (cityFilter !== 'all') {
+            filtered = filtered.filter(lead => lead.city === cityFilter);
+        }
+        
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(lead => 
+                lead.name.toLowerCase().includes(term) ||
+                lead.phone.includes(term) ||
+                (lead.city && lead.city.toLowerCase().includes(term))
+            );
+        }
+        
+        setFilteredLeads(filtered);
     };
     
     // =============================================
     // Lead Management
     // =============================================
     const handleAssignToCompany = async () => {
-        if (!selectedCompany) {
+        if (!selectedLead) return;
+        if (!selectedCompanyId) {
             toast.error('يرجى اختيار شركة');
             return;
         }
+        if (assigningLeadId === selectedLead.id) return;
+        
+        setAssigningLeadId(selectedLead.id);
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`https://shamsi-tn.onrender.com/api/manager/assign-company/${selectedLead.id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    companyId: selectedCompany,
-                    notes: assignmentNotes
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(result.message || 'حدث خطأ');
-            }
-            
+            await managerAPI.assignToCompany(selectedLead.id, selectedCompanyId, assignNotes);
             toast.success('✅ تم إرسال الطلب للشركة بنجاح');
-            setShowCompanyModal(false);
-            setSelectedLead(null);
-            setSelectedCompany('');
-            setAssignmentNotes('');
+            showNotificationMessage('تم إرسال الطلب للشركة');
             fetchData();
             fetchStats();
+            setShowAssignModal(false);
+            setSelectedLead(null);
+            setSelectedCompanyId('');
+            setAssignNotes('');
         } catch (error) {
             console.error('Error assigning to company:', error);
-            toast.error(`❌ فشل الإرسال: ${error.message}`);
+            toast.error('❌ حدث خطأ في إرسال الطلب للشركة');
+        } finally {
+            setAssigningLeadId(null);
         }
     };
     
     const handleUpdateStatus = async (leadId, newStatus) => {
-        const statusNotes = prompt('أضف ملاحظات عن تحديث الحالة:');
-        
-        setUpdating(true);
         try {
-            if (newStatus === 'completed') {
-                const lead = leads.find(l => l.id === leadId);
-                if (!lead) {
-                    toast.error('الطلب غير موجود');
-                    setUpdating(false);
-                    return;
-                }
-                
-                if (!lead.assigned_company_id) {
-                    toast.error('لا توجد شركة معينة لهذا الطلب');
-                    setUpdating(false);
-                    return;
-                }
-                
-                const rateResponse = await managerAPI.getCompanyCommissionRate(lead.assigned_company_id);
-                const rate = rateResponse.data.commission_rate || 0;
-                const calculatedCommission = (lead.required_kw || 0) * rate;
-                
-                await managerAPI.updateLeadCommission(leadId, calculatedCommission);
-                toast.success(`💹 تم حساب العمولة تلقائياً: ${calculatedCommission.toLocaleString()} دينار (${lead.required_kw} kWp × ${rate} دينار/kWp)`);
-            }
-            
-            await managerAPI.updateLeadStatus(leadId, newStatus, statusNotes);
+            await managerAPI.updateLeadStatus(leadId, newStatus, notes);
             toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
+            showNotificationMessage(`تم تحديث حالة الطلب #${leadId}`);
             fetchData();
             fetchStats();
+            setShowNotesModal(false);
+            setSelectedLead(null);
+            setNotes('');
         } catch (error) {
             console.error('Error updating status:', error);
-            toast.error('❌ حدث خطأ في تحديث الحالة');
-        } finally {
-            setUpdating(false);
+            toast.error('❌ حدث خطأ');
         }
     };
     
     const handleAddNotes = async () => {
         if (!selectedLead) return;
+        
         try {
-            await managerAPI.updateLeadStatus(selectedLead.id, selectedLead.status, notes);
+            await managerAPI.addLeadNote(selectedLead.id, notes);
             toast.success('✅ تم إضافة الملاحظات');
+            showNotificationMessage('تم إضافة الملاحظات');
             setShowNotesModal(false);
             setSelectedLead(null);
             setNotes('');
@@ -228,8 +177,18 @@ const OperationsDashboard = () => {
         }
     };
     
+    const showNotificationMessage = (message) => {
+        setNotificationMessage(message);
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3000);
+    };
+    
+    const toggleExpand = (leadId) => {
+        setExpandedLeadId(expandedLeadId === leadId ? null : leadId);
+    };
+    
     // =============================================
-    // Contact
+    // Contact Client
     // =============================================
     const handleWhatsApp = (phone, name) => {
         const message = encodeURIComponent(`مرحباً ${name}، هذا مدير العمليات من Shamsi.tn. بخصوص طلبكم للطاقة الشمسية.`);
@@ -241,21 +200,97 @@ const OperationsDashboard = () => {
     };
     
     // =============================================
+    // Parse additional info
+    // =============================================
+    const parseAdditionalInfo = (info) => {
+        if (!info) return {};
+        
+        try {
+            const parsed = JSON.parse(info);
+            return parsed;
+        } catch (e) {
+            const result = {
+                meter_number: null,
+                payment_method: null,
+                preferred_bank: null,
+                roof_area: null,
+                roof_type: null,
+                installation_timeline: null,
+                other: info
+            };
+            
+            const meterMatch = info.match(/رقم العداد[:\s]+([^\n]+)/i);
+            if (meterMatch) result.meter_number = meterMatch[1];
+            
+            const paymentMatch = info.match(/طريقة الدفع[:\s]+([^\n]+)/i);
+            if (paymentMatch) result.payment_method = paymentMatch[1];
+            
+            const bankMatch = info.match(/البنك المختار[:\s]+([^\n]+)/i);
+            if (bankMatch) result.preferred_bank = bankMatch[1];
+            
+            const roofMatch = info.match(/مساحة السطح[:\s]+([^\n]+)/i);
+            if (roofMatch) result.roof_area = roofMatch[1];
+            
+            const roofTypeMatch = info.match(/نوع السطح[:\s]+([^\n]+)/i);
+            if (roofTypeMatch) result.roof_type = roofTypeMatch[1];
+            
+            const timelineMatch = info.match(/الجدول الزمني[:\s]+([^\n]+)/i);
+            if (timelineMatch) result.installation_timeline = timelineMatch[1];
+            
+            return result;
+        }
+    };
+    
+    // =============================================
     // Helpers
     // =============================================
+    const getLeadPriority = (lead) => {
+        const bill = lead.bill_amount || 0;
+        if (bill > 300) return { level: 'high', text: 'عالي', color: 'red', icon: <FaFire className="text-red-500" /> };
+        if (bill > 150) return { level: 'medium', text: 'متوسط', color: 'yellow', icon: <FaStar className="text-yellow-500" /> };
+        return { level: 'low', text: 'منخفض', color: 'green', icon: <FaTrophy className="text-green-500" /> };
+    };
+    
+    const getLeadScore = (lead) => {
+        let score = 0;
+        if (lead.bill_amount > 250) score += 30;
+        if (lead.bill_amount > 150) score += 20;
+        if (lead.required_kw > 5) score += 25;
+        if (lead.property_type === 'house' || lead.property_type === 'farm') score += 15;
+        if (lead.city === 'تونس' || lead.city === 'صفاقس' || lead.city === 'سوسة') score += 10;
+        return score;
+    };
+    
+    const isHotLead = (lead) => {
+        const score = getLeadScore(lead);
+        return score >= 60;
+    };
+    
+    const getProgressPercentage = (status) => {
+        const progress = {
+            sent_to_operations: 30,
+            assigned_to_company: 60,
+            completed: 100,
+            cancelled: 0
+        };
+        return progress[status] || 0;
+    };
+    
     const getStatusBadge = (status) => {
         const badges = {
             sent_to_operations: 'bg-indigo-100 text-indigo-800',
-            assigned_to_company: 'bg-purple-100 text-purple-800',
+            assigned_to_company: 'bg-pink-100 text-pink-800',
             completed: 'bg-green-100 text-green-800',
             cancelled: 'bg-red-100 text-red-800'
         };
+        
         const texts = {
-            sent_to_operations: 'في انتظار الشركة',
+            sent_to_operations: 'مرسل لعمليات',
             assigned_to_company: 'مرسل لشركة',
             completed: 'مكتمل',
             cancelled: 'ملغي'
         };
+        
         return (
             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badges[status] || 'bg-gray-100'}`}>
                 {texts[status] || status}
@@ -265,12 +300,17 @@ const OperationsDashboard = () => {
     
     const getStatusText = (status) => {
         const texts = {
-            sent_to_operations: 'في انتظار الشركة',
+            sent_to_operations: 'مرسل لعمليات',
             assigned_to_company: 'مرسل لشركة',
             completed: 'مكتمل',
             cancelled: 'ملغي'
         };
         return texts[status] || status;
+    };
+    
+    const formatCurrency = (amount) => {
+        if (!amount && amount !== 0) return '0';
+        return amount.toLocaleString();
     };
     
     const getPropertyIcon = (type) => {
@@ -295,235 +335,493 @@ const OperationsDashboard = () => {
         return texts[type] || type;
     };
     
-    const formatCurrency = (amount) => {
-        if (!amount && amount !== 0) return '0';
-        return amount.toLocaleString();
+    const getPaymentMethodIcon = (method) => {
+        if (!method) return null;
+        if (method.includes('نقدي')) return <FaMoneyBillWave className="text-green-600" />;
+        if (method.includes('STEG')) return <FaBolt className="text-blue-600" />;
+        if (method.includes('PROSOL')) return <FaHandHoldingHeart className="text-orange-600" />;
+        if (method.includes('بنكي')) return <FaUniversity className="text-purple-600" />;
+        return <FaMoneyBillWave className="text-gray-600" />;
     };
     
-    const advancedStats = calculateAdvancedStats(leads);
+    const getTimelineText = (timeline) => {
+        if (!timeline) return 'غير محدد';
+        switch(timeline) {
+            case '<3': return 'أقل من 3 أشهر';
+            case '3-6': return '3 - 6 أشهر';
+            case '>6': return 'أكثر من 6 أشهر';
+            default: return timeline;
+        }
+    };
+    
+    const advancedStats = {
+        totalLeads: filteredLeads.length,
+        hotLeads: filteredLeads.filter(l => isHotLead(l)).length,
+        avgSystemSize: (filteredLeads.reduce((acc, l) => acc + (l.required_kw || 0), 0) / filteredLeads.length || 0).toFixed(1),
+        pendingAssignment: filteredLeads.filter(l => l.status === 'sent_to_operations').length
+    };
     
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
             </div>
         );
     }
     
     return (
         <div className="min-h-screen bg-gray-100">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 shadow-lg">
+            {showNotification && (
+                <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-pulse">
+                    <FaBell className="inline ml-2" /> {notificationMessage}
+                </div>
+            )}
+            
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-6">
                     <div className="flex flex-wrap justify-between items-center">
                         <div>
                             <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-                                <FaBuilding className="text-yellow-300" />
+                                <FaSun className="text-yellow-300" />
                                 لوحة تحكم مدير العمليات
                             </h1>
-                            <p className="text-purple-100 mt-1">إدارة الطلبات وتوزيعها على شركات التركيب</p>
+                            <p className="text-indigo-100 mt-1">إدارة الطلبات وإرسالها للشركات</p>
                         </div>
-                        <button onClick={() => { fetchData(); fetchStats(); }} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2">
-                            <FaSync /> تحديث
-                        </button>
                     </div>
                 </div>
             </div>
             
-            {/* Advanced Stats Section */}
             <div className="max-w-7xl mx-auto px-4 py-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-indigo-600">{advancedStats.totalLeads}</div>
-                        <div className="text-sm text-gray-500">إجمالي الطلبات</div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white rounded-lg shadow-md p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-500 text-sm">إجمالي الطلبات</p>
+                                <p className="text-2xl font-bold text-blue-600">{advancedStats.totalLeads}</p>
+                            </div>
+                            <div className="bg-blue-100 p-3 rounded-full">
+                                <FaChartLine className="text-blue-600 text-xl" />
+                            </div>
+                        </div>
                     </div>
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-purple-600">{advancedStats.assignedLeads}</div>
-                        <div className="text-sm text-gray-500">مرسل لشركة</div>
+                    
+                    <div className="bg-white rounded-lg shadow-md p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-500 text-sm">طلبات ساخنة 🔥</p>
+                                <p className="text-2xl font-bold text-red-600">{advancedStats.hotLeads}</p>
+                            </div>
+                            <div className="bg-red-100 p-3 rounded-full">
+                                <FaFire className="text-red-600 text-xl" />
+                            </div>
+                        </div>
                     </div>
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-green-600">{advancedStats.completedLeads}</div>
-                        <div className="text-sm text-gray-500">مكتمل</div>
+                    
+                    <div className="bg-white rounded-lg shadow-md p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-500 text-sm">متوسط القدرة</p>
+                                <p className="text-2xl font-bold text-orange-600">{advancedStats.avgSystemSize} kWp</p>
+                            </div>
+                            <div className="bg-orange-100 p-3 rounded-full">
+                                <FaBolt className="text-orange-600 text-xl" />
+                            </div>
+                        </div>
                     </div>
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-red-600">{advancedStats.rejectedLeads}</div>
-                        <div className="text-sm text-gray-500">ملغي</div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-blue-600">{advancedStats.averageKW}</div>
-                        <div className="text-sm text-gray-500">متوسط KW</div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="text-2xl font-bold text-emerald-600">{advancedStats.conversionRate}%</div>
-                        <div className="text-sm text-gray-500">نسبة التحويل</div>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow p-4">
-                        <div className="text-sm text-gray-600">إجمالي العمولات</div>
-                        <div className="text-2xl font-bold text-purple-600">{advancedStats.totalCommission.toLocaleString()} دينار</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow p-4">
-                        <div className="text-sm text-gray-600">متوسط فاتورة الكهرباء</div>
-                        <div className="text-2xl font-bold text-blue-600">{advancedStats.averageBill.toLocaleString()} دينار</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg shadow p-4">
-                        <div className="text-sm text-gray-600">الطلبات قيد الانتظار</div>
-                        <div className="text-2xl font-bold text-green-600">{advancedStats.pendingLeads}</div>
+                    
+                    <div className="bg-white rounded-lg shadow-md p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-gray-500 text-sm">بانتظار الإرسال</p>
+                                <p className="text-2xl font-bold text-purple-600">{advancedStats.pendingAssignment}</p>
+                            </div>
+                            <div className="bg-purple-100 p-3 rounded-full">
+                                <FaPaperPlane className="text-purple-600 text-xl" />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            {/* Filters */}
             <div className="max-w-7xl mx-auto px-4">
-                <div className="flex flex-wrap gap-2 mb-6">
-                    <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'all' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 border'}`}>الكل</button>
-                    <button onClick={() => setFilter('sent_to_operations')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'sent_to_operations' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'}`}>في انتظار الشركة</button>
-                    <button onClick={() => setFilter('assigned_to_company')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'assigned_to_company' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 border'}`}>مرسل لشركة</button>
-                    <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg font-semibold transition ${filter === 'completed' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 border'}`}>مكتمل</button>
+                <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="relative">
+                            <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="🔍 بحث بالاسم / الهاتف / المدينة..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        </div>
+                        
+                        <div className="relative">
+                            <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
+                            <select
+                                value={cityFilter}
+                                onChange={(e) => setCityFilter(e.target.value)}
+                                className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                            >
+                                <option value="all">جميع المدن</option>
+                                {cities.map(city => (
+                                    <option key={city} value={city}>{city}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="relative">
+                            <FaFilter className="absolute right-3 top-3 text-gray-400" />
+                            <select
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
+                                className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                            >
+                                <option value="all">جميع الحالات</option>
+                                <option value="sent_to_operations">مرسل لعمليات</option>
+                                <option value="assigned_to_company">مرسل لشركة</option>
+                                <option value="completed">مكتمل</option>
+                                <option value="cancelled">ملغي</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 
-                {/* Leads Cards */}
-                {leads.length === 0 ? (
+                {filteredLeads.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-md p-12 text-center">
                         <FaSun className="text-6xl text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-500 text-lg">لا توجد طلبات حالياً</p>
-                        <p className="text-gray-400 text-sm">سيظهر هنا الطلبات المرسلة من المدير التنفيذي</p>
+                        <p className="text-gray-400 text-sm">سيظهر هنا الطلبات المعينة لك</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {leads.map((lead) => {
-                            const leadScore = calculateLeadScore(lead.bill_amount, lead.property_type, lead.monthly_consumption || 0);
-                            const scoreLevel = getLeadScoreLevel(leadScore);
-                            const ScoreIcon = scoreLevel.icon;
+                        {filteredLeads.map((lead) => {
+                            const additionalInfo = parseAdditionalInfo(lead.additional_info);
+                            const priority = getLeadPriority(lead);
+                            const hot = isHotLead(lead);
+                            const progress = getProgressPercentage(lead.status);
+                            const isExpanded = expandedLeadId === lead.id;
+                            
                             return (
-                            <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
-                                {leadScore >= 80 && (
-                                    <div className={`${scoreLevel.color} text-white text-xs py-1 px-3 text-center font-semibold`}>
-                                        <ScoreIcon className="inline ml-1" /> {scoreLevel.text} - نقاط: {leadScore}
-                                    </div>
-                                )}
-                                
+                            <div key={lead.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition border-t-4 border-t-indigo-500">
                                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b">
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
                                             <FaUser className="text-gray-400" />
                                             <h3 className="font-bold text-gray-800">{lead.name}</h3>
+                                            {hot && (
+                                                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <FaFire className="text-xs" /> HOT
+                                                </span>
+                                            )}
                                         </div>
                                         {getStatusBadge(lead.status)}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <FaMapMarkerAlt className="text-gray-400 text-xs" />
-                                        <p className="text-sm text-gray-500">{lead.city || 'غير محدد'}</p>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <div className="flex items-center gap-2">
+                                            <FaMapMarkerAlt className="text-gray-400 text-xs" />
+                                            <p className="text-sm text-gray-500">{lead.city || 'غير محدد'}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs">
+                                            {priority.icon}
+                                            <span className={`text-${priority.color}-600`}>أولوية {priority.text}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="px-4 pt-3">
+                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                        <span>التقدم</span>
+                                        <span>{progress}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div 
+                                            className="bg-indigo-500 h-2 rounded-full transition-all duration-500"
+                                            style={{ width: `${progress}%` }}
+                                        ></div>
                                     </div>
                                 </div>
                                 
                                 <div className="p-4">
-                                    <div className="space-y-2 mb-4">
+                                    {/* المعلومات الأساسية */}
+                                    <div className="space-y-2 mb-3">
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1"><FaBolt className="text-yellow-600" /> القدرة الموصى بها:</span>
-                                            <span className="font-bold text-yellow-600">{lead.required_kw} kWp</span>
+                                            <span className="text-gray-500">رقم الهاتف:</span>
+                                            <span className="font-medium" dir="ltr">{lead.phone}</span>
                                         </div>
+                                        
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1"><FaMoneyBillWave className="text-green-600" /> فاتورة الكهرباء:</span>
-                                            <span className="font-bold text-green-600">{lead.bill_amount} دينار</span>
+                                            <span className="text-gray-500 flex items-center gap-1">
+                                                <FaMoneyBillWave className="text-green-600" />
+                                                فاتورة الكهرباء:
+                                            </span>
+                                            <span className="font-bold text-green-600">
+                                                {lead.bill_amount} دينار
+                                            </span>
                                         </div>
+                                        
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500 flex items-center gap-1">
+                                                <FaBolt className="text-yellow-600" />
+                                                القدرة الموصى بها:
+                                            </span>
+                                            <span className="font-medium">{lead.required_kw} kWp</span>
+                                        </div>
+                                        
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
-                                            <span className="font-medium flex items-center gap-1">{getPropertyIcon(lead.property_type)}{getPropertyText(lead.property_type)}</span>
+                                            <span className="font-medium flex items-center gap-1">
+                                                {getPropertyIcon(lead.property_type)}
+                                                {getPropertyText(lead.property_type)}
+                                            </span>
                                         </div>
+                                        
+                                        {lead.meter_number && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-500 flex items-center gap-1">
+                                                    <FaIdCard className="text-blue-500" />
+                                                    رقم العداد:
+                                                </span>
+                                                <span className="font-medium" dir="ltr">{lead.meter_number}</span>
+                                            </div>
+                                        )}
+                                        
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 flex items-center gap-1"><FaCalendarAlt className="text-gray-400" /> تاريخ الطلب:</span>
-                                            <span className="text-xs text-gray-500">{new Date(lead.created_at).toLocaleDateString('ar-TN')}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm border-t pt-2 mt-2">
-                                            <span className="text-gray-500 flex items-center gap-1"><FaMoneyBillWave className="text-purple-600" /> عمولة المنصة:</span>
-                                            <span className="font-bold text-purple-600">{formatCurrency(lead.commission_amount)} دينار</span>
+                                            <span className="text-gray-500 flex items-center gap-1">
+                                                <FaMoneyBillWave className="text-green-600" />
+                                                العمولة:
+                                            </span>
+                                            <span className="font-bold text-green-600">
+                                                {formatCurrency(lead.commission_amount)} دينار
+                                            </span>
                                         </div>
                                     </div>
                                     
-                                    {leadScore < 80 && leadScore >= 40 && (
-                                        <div className={`mb-3 p-1 rounded-lg text-center text-xs font-semibold ${scoreLevel.color} text-white`}>
-                                            <ScoreIcon className="inline ml-1" /> {scoreLevel.text} - {leadScore} نقطة
+                                    {/* ✅ عرض صورة الفاتورة إذا وجدت */}
+                                    {lead.invoice_image_url && (
+                                        <div className="mt-2 pt-2 border-t border-gray-100">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-gray-500 text-xs flex items-center gap-1">
+                                                    <FaImage className="text-blue-500" />
+                                                    صورة الفاتورة:
+                                                </span>
+                                                <button 
+                                                    onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                                    className="text-blue-500 text-xs hover:underline"
+                                                >
+                                                    عرض الصورة
+                                                </button>
+                                            </div>
+                                            <img 
+                                                src={`${lead.invoice_image_url}?tr=w-100,h-100,f-webp,q-80`}
+                                                alt="Invoice"
+                                                className="w-full h-24 object-cover rounded-lg cursor-pointer border"
+                                                onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                            />
                                         </div>
                                     )}
                                     
-                                    {lead.notes && (
-                                        <div className="mb-4 p-2 bg-gray-50 rounded-lg text-sm border-r-4 border-purple-400">
-                                            <p className="text-gray-600 font-semibold text-xs mb-1">📝 ملاحظات:</p>
-                                            <p className="text-gray-600 text-xs">{lead.notes}</p>
+                                    {/* زر عرض التفاصيل الإضافية */}
+                                    <button
+                                        onClick={() => toggleExpand(lead.id)}
+                                        className="w-full text-center text-sm text-indigo-600 hover:text-indigo-700 flex items-center justify-center gap-1 mt-2 py-1 border-t border-gray-100"
+                                    >
+                                        {isExpanded ? <><FaChevronUp /> إخفاء التفاصيل</> : <><FaChevronDown /> عرض جميع تفاصيل العميل والحساب</>}
+                                    </button>
+                                    
+                                    {/* قسم التفاصيل الإضافية (يظهر عند النقر) */}
+                                    {isExpanded && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                                            <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                                <FaInfoCircle className="text-blue-500" /> معلومات إضافية من الحاسبة
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div className="flex items-center gap-1">
+                                                    <FaRuler className="text-purple-500" />
+                                                    <span className="text-gray-500">مساحة السطح:</span>
+                                                    <span className="font-medium">{lead.roof_area || additionalInfo.roof_area || 'غير محدد'} م²</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <FaBuilding className="text-blue-500" />
+                                                    <span className="text-gray-500">نوع السطح:</span>
+                                                    <span className="font-medium">
+                                                        {lead.roof_type === 'terrace' ? 'سطح مسطح' : 
+                                                         lead.roof_type === 'inclined' ? 'سطح مائل' :
+                                                         lead.roof_type === 'ground' ? 'أرض / حديقة' : additionalInfo.roof_type || 'غير محدد'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div className="flex items-center gap-1">
+                                                    <FaClock className="text-green-500" />
+                                                    <span className="text-gray-500">الجدول الزمني:</span>
+                                                    <span className="font-medium">{getTimelineText(lead.installation_timeline || additionalInfo.installation_timeline)}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {getPaymentMethodIcon(lead.payment_method || additionalInfo.payment_method)}
+                                                    <span className="text-gray-500">طريقة الدفع:</span>
+                                                    <span className="font-medium">{lead.payment_method || additionalInfo.payment_method || 'غير محدد'}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {(lead.preferred_bank || additionalInfo.preferred_bank) && (
+                                                <div className="flex items-center gap-1 text-sm">
+                                                    <FaUniversity className="text-indigo-500" />
+                                                    <span className="text-gray-500">البنك المفضل:</span>
+                                                    <span className="font-medium">{lead.preferred_bank || additionalInfo.preferred_bank}</span>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="bg-gray-50 p-3 rounded-lg mt-2 space-y-2">
+                                                <div className="text-xs font-semibold text-gray-600">📊 نتائج الحساب التفصيلية:</div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div className="flex items-center gap-1">
+                                                        <FaSun className="text-orange-500" />
+                                                        <span>الإنتاج السنوي:</span>
+                                                        <span className="font-bold">{lead.annual_production?.toLocaleString() || 'غير محدد'} kWh</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <FaMoneyBillWave className="text-green-500" />
+                                                        <span>التوفير الشهري:</span>
+                                                        <span className="font-bold">{lead.monthly_savings?.toLocaleString() || 'غير محدد'} دينار</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <FaLeaf className="text-green-600" />
+                                                        <span>توفير CO₂:</span>
+                                                        <span className="font-bold">{lead.co2_saved?.toLocaleString() || 'غير محدد'} كغ/سنة</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <FaChartLine className="text-blue-500" />
+                                                        <span>Solar Score:</span>
+                                                        <span className="font-bold">{lead.solar_score || 'غير محدد'}/100</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 col-span-2">
+                                                        <FaCheckCircle className="text-green-500" />
+                                                        <span>نسبة تغطية الاستهلاك:</span>
+                                                        <span className="font-bold">{lead.coverage_percent || 'غير محدد'}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {lead.additional_info && lead.additional_info !== '{}' && (
+                                                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                                    <span className="font-semibold">📝 ملاحظات إضافية:</span> {lead.additional_info}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                                 
                                 <div className="bg-gray-50 px-4 py-3 border-t">
                                     <div className="flex gap-2 mb-2">
-                                        <button onClick={() => handleCall(lead.phone)} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 text-sm"><FaPhone /> اتصل</button>
-                                        <button onClick={() => handleWhatsApp(lead.phone, lead.name)} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm"><FaWhatsapp /> واتساب</button>
+                                        <button
+                                            onClick={() => handleCall(lead.phone)}
+                                            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            <FaPhone /> اتصل
+                                        </button>
+                                        <button
+                                            onClick={() => handleWhatsApp(lead.phone, lead.name)}
+                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            <FaWhatsapp /> واتساب
+                                        </button>
                                     </div>
                                     
                                     {lead.status === 'sent_to_operations' && (
-                                        <button onClick={() => { setSelectedLead(lead); setShowCompanyModal(true); }} className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm"><FaBuilding /> اختر شركة التركيب</button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedLead(lead);
+                                                setShowAssignModal(true);
+                                            }}
+                                            disabled={assigningLeadId === lead.id}
+                                            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                                        >
+                                            {assigningLeadId === lead.id ? 'جاري الإرسال...' : <><FaCompany /> إرسال لشركة</>}
+                                        </button>
                                     )}
                                     
-                                    {lead.status === 'assigned_to_company' && (
-                                        <button onClick={() => handleUpdateStatus(lead.id, 'completed')} disabled={updating} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm"><FaCheck /> إتمام الصفقة</button>
-                                    )}
-                                    
-                                    {lead.status === 'completed' && (
-                                        <div className="text-center text-sm text-green-600 py-2"><FaCheckCircle className="inline ml-1" /> تم إكمال التركيب</div>
-                                    )}
-                                    
-                                    {lead.status === 'cancelled' && (
-                                        <div className="text-center text-sm text-red-600 py-2"><FaTimesCircle className="inline ml-1" /> تم رفض الطلب</div>
-                                    )}
-                                    
-                                    <button onClick={() => { setSelectedLead(lead); setNotes(lead.notes || ''); setShowNotesModal(true); }} className="w-full mt-2 text-gray-500 hover:text-purple-600 text-xs flex items-center justify-center gap-1"><FaEye /> إضافة ملاحظات</button>
+                                    <button
+                                        onClick={() => { 
+                                            setSelectedLead(lead); 
+                                            setNotes(lead.notes || ''); 
+                                            setShowNotesModal(true); 
+                                        }}
+                                        className="w-full mt-2 text-gray-500 hover:text-indigo-600 text-xs flex items-center justify-center gap-1"
+                                    >
+                                        <FaEye /> إضافة ملاحظات
+                                    </button>
                                 </div>
                             </div>
-                        );})}
+                            );
+                        })}
                     </div>
                 )}
             </div>
             
-            {/* Company Selection Modal */}
-            {showCompanyModal && selectedLead && (
+            {/* Modal لإرسال لشركة */}
+            {showAssignModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold mb-4">🏢 اختر شركة التركيب</h3>
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <FaCompany className="text-indigo-600" /> إرسال الطلب لشركة
+                        </h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-2">قدرة النظام: {selectedLead.required_kw} kWp</p>
-                        <p className="text-gray-500 text-sm mb-4">عمولة المنصة: {formatCurrency(selectedLead.commission_amount)} دينار</p>
                         
                         <label className="block text-gray-700 mb-2">اختر الشركة:</label>
-                        <select onChange={(e) => setSelectedCompany(e.target.value)} className="w-full px-4 py-2 border rounded-lg mb-4" value={selectedCompany}>
+                        <select
+                            value={selectedCompanyId}
+                            onChange={(e) => setSelectedCompanyId(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                        >
                             <option value="">-- اختر شركة --</option>
-                            {companies.map((company) => (
-                                <option key={company.id} value={company.id}>{company.name} - {company.address || 'عنوان غير محدد'}</option>
+                            {companies.map(company => (
+                                <option key={company.id} value={company.id}>
+                                    {company.name} - {company.phone}
+                                </option>
                             ))}
                         </select>
                         
-                        <label className="block text-gray-700 mb-2">ملاحظات للشركة (اختياري):</label>
-                        <textarea placeholder="أضف ملاحظات للشركة..." value={assignmentNotes} onChange={(e) => setAssignmentNotes(e.target.value)} className="w-full px-4 py-2 border rounded-lg mb-4" rows="3" />
+                        <label className="block text-gray-700 mb-2">ملاحظات إضافية (اختياري):</label>
+                        <textarea
+                            placeholder="أضف ملاحظات عن الطلب قبل إرساله للشركة..."
+                            value={assignNotes}
+                            onChange={(e) => setAssignNotes(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            rows="4"
+                        />
                         
                         <div className="flex gap-3">
-                            <button onClick={handleAssignToCompany} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">إرسال للشركة</button>
-                            <button onClick={() => { setShowCompanyModal(false); setSelectedLead(null); setSelectedCompany(''); setAssignmentNotes(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
+                            <button 
+                                onClick={handleAssignToCompany} 
+                                disabled={assigningLeadId === selectedLead.id || !selectedCompanyId}
+                                className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {assigningLeadId === selectedLead.id ? 'جاري الإرسال...' : <><FaPaperPlane /> إرسال</>}
+                            </button>
+                            <button onClick={() => { setShowAssignModal(false); setSelectedLead(null); setSelectedCompanyId(''); setAssignNotes(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
                         </div>
                     </div>
                 </div>
             )}
             
-            {/* Notes Modal */}
+            {/* Modal للملاحظات */}
             {showNotesModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                         <h3 className="text-xl font-bold mb-4">📝 إضافة ملاحظات</h3>
                         <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
-                        <p className="text-gray-500 text-sm mb-4">الحالة الحالية: {getStatusText(selectedLead.status)}</p>
                         
-                        <textarea placeholder="أضف ملاحظات عن العميل أو الشركة..." value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-4 py-2 border rounded-lg mb-4" rows="4" />
+                        <textarea
+                            placeholder="أضف ملاحظات عن العميل..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            rows="4"
+                        />
                         
                         <div className="flex gap-3">
                             <button onClick={handleAddNotes} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">حفظ</button>
@@ -536,4 +834,4 @@ const OperationsDashboard = () => {
     );
 };
 
-export default OperationsDashboard;
+export default OperationsManagerDashboard;
