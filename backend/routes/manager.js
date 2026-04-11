@@ -86,7 +86,8 @@ router.post('/leads/:id/accept', isExecutiveManager, acceptLeadAndSendToOperatio
 router.post('/leads/:id/assign-company', isOperationsManager, assignToCompany);
 // ✅ مسار إضافي للتوافق مع leadId (تمت الإضافة فقط، لم نحذف أي شيء)
 router.post('/leads/:leadId/assign-company', isOperationsManager, assignToCompany);
-
+// ✅ أضف هذا المسار الجديد
+router.post('/assign-company/:leadId', isOperationsManager, assignToCompany);
 // =============================================
 // مسارات لمركز الاتصال فقط
 // =============================================
