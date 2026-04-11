@@ -1,9 +1,7 @@
 const db = require('../config/database');
 
 // Helper function to handle both PostgreSQL and SQLite results
-const getRows = (result) => {
-    return result.rows || result || [];
-};
+const { getRows, getFirstRow } = require('../config/database');
 
 const getFirstRow = (result) => {
     const rows = getRows(result);
@@ -157,25 +155,11 @@ exports.assignToCompany = async (req, res) => {
         const { companyId, notes } = req.body;
         const managerId = req.user?.id;
 
-        // ✅ التحقق من وجود المستخدم في الطلب
         if (!managerId) {
-            return res.status(401).json({ 
-                message: 'غير مصرح به. يرجى تسجيل الدخول مرة أخرى.' 
-            });
+            return res.status(401).json({ message: 'غير مصرح به. يرجى تسجيل الدخول مرة أخرى.' });
         }
 
-        // ✅ التحقق من أن المستخدم موجود بالفعل في قاعدة البيانات
-        const userCheck = await db.query(
-            'SELECT id FROM users WHERE id = $1 AND is_active = true',
-            [managerId]
-        );
-        if (getRows(userCheck).length === 0) {
-            return res.status(400).json({ 
-                message: 'المستخدم غير موجود في قاعدة البيانات أو غير نشط.' 
-            });
-        }
-
-        // تحديث lead
+        // تحديث الطلب
         await db.query(`
             UPDATE leads 
             SET status = 'assigned_to_company', 
@@ -190,6 +174,7 @@ exports.assignToCompany = async (req, res) => {
             'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
             [leadId, companyId]
         );
+        
         if (getRows(existing).length > 0) {
             await db.query(`
                 UPDATE lead_companies 
@@ -206,10 +191,7 @@ exports.assignToCompany = async (req, res) => {
         res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
     } catch (error) {
         console.error('❌ Error in assignToCompany:', error);
-        res.status(500).json({ 
-            message: 'حدث خطأ في إرسال الطلب للشركة', 
-            error: error.message 
-        });
+        res.status(500).json({ message: 'حدث خطأ في إرسال الطلب للشركة', error: error.message });
     }
 };
 
