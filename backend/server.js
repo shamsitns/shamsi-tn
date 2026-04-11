@@ -162,33 +162,34 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         else if (bill_amount > 150) leadScore += 10;
         
         // رفع الصورة إذا وجدت
-        let invoiceImageUrl = null;
-        let invoiceImageFileId = null;
-        
-        if (invoiceImage) {
-            try {
-                const { uploadImage, FOLDERS, validateImage } = require('./utils/imagekit');
-                const validation = validateImage(invoiceImage, 5);
-                if (validation.valid) {
-                    const uploadResult = await uploadImage(
-                        invoiceImage,
-                        `invoice_${Date.now()}_${userId || 'guest'}.jpg`,
-                        FOLDERS.INVOICES
-                    );
-                    if (uploadResult.success) {
-                        invoiceImageUrl = uploadResult.url;
-                        invoiceImageFileId = uploadResult.fileId;
-                        console.log(`✅ Invoice image uploaded: ${invoiceImageUrl}`);
-                    } else {
-                        console.error('❌ Upload failed:', uploadResult.error);
-                    }
-                } else {
-                    console.error('❌ Validation failed:', validation.error);
-                }
-            } catch (error) {
-                console.error('❌ Image upload error:', error);
+        // رفع الصورة إذا وجدت (نسخة مبسطة)
+let invoiceImageUrl = null;
+let invoiceImageFileId = null;
+
+if (invoiceImage) {
+    try {
+        const { uploadImage, validateImage } = require('./utils/imagekit');
+        const validation = validateImage(invoiceImage, 5);
+        if (validation.valid) {
+            const uploadResult = await uploadImage(
+                invoiceImage,
+                `invoice_${Date.now()}_${userId || 'guest'}.jpg`,
+                ''  // ✅ بدون مجلد
+            );
+            if (uploadResult.success) {
+                invoiceImageUrl = uploadResult.url;
+                invoiceImageFileId = uploadResult.fileId;
+                console.log(`✅ Invoice image uploaded: ${invoiceImageUrl}`);
+            } else {
+                console.error('❌ Upload failed:', uploadResult.error);
             }
+        } else {
+            console.error('❌ Validation failed:', validation.error);
         }
+    } catch (error) {
+        console.error('❌ Image upload error:', error);
+    }
+}
         
         const db = getDb();
         
