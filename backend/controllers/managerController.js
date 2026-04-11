@@ -1,8 +1,5 @@
 const db = require('../config/database');
-
-// Helper function to handle both PostgreSQL and SQLite results
 const { getRows, getFirstRow } = require('../config/database');
-
 
 // =============================================
 // الحصول على طلبات المدير
@@ -143,7 +140,7 @@ exports.getManagerStats = async (req, res) => {
 };
 
 // =============================================
-// إرسال طلب لشركة (لـ Operations Manager) - النسخة الصحيحة
+// إرسال طلب لشركة (لـ Operations Manager)
 // =============================================
 exports.assignToCompany = async (req, res) => {
     try {
@@ -155,7 +152,6 @@ exports.assignToCompany = async (req, res) => {
             return res.status(401).json({ message: 'غير مصرح به. يرجى تسجيل الدخول مرة أخرى.' });
         }
 
-        // تحديث الطلب
         await db.query(`
             UPDATE leads 
             SET status = 'assigned_to_company', 
@@ -165,7 +161,6 @@ exports.assignToCompany = async (req, res) => {
             WHERE id = $2
         `, [companyId, leadId]);
 
-        // إدراج أو تحديث lead_companies
         const existing = await db.query(
             'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
             [leadId, companyId]
@@ -239,7 +234,6 @@ exports.sendToOperationsManager = async (req, res) => {
             if (!targetOpsManagerId) return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
 
-        // جلب بيانات الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
         if (!lead) return res.status(404).json({ message: 'الطلب غير موجود' });
