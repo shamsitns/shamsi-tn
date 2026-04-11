@@ -530,12 +530,11 @@ exports.getAllCompanies = async (req, res) => {
             SELECT id, name, email, phone, address, contact_person, 
                    rating, projects_count, is_active, created_at
             FROM companies
-            WHERE is_active = 1
+            WHERE is_active = true
             ORDER BY rating DESC
         `);
         
         res.json(getRows(result));
-        
     } catch (error) {
         console.error('❌ Error getting companies:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب الشركات', error: error.message });
