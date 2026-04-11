@@ -32,7 +32,6 @@ const OperationsDashboard = () => {
     // Helper Functions
     // =============================================
     
-    // Calculate Lead Score (Premium/High/Medium/Low)
     const calculateLeadScore = (billAmount, propertyType, monthlyConsumption) => {
         let score = 0;
         
@@ -138,37 +137,49 @@ const OperationsDashboard = () => {
     // Lead Management
     // =============================================
     const handleAssignToCompany = async () => {
-    if (!selectedCompany) {
-        toast.error('يرجى اختيار شركة');
-        return;
-    }
-    try {
-        // ✅ استخدم managerAPI.assignToCompany (المسار الصحيح موجود في api.js)
-        await managerAPI.assignToCompany(selectedLead.id, selectedCompany, assignmentNotes);
-        
-        toast.success('✅ تم إرسال الطلب للشركة بنجاح');
-        setShowCompanyModal(false);
-        setSelectedLead(null);
-        setSelectedCompany('');
-        setAssignmentNotes('');
-        fetchData();
-        fetchStats();
-    } catch (error) {
-        console.error('Error assigning to company:', error);
-        const errorMsg = error.response?.data?.message || 'حدث خطأ';
-        toast.error(`❌ فشل الإرسال: ${errorMsg}`);
-    }
-};
+        if (!selectedCompany) {
+            toast.error('يرجى اختيار شركة');
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`https://shamsi-tn.onrender.com/api/manager/assign-company/${selectedLead.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    companyId: selectedCompany,
+                    notes: assignmentNotes
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(result.message || 'حدث خطأ');
+            }
+            
+            toast.success('✅ تم إرسال الطلب للشركة بنجاح');
+            setShowCompanyModal(false);
+            setSelectedLead(null);
+            setSelectedCompany('');
+            setAssignmentNotes('');
+            fetchData();
+            fetchStats();
+        } catch (error) {
+            console.error('Error assigning to company:', error);
+            toast.error(`❌ فشل الإرسال: ${error.message}`);
+        }
+    };
     
-    // ✅ Modified: Handle status update with automatic commission calculation for completed leads
     const handleUpdateStatus = async (leadId, newStatus) => {
         const statusNotes = prompt('أضف ملاحظات عن تحديث الحالة:');
         
         setUpdating(true);
         try {
-            // If marking as completed, calculate commission based on company rate
             if (newStatus === 'completed') {
-                // Find the lead to get assigned_company_id and required_kw
                 const lead = leads.find(l => l.id === leadId);
                 if (!lead) {
                     toast.error('الطلب غير موجود');
@@ -182,17 +193,14 @@ const OperationsDashboard = () => {
                     return;
                 }
                 
-                // Get company commission rate
                 const rateResponse = await managerAPI.getCompanyCommissionRate(lead.assigned_company_id);
                 const rate = rateResponse.data.commission_rate || 0;
                 const calculatedCommission = (lead.required_kw || 0) * rate;
                 
-                // Update commission amount
                 await managerAPI.updateLeadCommission(leadId, calculatedCommission);
                 toast.success(`💹 تم حساب العمولة تلقائياً: ${calculatedCommission.toLocaleString()} دينار (${lead.required_kw} kWp × ${rate} دينار/kWp)`);
             }
             
-            // Update lead status
             await managerAPI.updateLeadStatus(leadId, newStatus, statusNotes);
             toast.success(`✅ تم تحديث حالة الطلب إلى ${getStatusText(newStatus)}`);
             fetchData();
@@ -419,7 +427,7 @@ const OperationsDashboard = () => {
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500 flex items-center gap-1"><FaMoneyBillWave className="text-green-600" /> فاتورة الكهرباء:</span>
-                                            <span className="font-bold text-green-600">{lead.bill_amount} دينار<span className="text-xs text-gray-500 block">({lead.bill_period_months === 60 ? 'شهرين' : 'شهر'})</span></span>
+                                            <span className="font-bold text-green-600">{lead.bill_amount} دينار</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">نوع العقار:</span>
