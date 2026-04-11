@@ -1,9 +1,6 @@
 const db = require('../config/database');
 const { getRows, getFirstRow } = require('../config/database');
 
-// =============================================
-// الحصول على طلبات المدير
-// =============================================
 exports.getMyLeads = async (req, res) => {
     try {
         const managerId = req.user.id;
@@ -58,9 +55,6 @@ exports.getMyLeads = async (req, res) => {
     }
 };
 
-// =============================================
-// تحديث حالة طلب
-// =============================================
 exports.updateLeadStatus = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
@@ -100,9 +94,6 @@ exports.updateLeadStatus = async (req, res) => {
     }
 };
 
-// =============================================
-// الحصول على إحصائيات المدير
-// =============================================
 exports.getManagerStats = async (req, res) => {
     try {
         const managerId = req.user.id;
@@ -125,9 +116,6 @@ exports.getManagerStats = async (req, res) => {
     }
 };
 
-// =============================================
-// إرسال طلب لشركة (لـ Operations Manager)
-// =============================================
 exports.assignToCompany = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
@@ -152,9 +140,6 @@ exports.assignToCompany = async (req, res) => {
     }
 };
 
-// =============================================
-// الحصول على تفاصيل طلب محدد للمدير
-// =============================================
 exports.getLeadDetails = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
@@ -167,9 +152,6 @@ exports.getLeadDetails = async (req, res) => {
     }
 };
 
-// =============================================
-// الحصول على قائمة الشركات المتاحة
-// =============================================
 exports.getAvailableCompanies = async (req, res) => {
     try {
         const result = await db.query(`SELECT id, name, phone, address, contact_person, is_active FROM companies WHERE is_active = 1 ORDER BY name ASC`);
@@ -179,9 +161,6 @@ exports.getAvailableCompanies = async (req, res) => {
     }
 };
 
-// =============================================
-// إرسال الطلب لمدير العمليات (للمدير التنفيذي)
-// =============================================
 exports.sendToOperationsManager = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
@@ -207,9 +186,6 @@ exports.sendToOperationsManager = async (req, res) => {
     }
 };
 
-// =============================================
-// إضافة ملاحظات للطلب
-// =============================================
 exports.addLeadNote = async (req, res) => {
     try {
         const leadId = req.params.id || req.params.leadId;
@@ -227,9 +203,6 @@ exports.addLeadNote = async (req, res) => {
     }
 };
 
-// =============================================
-// تصدير الطلبات إلى CSV
-// =============================================
 exports.exportLeads = async (req, res) => {
     try {
         const managerId = req.user.id;
@@ -254,9 +227,6 @@ exports.exportLeads = async (req, res) => {
     }
 };
 
-// =============================================
-// الحصول على نسبة عمولة شركة معينة
-// =============================================
 exports.getCompanyCommissionRate = async (req, res) => {
     try {
         const { companyId } = req.params;
@@ -268,9 +238,6 @@ exports.getCompanyCommissionRate = async (req, res) => {
     }
 };
 
-// =============================================
-// تحديث عمولة طلب معين
-// =============================================
 exports.updateLeadCommission = async (req, res) => {
     try {
         const { leadId } = req.params;
