@@ -558,10 +558,10 @@ exports.addCompany = async (req, res) => {
         
         // ✅ إضافة الشركة فقط (بدون إنشاء مستخدم)
         const result = await db.query(`
-            INSERT INTO companies (name, email, phone, address, contact_person, projects_count, description, website, logo, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1)
-            RETURNING id
-        `, [name, email, phone || null, address || null, contact_person || null, projects_count || 0, description || null, website || null, logo || null]);
+    INSERT INTO companies (name, email, phone, address, contact_person, projects_count, description, website, logo, is_active)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+    RETURNING id
+`, [name, email, phone || null, address || null, contact_person || null, projects_count || 0, description || null, website || null, logo || null]);
         
         const companyId = result.rows[0].id;
         
