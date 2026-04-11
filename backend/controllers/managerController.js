@@ -1,5 +1,14 @@
 const db = require('../config/database');
-const { getRows, getFirstRow } = require('../config/database');
+
+// Helper function to handle both PostgreSQL and SQLite results
+const getRows = (result) => {
+    return result.rows || result || [];
+};
+
+const getFirstRow = (result) => {
+    const rows = getRows(result);
+    return rows[0] || null;
+};
 
 // =============================================
 // الحصول على طلبات المدير
@@ -13,7 +22,11 @@ exports.getMyLeads = async (req, res) => {
         
         console.log(`📊 Manager ${managerId} (${role}) fetching leads, status: ${status}`);
         
-        let query = `SELECT l.* FROM leads l WHERE 1=1`;
+        let query = `
+            SELECT l.*
+            FROM leads l
+            WHERE 1=1
+        `;
         const queryParams = [];
         let paramIndex = 1;
         
@@ -54,12 +67,14 @@ exports.getMyLeads = async (req, res) => {
         const countResult = await db.query(countQuery, countParams);
         const total = getFirstRow(countResult)?.total || 0;
         
+        console.log(`✅ Found ${leads?.length || 0} leads, total: ${total}`);
         res.json({
             leads: leads || [],
             total: total,
             page: parseInt(page),
             totalPages: Math.ceil(total / limit)
         });
+        
     } catch (error) {
         console.error('❌ Error getting manager leads:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب الطلبات', error: error.message });
@@ -71,14 +86,17 @@ exports.getMyLeads = async (req, res) => {
 // =============================================
 exports.updateLeadStatus = async (req, res) => {
     try {
-        const leadId = req.params.id || req.params.leadId;
+        const { leadId } = req.params;
         const { status, notes } = req.body;
         const managerId = req.user.id;
         
         const validStatuses = ['pending', 'approved', 'contacted', 'sent_to_operations', 'assigned_to_company', 'completed', 'cancelled'];
+        
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'حالة غير صالحة' });
         }
+        
+        console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
         
         let updateQuery = `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP`;
         const updateParams = [status];
@@ -104,7 +122,14 @@ exports.updateLeadStatus = async (req, res) => {
         updateParams.push(leadId);
         
         await db.query(updateQuery, updateParams);
-        res.json({ message: 'تم تحديث حالة الطلب بنجاح', leadId, status });
+        
+        console.log(`✅ Lead ${leadId} updated to ${status}`);
+        res.json({ 
+            message: 'تم تحديث حالة الطلب بنجاح',
+            leadId,
+            status
+        });
+        
     } catch (error) {
         console.error('❌ Error updating lead status:', error);
         res.status(500).json({ message: 'حدث خطأ في تحديث الحالة', error: error.message });
@@ -112,11 +137,14 @@ exports.updateLeadStatus = async (req, res) => {
 };
 
 // =============================================
-// الحصول على إحصائيات المدير
+// الحصول على إحصائيات المدير (مع العمولة)
 // =============================================
 exports.getManagerStats = async (req, res) => {
     try {
         const managerId = req.user.id;
+        const role = req.user.role;
+        
+        console.log(`📈 Getting stats for manager ${managerId} (${role})`);
         
         let query = `
             SELECT 
@@ -139,7 +167,9 @@ exports.getManagerStats = async (req, res) => {
             completed: 0, cancelled: 0, total_commission: 0
         };
         
+        console.log(`📊 Stats: pending=${stats.pending}, completed=${stats.completed}, commission=${stats.total_commission}`);
         res.json(stats);
+        
     } catch (error) {
         console.error('❌ Error getting manager stats:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب الإحصائيات', error: error.message });
@@ -151,43 +181,66 @@ exports.getManagerStats = async (req, res) => {
 // =============================================
 exports.assignToCompany = async (req, res) => {
     try {
-        const leadId = req.params.id || req.params.leadId;
+        const { leadId } = req.params;
         const { companyId, notes } = req.body;
-        const managerId = req.user?.id;
-
-        if (!managerId) {
-            return res.status(401).json({ message: 'غير مصرح به. يرجى تسجيل الدخول مرة أخرى.' });
+        const managerId = req.user.id;
+        
+        console.log(`🏢 Assigning lead ${leadId} to company ${companyId}`);
+        
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(resultLead);
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
         }
-
-        await db.query(`
-            UPDATE leads 
-            SET status = 'assigned_to_company', 
-                assigned_company_id = $1, 
-                assigned_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP 
-            WHERE id = $2
-        `, [companyId, leadId]);
-
-        const existing = await db.query(
-            'SELECT id FROM lead_companies WHERE lead_id = $1 AND company_id = $2',
+        
+        const resultCompany = await db.query('SELECT id, name FROM companies WHERE id = $1', [companyId]);
+        const company = getFirstRow(resultCompany);
+        if (!company) {
+            return res.status(404).json({ message: 'الشركة غير موجودة' });
+        }
+        
+        await db.query(
+            `UPDATE leads 
+             SET status = 'assigned_to_company', 
+                 assigned_company_id = $1, 
+                 assigned_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [companyId, leadId]
+        );
+        
+        const resultExisting = await db.query(
+            `SELECT id FROM lead_companies 
+             WHERE lead_id = $1 AND company_id = $2`,
             [leadId, companyId]
         );
-        if (getRows(existing).length > 0) {
-            await db.query(`
-                UPDATE lead_companies 
-                SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
-                WHERE lead_id = $3 AND company_id = $4
-            `, [managerId, notes || null, leadId, companyId]);
+        const existing = getRows(resultExisting);
+        
+        if (existing && existing.length > 0) {
+            await db.query(
+                `UPDATE lead_companies 
+                 SET assigned_by = $1, notes = $2, status = 'assigned', assigned_at = CURRENT_TIMESTAMP
+                 WHERE lead_id = $3 AND company_id = $4`,
+                [managerId, notes || null, leadId, companyId]
+            );
         } else {
-            await db.query(`
-                INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
-                VALUES ($1, $2, $3, $4, 'assigned', CURRENT_TIMESTAMP)
-            `, [leadId, companyId, managerId, notes || null]);
+            await db.query(
+                `INSERT INTO lead_companies (lead_id, company_id, assigned_by, notes, status, assigned_at) 
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                [leadId, companyId, managerId, notes || null, 'assigned']
+            );
         }
-
-        res.json({ message: 'تم إرسال الطلب للشركة بنجاح' });
+        
+        console.log(`✅ Lead ${leadId} assigned to company ${company.name}`);
+        res.json({ 
+            message: `تم إرسال الطلب للشركة: ${company.name}`,
+            leadId,
+            companyId,
+            companyName: company.name
+        });
+        
     } catch (error) {
-        console.error('❌ Error in assignToCompany:', error);
+        console.error('❌ Error assigning to company:', error);
         res.status(500).json({ message: 'حدث خطأ في إرسال الطلب للشركة', error: error.message });
     }
 };
@@ -197,7 +250,7 @@ exports.assignToCompany = async (req, res) => {
 // =============================================
 exports.getLeadDetails = async (req, res) => {
     try {
-        const leadId = req.params.id || req.params.leadId;
+        const { leadId } = req.params;
         
         const result = await db.query(`
             SELECT l.*, 
@@ -210,10 +263,13 @@ exports.getLeadDetails = async (req, res) => {
         `, [leadId]);
         
         const lead = getFirstRow(result);
+        
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
+        
         res.json(lead);
+        
     } catch (error) {
         console.error('❌ Error getting lead details:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب تفاصيل الطلب', error: error.message });
@@ -234,6 +290,7 @@ exports.getAvailableCompanies = async (req, res) => {
         
         const companies = getRows(result);
         res.json(companies || []);
+        
     } catch (error) {
         console.error('❌ Error getting available companies:', error);
         res.status(500).json({ message: 'حدث خطأ في جلب الشركات', error: error.message });
@@ -244,26 +301,38 @@ exports.getAvailableCompanies = async (req, res) => {
 // إرسال الطلب لمدير العمليات (للمدير التنفيذي)
 // =============================================
 exports.sendToOperationsManager = async (req, res) => {
+    console.log('🚀🔴🔴 sendToOperationsManager FUNCTION IS CALLED! 🔴🔴🚀');
+    console.log('📝 req.params:', req.params);
+    console.log('📝 req.body:', req.body);
+    console.log('👤 req.user:', req.user);
+    
     try {
-        const leadId = req.params.id || req.params.leadId;
-        const { notes, operations_manager_id } = req.body;
+        const leadId = req.params.id;
+        const { notes } = req.body;
         const executiveId = req.user.id;
-
-        let targetOpsManagerId = operations_manager_id;
-        if (!targetOpsManagerId) {
-            const opsResult = await db.query("SELECT id FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1");
-            targetOpsManagerId = getFirstRow(opsResult)?.id;
-            if (!targetOpsManagerId) {
-                return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
-            }
-        }
-
-        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const lead = getFirstRow(leadResult);
+        
+        console.log(`📤 Executive ${executiveId} sending lead ${leadId} to operations manager`);
+        
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(resultLead);
         if (!lead) {
+            console.log('❌ Lead not found:', leadId);
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
-
+        
+        const opsResult = await db.query(
+            'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
+            ['operations_manager']
+        );
+        const operationsManager = getFirstRow(opsResult);
+        
+        if (!operationsManager) {
+            console.log('❌ No operations manager available');
+            return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
+        }
+        
+        const commission = lead.commission_amount || (lead.required_kw * 150);
+        
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
@@ -272,19 +341,22 @@ exports.sendToOperationsManager = async (req, res) => {
                  sent_to_operations_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $3`,
-            [targetOpsManagerId, executiveId, leadId]
+            [operationsManager.id, executiveId, leadId]
         );
-
-        const commission = lead.commission_amount || (lead.required_kw * 150);
-        res.json({ 
-            message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`, 
+        
+        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.name} with commission ${commission}`);
+        
+        return res.status(200).json({ 
+            message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId: parseInt(leadId),
             commission: commission,
-            operationsManagerId: targetOpsManagerId
+            operationsManagerId: operationsManager.id,
+            operationsManagerName: operationsManager.name
         });
+        
     } catch (error) {
-        console.error('❌ Error in sendToOperationsManager:', error);
-        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+        console.error('❌ Error sending to operations:', error);
+        return res.status(500).json({ message: 'حدث خطأ في إرسال الطلب لمدير العمليات', error: error.message });
     }
 };
 
@@ -293,21 +365,30 @@ exports.sendToOperationsManager = async (req, res) => {
 // =============================================
 exports.acceptLeadAndSendToOperations = async (req, res) => {
     try {
-        const leadId = req.params.id || req.params.leadId;
+        const { leadId } = req.params;
         const { notes } = req.body;
         const executiveId = req.user.id;
         
-        const lead = getFirstRow(await db.query('SELECT * FROM leads WHERE id = $1', [leadId]));
+        console.log(`✅ Executive ${executiveId} accepting lead ${leadId} and sending to operations`);
+        
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(resultLead);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        const opsManager = getFirstRow(await db.query("SELECT id, name FROM users WHERE role = 'operations_manager' AND is_active = true LIMIT 1"));
-        if (!opsManager) {
+        const opsResult = await db.query(
+            'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
+            ['operations_manager']
+        );
+        const operationsManager = getFirstRow(opsResult);
+        
+        if (!operationsManager) {
             return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
         
         const commission = lead.commission_amount || (lead.required_kw * 150);
+        
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
@@ -316,19 +397,22 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
                  contacted_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $3`,
-            [opsManager.id, executiveId, leadId]
+            [operationsManager.id, executiveId, leadId]
         );
         
-        res.json({ 
+        console.log(`✅ Lead ${leadId} accepted and sent to operations manager ${operationsManager.name} with commission ${commission}`);
+        
+        return res.status(200).json({ 
             message: `تم قبول الطلب وإرساله لمدير العمليات (العمولة: ${commission} دينار)`,
             leadId,
             commission: commission,
-            operationsManagerId: opsManager.id,
-            operationsManagerName: opsManager.name
+            operationsManagerId: operationsManager.id,
+            operationsManagerName: operationsManager.name
         });
+        
     } catch (error) {
         console.error('❌ Error accepting lead:', error);
-        res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
+        return res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
     }
 };
 
@@ -337,7 +421,7 @@ exports.acceptLeadAndSendToOperations = async (req, res) => {
 // =============================================
 exports.addLeadNote = async (req, res) => {
     try {
-        const leadId = req.params.id || req.params.leadId;
+        const { leadId } = req.params;
         const { notes } = req.body;
         const managerId = req.user.id;
         
@@ -363,10 +447,53 @@ exports.addLeadNote = async (req, res) => {
             [`[${new Date().toISOString()}] المستخدم ${managerId}: ${notes}`, leadId]
         );
         
+        console.log(`✅ Note added to lead ${leadId}`);
         res.json({ message: 'تم إضافة الملاحظة بنجاح' });
+        
     } catch (error) {
         console.error('❌ Error adding note:', error);
         res.status(500).json({ message: 'حدث خطأ في إضافة الملاحظة', error: error.message });
+    }
+};
+
+// قبول الطلب وإرساله (اختصار)
+exports.acceptLeadAndSend = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        const { notes } = req.body;
+        const executiveId = req.user.id;
+        
+        console.log(`✅ Executive ${executiveId} accepting lead ${leadId}`);
+        
+        const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(resultLead);
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        const commission = lead.commission_amount || (lead.required_kw * 150);
+        
+        await db.query(
+            `UPDATE leads 
+             SET status = 'sent_to_operations', 
+                 contacted_by = $1,
+                 contacted_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [executiveId, leadId]
+        );
+        
+        console.log(`✅ Lead ${leadId} accepted and sent to operations`);
+        
+        res.json({ 
+            message: `تم قبول الطلب وإرساله لمدير العمليات`,
+            leadId,
+            commission: commission
+        });
+        
+    } catch (error) {
+        console.error('❌ Error accepting lead:', error);
+        res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
     }
 };
 
@@ -375,11 +502,18 @@ exports.addLeadNote = async (req, res) => {
 // =============================================
 exports.markAsContacted = async (req, res) => {
     try {
-        const leadId = req.params.id;
+        const { id } = req.params;
         const { notes } = req.body;
         const userId = req.user.id;
         
-        const lead = getFirstRow(await db.query('SELECT * FROM leads WHERE id = $1', [leadId]));
+        console.log(`📞 User ${userId} marking lead ${id} as contacted`);
+        
+        const resultLead = await db.query(
+            'SELECT * FROM leads WHERE id = $1',
+            [id]
+        );
+        const lead = getFirstRow(resultLead);
+        
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
@@ -392,14 +526,16 @@ exports.markAsContacted = async (req, res) => {
                  notes = COALESCE(notes, '') || '\n' || $2,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $3`,
-            [userId, `[${new Date().toISOString()}] تم التواصل مع العميل: ${notes || 'تم التواصل بنجاح'}`, leadId]
+            [userId, `[${new Date().toISOString()}] تم التواصل مع العميل: ${notes || 'تم التواصل بنجاح'}`, id]
         );
         
+        console.log(`✅ Lead ${id} marked as contacted by user ${userId}`);
         res.json({ 
             message: 'تم تسجيل التواصل مع العميل بنجاح',
-            leadId: leadId,
+            leadId: id,
             status: 'contacted'
         });
+        
     } catch (error) {
         console.error('❌ Error marking as contacted:', error);
         res.status(500).json({ message: 'حدث خطأ في تسجيل التواصل', error: error.message });
@@ -413,6 +549,8 @@ exports.exportLeads = async (req, res) => {
     try {
         const managerId = req.user.id;
         const role = req.user.role;
+        
+        console.log(`📊 Exporting leads by manager ${managerId}`);
         
         let query = `
             SELECT 
@@ -459,44 +597,11 @@ exports.exportLeads = async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=leads_${new Date().toISOString().split('T')[0]}.csv`);
         res.send('\uFEFF' + csvContent);
         
+        console.log(`✅ Leads exported successfully by manager ${managerId}`);
+        
     } catch (error) {
         console.error('❌ Error exporting leads:', error);
         res.status(500).json({ message: 'حدث خطأ في تصدير الطلبات', error: error.message });
-    }
-};
-
-// =============================================
-// قبول الطلب وإرساله (اختصار)
-// =============================================
-exports.acceptLeadAndSend = async (req, res) => {
-    try {
-        const leadId = req.params.id || req.params.leadId;
-        const executiveId = req.user.id;
-        
-        const lead = getFirstRow(await db.query('SELECT * FROM leads WHERE id = $1', [leadId]));
-        if (!lead) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
-        }
-        
-        const commission = lead.commission_amount || (lead.required_kw * 150);
-        await db.query(
-            `UPDATE leads 
-             SET status = 'sent_to_operations', 
-                 contacted_by = $1,
-                 contacted_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [executiveId, leadId]
-        );
-        
-        res.json({ 
-            message: `تم قبول الطلب وإرساله لمدير العمليات`,
-            leadId,
-            commission: commission
-        });
-    } catch (error) {
-        console.error('❌ Error accepting lead:', error);
-        res.status(500).json({ message: 'حدث خطأ في قبول الطلب', error: error.message });
     }
 };
 
