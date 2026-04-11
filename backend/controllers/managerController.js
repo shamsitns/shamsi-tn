@@ -3,10 +3,6 @@ const db = require('../config/database');
 // Helper function to handle both PostgreSQL and SQLite results
 const { getRows, getFirstRow } = require('../config/database');
 
-const getFirstRow = (result) => {
-    const rows = getRows(result);
-    return rows[0] || null;
-};
 
 // =============================================
 // الحصول على طلبات المدير
