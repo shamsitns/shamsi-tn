@@ -13,10 +13,14 @@ const getFirstRow = (result) => {
 // الحصول على طلبات الشركة
 exports.getMyLeads = async (req, res) => {
     try {
-        const userId = req.user.id;
-        // Get company_id from user
-        const userResult = await db.query('SELECT company_id FROM users WHERE id = $1', [userId]);
-        const companyId = getFirstRow(userResult)?.company_id;
+        const userEmail = req.user.email;
+        
+        // جلب company_id من جدول companies باستخدام البريد الإلكتروني
+        const companyResult = await db.query(`
+            SELECT id FROM companies WHERE email = $1 OR user_id = $2
+        `, [userEmail, req.user.id]);
+        
+        const companyId = getFirstRow(companyResult)?.id;
         
         if (!companyId) {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
@@ -34,7 +38,7 @@ exports.getMyLeads = async (req, res) => {
         res.json({ leads });
     } catch (error) {
         console.error('Error fetching my leads:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب الطلبات' });
+        res.status(500).json({ message: 'حدث خطأ في جلب الطلبات', error: error.message });
     }
 };
 
@@ -44,15 +48,19 @@ exports.updateLeadStatus = async (req, res) => {
         const { leadId } = req.params;
         const { status, notes } = req.body;
         const userId = req.user.id;
+        const userEmail = req.user.email;
         
         const validStatuses = ['pending', 'accepted', 'rejected', 'in_progress', 'completed'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'حالة غير صالحة' });
         }
         
-        // Get company_id from user
-        const userResult = await db.query('SELECT company_id FROM users WHERE id = $1', [userId]);
-        const companyId = getFirstRow(userResult)?.company_id;
+        // جلب company_id من جدول companies
+        const companyResult = await db.query(`
+            SELECT id FROM companies WHERE email = $1 OR user_id = $2
+        `, [userEmail, userId]);
+        
+        const companyId = getFirstRow(companyResult)?.id;
         
         if (!companyId) {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
@@ -90,9 +98,13 @@ exports.updateLeadStatus = async (req, res) => {
 // الحصول على إحصائيات الشركة
 exports.getMyStats = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const userResult = await db.query('SELECT company_id FROM users WHERE id = $1', [userId]);
-        const companyId = getFirstRow(userResult)?.company_id;
+        const userEmail = req.user.email;
+        
+        const companyResult = await db.query(`
+            SELECT id FROM companies WHERE email = $1 OR user_id = $2
+        `, [userEmail, req.user.id]);
+        
+        const companyId = getFirstRow(companyResult)?.id;
         
         if (!companyId) {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
@@ -168,9 +180,13 @@ exports.updateCommission = async (req, res) => {
 // ✅ NEW: الحصول على نسبة العمولة للشركة (دينار/كيلوواط)
 exports.getCommissionRate = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const userResult = await db.query('SELECT company_id FROM users WHERE id = $1', [userId]);
-        const companyId = getFirstRow(userResult)?.company_id;
+        const userEmail = req.user.email;
+        
+        const companyResult = await db.query(`
+            SELECT id FROM companies WHERE email = $1 OR user_id = $2
+        `, [userEmail, req.user.id]);
+        
+        const companyId = getFirstRow(companyResult)?.id;
         
         if (!companyId) {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
@@ -193,9 +209,13 @@ exports.updateCommissionRate = async (req, res) => {
             return res.status(400).json({ message: 'نسبة العمولة يجب أن تكون رقماً موجباً' });
         }
         
-        const userId = req.user.id;
-        const userResult = await db.query('SELECT company_id FROM users WHERE id = $1', [userId]);
-        const companyId = getFirstRow(userResult)?.company_id;
+        const userEmail = req.user.email;
+        
+        const companyResult = await db.query(`
+            SELECT id FROM companies WHERE email = $1 OR user_id = $2
+        `, [userEmail, req.user.id]);
+        
+        const companyId = getFirstRow(companyResult)?.id;
         
         if (!companyId) {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
