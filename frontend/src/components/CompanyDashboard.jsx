@@ -5,7 +5,8 @@ import {
     FaChartLine, FaClipboardList, FaCheckCircle, FaTimesCircle,
     FaHourglassHalf, FaCalendarAlt, FaUser, FaMapMarkerAlt,
     FaBolt, FaMoneyBillWave, FaPhone, FaEye, FaSpinner,
-    FaCheck, FaTimes, FaBuilding, FaEdit, FaSave, FaPercentage
+    FaCheck, FaTimes, FaBuilding, FaEdit, FaSave, FaPercentage,
+    FaImage
 } from 'react-icons/fa';
 
 const CompanyDashboard = () => {
@@ -223,6 +224,7 @@ const CompanyDashboard = () => {
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المدينة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">القدرة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">العمولة</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">صورة الفاتورة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">تاريخ التعيين</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
@@ -231,16 +233,16 @@ const CompanyDashboard = () => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {leads.length === 0 ? (
                                     <tr>
-                                        <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                                             لا توجد طلبات معينة لشركتك حالياً
-                                         </td>
+                                        </td>
                                     </tr>
                                 ) : (
                                     leads.map((lead) => (
                                         <tr key={lead.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900">{lead.name}</div>
-                                             </td>
+                                            </td>
                                             <td className="px-4 py-3">{lead.phone}</td>
                                             <td className="px-4 py-3">{lead.city}</td>
                                             <td className="px-4 py-3">{lead.required_kw} kWp</td>
@@ -259,13 +261,25 @@ const CompanyDashboard = () => {
                                                         <FaEdit size={14} />
                                                     </button>
                                                 </div>
-                                             </td>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {lead.invoice_image_url ? (
+                                                    <img 
+                                                        src={`${lead.invoice_image_url}?tr=w-40,h-40,f-webp,q-80`}
+                                                        alt="Invoice"
+                                                        className="w-10 h-10 object-cover rounded cursor-pointer border"
+                                                        onClick={() => window.open(lead.invoice_image_url, '_blank')}
+                                                    />
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">لا توجد صورة</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3">
                                                 {getStatusBadge(lead.assignment_status || lead.status)}
-                                             </td>
+                                            </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                                 {new Date(lead.assigned_at).toLocaleDateString('ar-TN')}
-                                             </td>
+                                            </td>
                                             <td className="px-4 py-3">
                                                 <button
                                                     onClick={() => {
@@ -277,12 +291,12 @@ const CompanyDashboard = () => {
                                                 >
                                                     <FaEye size={18} />
                                                 </button>
-                                             </td>
-                                         </tr>
+                                            </td>
+                                        </tr>
                                     ))
                                 )}
                             </tbody>
-                         </table>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -333,6 +347,27 @@ const CompanyDashboard = () => {
                                     <p className="font-semibold text-green-600">{formatCurrency(selectedLead.commission_amount)} دينار</p>
                                 </div>
                             </div>
+                            
+                            {/* Invoice Image */}
+                            {selectedLead.invoice_image_url && (
+                                <div className="mb-6 p-3 bg-gray-50 rounded-lg">
+                                    <label className="text-gray-500 text-sm block mb-2 flex items-center gap-2">
+                                        <FaImage className="text-blue-500" /> صورة فاتورة الكهرباء
+                                    </label>
+                                    <img 
+                                        src={selectedLead.invoice_image_url}
+                                        alt="Invoice"
+                                        className="w-full max-h-96 object-contain rounded-lg cursor-pointer border"
+                                        onClick={() => window.open(selectedLead.invoice_image_url, '_blank')}
+                                    />
+                                    <button 
+                                        onClick={() => window.open(selectedLead.invoice_image_url, '_blank')}
+                                        className="mt-2 text-blue-500 hover:underline text-sm"
+                                    >
+                                        📥 عرض الصورة بحجم كامل
+                                    </button>
+                                </div>
+                            )}
                             
                             {selectedLead.additional_info && (
                                 <div className="mb-6 p-3 bg-gray-50 rounded-lg">
