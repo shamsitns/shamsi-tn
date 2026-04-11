@@ -17,8 +17,8 @@ exports.getMyLeads = async (req, res) => {
         
         // جلب company_id من جدول companies باستخدام البريد الإلكتروني
         const companyResult = await db.query(`
-            SELECT id FROM companies WHERE email = $1 OR user_id = $2
-        `, [userEmail, req.user.id]);
+    SELECT id FROM companies WHERE email = $1 OR user_id = $2
+`, [userEmail, req.user.id]);
         
         const companyId = getFirstRow(companyResult)?.id;
         
@@ -57,8 +57,8 @@ exports.updateLeadStatus = async (req, res) => {
         
         // جلب company_id من جدول companies
         const companyResult = await db.query(`
-            SELECT id FROM companies WHERE email = $1 OR user_id = $2
-        `, [userEmail, userId]);
+            SELECT id FROM companies WHERE email = $1
+        `, [userEmail]);
         
         const companyId = getFirstRow(companyResult)?.id;
         
@@ -66,20 +66,35 @@ exports.updateLeadStatus = async (req, res) => {
             return res.status(400).json({ message: 'لا توجد شركة مرتبطة بهذا الحساب' });
         }
         
-        // Update lead_companies status
-        await db.query(
-            `UPDATE lead_companies 
-             SET status = $1, notes = COALESCE(notes || E'\n' || $2, $2), updated_at = CURRENT_TIMESTAMP 
-             WHERE lead_id = $3 AND company_id = $4`,
-            [status, notes || null, leadId, companyId]
-        );
+        // تحديث lead_companies
+        let updateQuery = `
+            UPDATE lead_companies 
+            SET status = $1, 
+                updated_at = CURRENT_TIMESTAMP
+        `;
+        const queryParams = [status, leadId, companyId];
         
-        // Update lead status accordingly
+        // إضافة notes إذا وجدت
+        if (notes) {
+            updateQuery += `, notes = COALESCE(notes, '') || '\n' || $4`;
+            queryParams.push(`[${new Date().toISOString()}] ${notes}`);
+        }
+        
+        updateQuery += ` WHERE lead_id = $2 AND company_id = $3`;
+        
+        await db.query(updateQuery, queryParams);
+        
+        // تحديث lead status بناءً على الحالة
         let leadStatus = null;
-        if (status === 'accepted') leadStatus = 'assigned_to_company';
-        else if (status === 'rejected') leadStatus = 'cancelled';
-        else if (status === 'in_progress') leadStatus = 'installation_in_progress';
-        else if (status === 'completed') leadStatus = 'completed';
+        if (status === 'accepted') {
+            leadStatus = 'assigned_to_company';
+        } else if (status === 'rejected') {
+            leadStatus = 'cancelled';
+        } else if (status === 'in_progress') {
+            leadStatus = 'assigned_to_company';  // الحفاظ على نفس الحالة
+        } else if (status === 'completed') {
+            leadStatus = 'completed';
+        }
         
         if (leadStatus) {
             await db.query(
@@ -88,10 +103,18 @@ exports.updateLeadStatus = async (req, res) => {
             );
         }
         
-        res.json({ message: 'تم تحديث الحالة بنجاح' });
+        res.json({ 
+            message: 'تم تحديث الحالة بنجاح',
+            status: status,
+            leadId: leadId
+        });
+        
     } catch (error) {
         console.error('Error updating lead status:', error);
-        res.status(500).json({ message: 'حدث خطأ في تحديث الحالة' });
+        res.status(500).json({ 
+            message: 'حدث خطأ في تحديث الحالة',
+            error: error.message 
+        });
     }
 };
 
