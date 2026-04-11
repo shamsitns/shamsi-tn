@@ -1,12 +1,23 @@
 const ImageKit = require('imagekit');
 require('dotenv').config();
 
-// تهيئة ImageKit
-const imagekit = new ImageKit({
-    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
-});
+// ✅ التحقق من وجود المفاتيح قبل تهيئة ImageKit
+let imagekit = null;
+let isImageKitEnabled = false;
+
+if (process.env.IMAGEKIT_PUBLIC_KEY && 
+    process.env.IMAGEKIT_PRIVATE_KEY && 
+    process.env.IMAGEKIT_URL_ENDPOINT) {
+    imagekit = new ImageKit({
+        publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+        privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+        urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+    });
+    isImageKitEnabled = true;
+    console.log('✅ ImageKit initialized successfully');
+} else {
+    console.warn('⚠️ ImageKit credentials missing. Image upload disabled.');
+}
 
 // مجلدات التخزين المقترحة
 const FOLDERS = {
@@ -16,8 +27,18 @@ const FOLDERS = {
     USER_AVATARS: 'avatars'
 };
 
-// دالة رفع صورة من Base64
+// دالة رفع صورة من Base64 (مصححة)
 async function uploadImage(fileBase64, fileName, folder, options = {}) {
+    if (!isImageKitEnabled) {
+        console.warn('⚠️ ImageKit not configured. Returning mock URL.');
+        return {
+            success: true,
+            url: 'https://via.placeholder.com/400x300?text=Image+Upload+Disabled',
+            fileId: 'mock_' + Date.now(),
+            size: 0
+        };
+    }
+    
     try {
         // إزالة metadata من Base64 إذا وجدت
         let base64Data = fileBase64;
@@ -25,16 +46,27 @@ async function uploadImage(fileBase64, fileName, folder, options = {}) {
             base64Data = fileBase64.split('base64,')[1];
         }
 
-        const result = await imagekit.upload({
+        // ✅ بناء كائن الرفع الأساسي
+        const uploadParams = {
             file: base64Data,
             fileName: fileName,
             folder: folder,
             useUniqueFileName: true,
             isPrivateFile: false,
-            tags: options.tags || [],
-            customCoordinates: options.customCoordinates || null,
-            extensions: options.extensions || []
-        });
+            tags: options.tags || []
+        };
+        
+        // ✅ فقط أضف customCoordinates إذا كانت موجودة وصالحة
+        if (options.customCoordinates && typeof options.customCoordinates === 'string') {
+            uploadParams.customCoordinates = options.customCoordinates;
+        }
+        
+        // ✅ فقط أضف extensions إذا كانت موجودة
+        if (options.extensions && Array.isArray(options.extensions)) {
+            uploadParams.extensions = options.extensions;
+        }
+
+        const result = await imagekit.upload(uploadParams);
 
         return {
             success: true,
@@ -50,14 +82,17 @@ async function uploadImage(fileBase64, fileName, folder, options = {}) {
         console.error('❌ Error uploading to ImageKit:', error);
         return { 
             success: false, 
-            error: error.message,
-            code: error.code 
+            error: error.message 
         };
     }
 }
 
 // دالة رفع صورة من URL
 async function uploadImageFromUrl(imageUrl, fileName, folder) {
+    if (!isImageKitEnabled) {
+        return { success: false, error: 'ImageKit not configured' };
+    }
+    
     try {
         const result = await imagekit.upload({
             url: imageUrl,
@@ -74,13 +109,17 @@ async function uploadImageFromUrl(imageUrl, fileName, folder) {
             size: result.size
         };
     } catch (error) {
-        console.error('❌ Error uploading from URL to ImageKit:', error);
+        console.error('❌ Error uploading from URL:', error);
         return { success: false, error: error.message };
     }
 }
 
 // دالة حذف صورة
 async function deleteImage(fileId) {
+    if (!isImageKitEnabled) {
+        return { success: true };
+    }
+    
     try {
         await imagekit.deleteFile(fileId);
         return { success: true };
@@ -102,34 +141,30 @@ async function deleteMultipleImages(fileIds) {
 
 // دالة الحصول على رابط الصورة المحسنة
 function getOptimizedUrl(url, options = {}) {
+    if (!isImageKitEnabled || !url || url.includes('via.placeholder.com')) {
+        return url;
+    }
+    
     const {
         width = 800,
         height = null,
         quality = 80,
-        format = 'webp',
-        crop = null,
-        blur = null,
-        grayscale = false
+        format = 'webp'
     } = options;
 
     let transformations = `tr=w-${width},q-${quality},f-${format}`;
-    
     if (height) transformations += `,h-${height}`;
-    if (crop) transformations += `,c-${crop}`;
-    if (blur) transformations += `,bl-${blur}`;
-    if (grayscale) transformations += `,e-grayscale`;
 
     return `${url}?${transformations}`;
 }
 
-// دالة الحصول على رابط الصورة المصغرة (Thumbnail)
+// دالة الحصول على الصورة المصغرة
 function getThumbnailUrl(url, size = 150) {
     return getOptimizedUrl(url, { width: size, height: size, quality: 60 });
 }
 
-// دالة التحقق من صحة الصورة (الحجم والنوع)
+// دالة التحقق من صحة الصورة
 function validateImage(fileBase64, maxSizeMB = 5) {
-    // حساب حجم الصورة (بالميجابايت)
     const sizeInBytes = Buffer.byteLength(fileBase64, 'base64');
     const sizeInMB = sizeInBytes / (1024 * 1024);
     
@@ -140,7 +175,6 @@ function validateImage(fileBase64, maxSizeMB = 5) {
         };
     }
     
-    // التحقق من نوع الصورة (اختياري)
     const mimeMatch = fileBase64.match(/^data:image\/(\w+);base64,/);
     if (mimeMatch) {
         const extension = mimeMatch[1];
@@ -165,5 +199,6 @@ module.exports = {
     deleteMultipleImages,
     getOptimizedUrl,
     getThumbnailUrl,
-    validateImage
+    validateImage,
+    isImageKitEnabled
 };
