@@ -224,25 +224,27 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         
-        // ✅ إضافة إشعارات مباشرة باستخدام SQL
+        // ✅ إضافة إشعارات مباشرة باستخدام SQL مع RETURNING
         try {
             const dbInsert = getDb();
             
             // إشعار للمدير العام (ID: 19)
-            await dbInsert.query(
+            const gmResult = await dbInsert.query(
                 `INSERT INTO notifications (user_id, lead_id, title, message, type, created_at)
-                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                 RETURNING id`,
                 [19, leadId, '📋 طلب جديد', `طلب جديد من ${name} (${phone}) في انتظار المراجعة`, 'info']
             );
-            console.log(`✅ SQL notification sent to GM (ID:19)`);
+            console.log(`✅ GM notification inserted, ID: ${gmResult.rows[0]?.id}`);
             
             // إشعار للمدير التنفيذي (ID: 26)
-            await dbInsert.query(
+            const execResult = await dbInsert.query(
                 `INSERT INTO notifications (user_id, lead_id, title, message, type, created_at)
-                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                 RETURNING id`,
                 [26, leadId, '📋 طلب جديد', `طلب جديد من ${name} (${phone}) في انتظار المراجعة`, 'info']
             );
-            console.log(`✅ SQL notification sent to Executive (ID:26)`);
+            console.log(`✅ Executive notification inserted, ID: ${execResult.rows[0]?.id}`);
             
         } catch (notifError) {
             console.error('❌ Error sending SQL notifications:', notifError);
