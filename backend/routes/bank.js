@@ -10,6 +10,12 @@ const {
 
 const router = express.Router();
 
+// ✅ إضافة مسار اختبار بسيط
+router.get('/test', (req, res) => {
+    console.log('🔍 Bank test endpoint hit!');
+    res.json({ message: 'Bank routes are working!', user: req.user });
+});
+
 // جميع المسارات تحتاج مصادقة وصلاحيات مدير بنك
 router.use(authenticate);
 router.use(isBankManager);
