@@ -1,4 +1,14 @@
-// sw.js - Service Worker للإشعارات
+// Service Worker للإشعارات
+self.addEventListener('install', (event) => {
+  console.log('Service Worker installed');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activated');
+  event.waitUntil(clients.claim());
+});
+
 self.addEventListener('push', function(event) {
   const data = event.data ? event.data.json() : {};
   
@@ -8,8 +18,13 @@ self.addEventListener('push', function(event) {
     badge: '/logo192.png',
     vibrate: [200, 100, 200],
     data: {
-      url: data.url || '/'
-    }
+      url: data.url || '/',
+      leadId: data.leadId || null
+    },
+    actions: [
+      { action: 'open', title: 'فتح' },
+      { action: 'close', title: 'إغلاق' }
+    ]
   };
   
   event.waitUntil(
@@ -17,9 +32,13 @@ self.addEventListener('push', function(event) {
   );
 });
 
-// عند الضغط على الإشعار
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
+  
+  if (event.action === 'close') {
+    return;
+  }
+  
   event.waitUntil(
     clients.openWindow(event.notification.data.url)
   );
