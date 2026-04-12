@@ -38,6 +38,7 @@ exports.getMyFinancingRequests = async (req, res) => {
         
         console.log('🏦 Fetching financing requests for manager:', bankManagerId);
         
+        // ✅ التعديل: استخدم manager_id بدلاً من assigned_to
         let query = `
             SELECT fr.*, 
                    l.name as client_name, 
@@ -49,7 +50,7 @@ exports.getMyFinancingRequests = async (req, res) => {
                    l.estimated_price
             FROM financing_requests fr
             JOIN leads l ON fr.lead_id = l.id
-            WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
+            WHERE fr.financing_type = 'bank' AND fr.manager_id = $1
         `;
         const params = [bankManagerId];
         let paramIndex = 2;
@@ -66,9 +67,8 @@ exports.getMyFinancingRequests = async (req, res) => {
         const result = await db.query(query, params);
         const requests = getRows(result);
         
-        // ✅ إضافة requested_amount و amount بناءً على السعر التقديري أو القدرة
+        // ✅ إضافة requested_amount و amount
         const formattedRequests = requests.map(req => {
-            // استخدام estimated_price من جدول leads إذا كان موجوداً
             let estimatedPrice = req.estimated_price;
             if (!estimatedPrice && req.required_kw) {
                 estimatedPrice = getEstimatedPrice(req.required_kw);
@@ -82,10 +82,11 @@ exports.getMyFinancingRequests = async (req, res) => {
             };
         });
         
+        // ✅ تعديل استعلام العدد أيضاً
         let countQuery = `
             SELECT COUNT(*) as total 
             FROM financing_requests fr
-            WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
+            WHERE fr.financing_type = 'bank' AND fr.manager_id = $1
         `;
         const countParams = [bankManagerId];
         
@@ -127,10 +128,10 @@ exports.updateFinancingStatus = async (req, res) => {
             return res.status(400).json({ message: 'حالة غير صالحة' });
         }
         
-        // التحقق من وجود الطلب
+        // ✅ التحقق من وجود الطلب باستخدام manager_id
         const existingResult = await db.query(
             `SELECT id, lead_id, status FROM financing_requests 
-             WHERE id = $1 AND financing_type = 'bank' AND assigned_to = $2`,
+             WHERE id = $1 AND financing_type = 'bank' AND manager_id = $2`,
             [requestId, bankManagerId]
         );
         const existing = getFirstRow(existingResult);
@@ -225,6 +226,7 @@ exports.getBankStats = async (req, res) => {
     try {
         const bankManagerId = req.user.id;
         
+        // ✅ استخدم manager_id بدلاً من assigned_to
         const result = await db.query(`
             SELECT 
                 COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
@@ -234,7 +236,7 @@ exports.getBankStats = async (req, res) => {
                 COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
                 COALESCE(SUM(CASE WHEN status = 'approved' THEN approved_amount ELSE 0 END), 0) as total_approved_amount
             FROM financing_requests
-            WHERE financing_type = 'bank' AND assigned_to = $1
+            WHERE financing_type = 'bank' AND manager_id = $1
         `, [bankManagerId]);
         
         const stats = getFirstRow(result) || { 
