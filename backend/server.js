@@ -27,7 +27,7 @@ const companyRoutes = require('./routes/companies');
 const bankRoutes = require('./routes/bank');
 const leasingRoutes = require('./routes/leasing');
 const companyDashboardRoutes = require('./routes/companyDashboard');
-const notificationRoutes = require('./routes/notifications'); // ✅ إضافة الإشعارات
+const notificationRoutes = require('./routes/notifications');
 
 // ✅ NEW: Import company requests routes
 const companyRequestsRoutes = require('./routes/companyRequests');
@@ -96,7 +96,7 @@ app.use(cors({
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Body parsing (حدود أصغر للأمان)
-app.use(express.json({ limit: '5mb' })); // زيادة الحد لاستقبال الصور
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Cache Control
@@ -122,9 +122,7 @@ app.use(`${API_PREFIX}/companies`, companyRoutes);
 app.use(`${API_PREFIX}/bank`, bankRoutes);
 app.use(`${API_PREFIX}/leasing`, leasingRoutes);
 app.use(`${API_PREFIX}/company`, companyDashboardRoutes);
-app.use(`${API_PREFIX}/notifications`, notificationRoutes); // ✅ إضافة مسار الإشعارات
-
-// ✅ NEW: Company Requests Routes (لصفحة JoinAsCompany)
+app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/company-requests`, companyRequestsRoutes);
 
 // =============================================
@@ -164,15 +162,13 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         else if (bill_amount > 150) leadScore += 10;
         
         // رفع الصورة إذا وجدت
-        // رفع الصورة إذا وجدت (نسخة مبسطة)
-// مؤقتاً: استخدم رابط تجريبي بدلاً من الرفع
-let invoiceImageUrl = null;
+        let invoiceImageUrl = null;
+        let invoiceImageFileId = null;
 
-if (invoiceImage) {
-    // ✅ رابط تجريبي للاختبار
-    invoiceImageUrl = 'https://picsum.photos/400/300?random=' + Date.now();
-    console.log(`✅ Mock invoice image URL: ${invoiceImageUrl}`);
-}
+        if (invoiceImage) {
+            invoiceImageUrl = 'https://picsum.photos/400/300?random=' + Date.now();
+            console.log(`✅ Mock invoice image URL: ${invoiceImageUrl}`);
+        }
         
         const db = getDb();
         
@@ -229,6 +225,31 @@ if (invoiceImage) {
         console.log(`✅ Lead created successfully with ID: ${leadId}`);
         console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
+        
+        // ✅ إرسال إشعار للمدير العام والمدير التنفيذي
+        try {
+            const { sendNotificationToRole } = require('./utils/notifications');
+            
+            await sendNotificationToRole(
+                'general_manager',
+                leadId,
+                '📋 طلب جديد',
+                `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
+                'info'
+            );
+            
+            await sendNotificationToRole(
+                'executive_manager',
+                leadId,
+                '📋 طلب جديد',
+                `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
+                'info'
+            );
+            
+            console.log(`✅ Notifications sent for lead ${leadId}`);
+        } catch (notifError) {
+            console.error('❌ Error sending notifications:', notifError);
+        }
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
@@ -603,6 +624,7 @@ const startServer = async () => {
     📝 Request ID: Enabled
     ✅ Company Requests API: Enabled (/api/company-requests)
     ✅ POST /api/leads: Enabled (for lead creation with images)
+    ✅ Notification System: Enabled
     ════════════════════════════════════════════════════════
             `);
         });
