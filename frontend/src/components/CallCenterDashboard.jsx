@@ -32,10 +32,19 @@ const CallCenterDashboard = () => {
     const fetchData = async () => {
     setLoading(true);
     try {
+        // ✅ تأكد من أن الفلتر يُرسل إلى API
         const params = filter !== 'all' ? { status: filter } : {};
+        console.log('📊 Fetching with filter:', filter, params);
         const response = await managerAPI.getLeads(params);
         console.log('📊 Call Center leads data:', response.data);
-        setLeads(response.data.leads || []);
+        
+        // ✅ فلترة إضافية في حالة عدم عمل API بشكل صحيح
+        let leadsData = response.data.leads || [];
+        if (filter !== 'all') {
+            leadsData = leadsData.filter(lead => lead.status === filter);
+        }
+        
+        setLeads(leadsData);
     } catch (error) {
         console.error('Error fetching leads:', error);
         toast.error('حدث خطأ في جلب البيانات');
