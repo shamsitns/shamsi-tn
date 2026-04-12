@@ -16,7 +16,7 @@ exports.getAllCompanies = async (req, res) => {
         const result = await db.query(
             `SELECT id, name, email, phone, address, contact_person, is_active, created_at
              FROM companies 
-             WHERE is_active = 1
+             WHERE is_active = true
              ORDER BY name ASC`
         );
         const companies = getRows(result);
