@@ -560,50 +560,41 @@ exports.assignToBankManager = async (req, res) => {
     try {
         const { leadId } = req.params;
         const { bankManagerId, bankId, notes } = req.body;
-        const adminId = req.user.id;
         
-        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
+        // ✅ تحديث assigned_sections
+        const leadResult = await db.query('SELECT assigned_sections FROM leads WHERE id = $1', [leadId]);
+        let sections = leadResult.rows[0]?.assigned_sections || [];
+        if (typeof sections === 'string') sections = JSON.parse(sections);
         
-        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
-        const lead = getFirstRow(leadResult);
-        if (!lead) {
-            return res.status(404).json({ message: 'الطلب غير موجود' });
+        if (!sections.includes('bank_manager')) {
+            sections.push('bank_manager');
+            await db.query(
+                'UPDATE leads SET assigned_sections = $1 WHERE id = $2',
+                [JSON.stringify(sections), leadId]
+            );
         }
         
-        const bankResult = await db.query(
-            'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
-            [bankManagerId, 'bank_manager']
-        );
-        const bankManager = getFirstRow(bankResult);
-        if (!bankManager) {
-            return res.status(404).json({ message: 'مدير البنك غير موجود' });
-        }
-        
+        // ✅ إدراج في financing_requests (الأهم)
         await db.query(
-            `UPDATE leads 
-             SET financing_type = 'bank', 
-                 assigned_to = $1,
-                 updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $2`,
-            [bankManagerId, leadId]
+            `INSERT INTO financing_requests (lead_id, manager_id, financing_type, status, created_at)
+             VALUES ($1, $2, 'bank', 'pending', CURRENT_TIMESTAMP)
+             ON CONFLICT (lead_id, financing_type) DO UPDATE SET status = 'pending'`,
+            [leadId, bankManagerId]
         );
         
+        // ✅ إدراج في bank_requests
         await db.query(
-            `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, financing_type, created_at)
-             VALUES ($1, $2, $3, $4, 'pending', 'bank', CURRENT_TIMESTAMP)`,
+            `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, created_at)
+             VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)
+             ON CONFLICT (lead_id) DO UPDATE SET status = 'pending'`,
             [leadId, bankManagerId, bankId || null, notes || null]
         );
         
-        res.json({ 
-            message: `تم إرسال الطلب لمدير البنك: ${bankManager.name}`,
-            leadId,
-            bankManagerId,
-            bankManagerName: bankManager.name
-        });
+        res.json({ message: 'تم إرسال الطلب لمدير البنك' });
         
     } catch (error) {
-        console.error('❌ Error in assignToBankManager:', error);
-        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+        console.error('Error:', error);
+        res.status(500).json({ message: 'حدث خطأ' });
     }
 };
 
