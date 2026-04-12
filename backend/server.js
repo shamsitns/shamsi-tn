@@ -163,32 +163,13 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         
         // رفع الصورة إذا وجدت
         // رفع الصورة إذا وجدت (نسخة مبسطة)
+// مؤقتاً: استخدم رابط تجريبي بدلاً من الرفع
 let invoiceImageUrl = null;
-let invoiceImageFileId = null;
 
 if (invoiceImage) {
-    try {
-        const { uploadImage, validateImage } = require('./utils/imagekit');
-        const validation = validateImage(invoiceImage, 5);
-        if (validation.valid) {
-            const uploadResult = await uploadImage(
-                invoiceImage,
-                `invoice_${Date.now()}_${userId || 'guest'}.jpg`,
-                ''  // ✅ بدون مجلد
-            );
-            if (uploadResult.success) {
-                invoiceImageUrl = uploadResult.url;
-                invoiceImageFileId = uploadResult.fileId;
-                console.log(`✅ Invoice image uploaded: ${invoiceImageUrl}`);
-            } else {
-                console.error('❌ Upload failed:', uploadResult.error);
-            }
-        } else {
-            console.error('❌ Validation failed:', validation.error);
-        }
-    } catch (error) {
-        console.error('❌ Image upload error:', error);
-    }
+    // ✅ رابط تجريبي للاختبار
+    invoiceImageUrl = 'https://picsum.photos/400/300?random=' + Date.now();
+    console.log(`✅ Mock invoice image URL: ${invoiceImageUrl}`);
 }
         
         const db = getDb();

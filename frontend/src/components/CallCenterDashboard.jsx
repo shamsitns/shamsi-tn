@@ -52,13 +52,12 @@ const CallCenterDashboard = () => {
     setSendingLeadId(leadId);
     
     try {
+        // استخدم sendToOperationsManager مباشرة
         await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
         toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
         
-        // ✅ تغيير الفلتر إلى sent_to_operations
+        // تحديث القائمة
         setFilter('sent_to_operations');
-        
-        // ✅ ثم جلب البيانات
         await fetchData();
         
     } catch (error) {
