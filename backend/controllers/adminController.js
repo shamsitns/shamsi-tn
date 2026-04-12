@@ -448,9 +448,11 @@ exports.assignToBankManager = async (req, res) => {
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
         
-        // التحقق من وجود leadId
-        if (!leadId || !bankManagerId) {
-            return res.status(400).json({ message: 'معرّف الطلب ومدير البنك مطلوبان' });
+        // التحقق من وجود الطلب
+        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(leadResult);
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
         // التحقق من وجود مدير البنك
@@ -459,7 +461,6 @@ exports.assignToBankManager = async (req, res) => {
             [bankManagerId, 'bank_manager']
         );
         const bankManager = getFirstRow(bankResult);
-        
         if (!bankManager) {
             return res.status(404).json({ message: 'مدير البنك غير موجود' });
         }
@@ -474,28 +475,12 @@ exports.assignToBankManager = async (req, res) => {
             [bankManagerId, leadId]
         );
         
-        // ✅ التحقق من وجود جدول bank_requests قبل الإدراج
-        try {
-            const tableCheck = await db.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'bank_requests'
-                )
-            `);
-            
-            if (tableCheck.rows[0].exists) {
-                await db.query(
-                    `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, created_at)
-                     VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)`,
-                    [leadId, bankManagerId, bankId || null, notes || null]
-                );
-                console.log('✅ Bank request recorded in bank_requests table');
-            } else {
-                console.log('⚠️ bank_requests table not found, skipping');
-            }
-        } catch (tableError) {
-            console.log('Error with bank_requests:', tableError.message);
-        }
+        // إدراج في bank_requests
+        await db.query(
+            `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, financing_type, created_at)
+             VALUES ($1, $2, $3, $4, 'pending', 'bank', CURRENT_TIMESTAMP)`,
+            [leadId, bankManagerId, bankId || null, notes || null]
+        );
         
         console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
         res.json({ 
@@ -520,16 +505,24 @@ exports.assignToLeasingManager = async (req, res) => {
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to leasing manager ${leasingManagerId}`);
         
+        // التحقق من وجود الطلب
+        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(leadResult);
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        // التحقق من وجود مدير التأجير
         const leasingResult = await db.query(
-            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
             [leasingManagerId, 'leasing_manager']
         );
         const leasingManager = getFirstRow(leasingResult);
-        
         if (!leasingManager) {
             return res.status(404).json({ message: 'مدير التأجير غير موجود' });
         }
         
+        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET financing_type = 'leasing', 
@@ -537,6 +530,13 @@ exports.assignToLeasingManager = async (req, res) => {
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
             [leasingManagerId, leadId]
+        );
+        
+        // إدراج في leasing_requests
+        await db.query(
+            `INSERT INTO leasing_requests (lead_id, leasing_manager_id, notes, status, financing_type, created_at)
+             VALUES ($1, $2, $3, 'pending', 'leasing', CURRENT_TIMESTAMP)`,
+            [leadId, leasingManagerId, notes || null]
         );
         
         console.log(`✅ Lead ${leadId} assigned to leasing manager ${leasingManager.name}`);
@@ -548,7 +548,7 @@ exports.assignToLeasingManager = async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Error in assignToLeasingManager:', error);
         res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
