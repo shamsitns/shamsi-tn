@@ -440,16 +440,18 @@ exports.assignToCallCenter = async (req, res) => {
 };
 
 // تعيين طلب لمدير البنك
+// تعيين طلب لمدير البنك
 exports.assignToBankManager = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const { bankManagerId, notes } = req.body;
+        const { bankManagerId, bankId, notes } = req.body;
         const adminId = req.user.id;
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
         
+        // التحقق من وجود مدير البنك
         const bankResult = await db.query(
-            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
             [bankManagerId, 'bank_manager']
         );
         const bankManager = getFirstRow(bankResult);
@@ -458,6 +460,7 @@ exports.assignToBankManager = async (req, res) => {
             return res.status(404).json({ message: 'مدير البنك غير موجود' });
         }
         
+        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET financing_type = 'bank', 
@@ -465,6 +468,13 @@ exports.assignToBankManager = async (req, res) => {
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
             [bankManagerId, leadId]
+        );
+        
+        // ✅ إدراج في جدول bank_requests (بدلاً من تحديث مباشر)
+        await db.query(
+            `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, created_at)
+             VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)`,
+            [leadId, bankManagerId, bankId || null, notes || null]
         );
         
         console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
