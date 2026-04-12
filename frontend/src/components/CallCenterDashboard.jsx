@@ -47,17 +47,21 @@ const CallCenterDashboard = () => {
     // =============================================
     // Update Lead Status
     // =============================================
-    const handleSendToOperations = async (leadId) => {
+    // عندما ترسل الطلب، غيّر الفلتر تلقائياً إلى sent_to_operations
+const handleSendToOperations = async (leadId) => {
     if (sendingLeadId === leadId) return;
     setSendingLeadId(leadId);
     
     try {
-        // ✅ استخدم sendToOperationsManager بدلاً من updateLeadStatus
         await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
         toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
         
-        // تحديث القائمة
-        await fetchData();
+        // ✅ تغيير الفلتر إلى sent_to_operations
+        setFilter('sent_to_operations');
+        
+        // ✅ ثم جلب البيانات
+        const response = await managerAPI.getLeads({ status: 'sent_to_operations' });
+        setLeads(response.data.leads || []);
         
     } catch (error) {
         console.error('Error sending to operations:', error);
