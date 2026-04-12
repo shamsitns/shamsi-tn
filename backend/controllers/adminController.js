@@ -357,12 +357,12 @@ exports.assignToExecutive = async (req, res) => {
             [executiveId, leadId]
         );
         
-        // إضافة سجل في جدول التعيينات
-        await db.query(
-            `INSERT INTO lead_assignments (lead_id, assigned_to, assigned_by, notes, assigned_at)
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-            [leadId, executiveId, adminId, notes || null]
-        );
+        // ✅ تعليق أو حذف هذا الجزء (الإدراج في lead_assignments)
+        // await db.query(
+        //     `INSERT INTO lead_assignments (lead_id, assigned_to, assigned_by, notes, assigned_at)
+        //      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+        //     [leadId, executiveId, adminId, notes || null]
+        // );
         
         console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
         
