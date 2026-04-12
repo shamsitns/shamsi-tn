@@ -9,16 +9,25 @@ const NotificationBell = () => {
     const previousUnreadCount = useRef(0);
     const audioRef = useRef(null);
 
-    // تحميل الصوت
+    // تحميل الصوت - استخدام مسار محلي أو رابط
     useEffect(() => {
-        // استخدام رابط صوت من الإنترنت
-        audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        // محاولة استخدام مسار محلي أولاً
+        audioRef.current = new Audio('/sounds/notification.mp3');
+        
+        // إذا فشل المسار المحلي، استخدم الرابط
+        audioRef.current.onerror = () => {
+            console.log('Local sound not found, using online sound');
+            audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        };
     }, []);
 
     const playSound = () => {
         if (audioRef.current) {
             audioRef.current.play().catch(err => {
                 console.log('Audio play failed:', err);
+                // محاولة تشغيل الصوت عبر رابط آخر
+                const fallbackAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+                fallbackAudio.play().catch(e => console.log('Fallback audio failed:', e));
             });
         }
     };
@@ -31,8 +40,11 @@ const NotificationBell = () => {
             const newNotifications = response.data.notifications || [];
             const newUnreadCount = response.data.unreadCount || 0;
             
+            console.log(`Previous unread: ${previousUnreadCount.current}, New unread: ${newUnreadCount}`);
+            
             // تشغيل الصوت عند وجود إشعارات جديدة
             if (newUnreadCount > previousUnreadCount.current) {
+                console.log('🔔 New notification detected! Playing sound...');
                 playSound();
             }
             
@@ -65,8 +77,8 @@ const NotificationBell = () => {
     useEffect(() => {
         if (localStorage.getItem('token')) {
             fetchNotifications();
-            // تحديث كل 15 ثانية
-            const interval = setInterval(fetchNotifications, 15000);
+            // تحديث كل 10 ثوانٍ (أسرع للاختبار)
+            const interval = setInterval(fetchNotifications, 10000);
             return () => clearInterval(interval);
         }
     }, []);
