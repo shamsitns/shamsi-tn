@@ -65,12 +65,11 @@ const handleSendToOperations = async (leadId) => {
         await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
         toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
         
-        // ✅ تغيير الفلتر إلى sent_to_operations
+        // ✅ تغيير الفلتر إلى 'sent_to_operations' لعرض الطلبات المرسلة
         setFilter('sent_to_operations');
         
-        // ✅ ثم جلب البيانات
-        const response = await managerAPI.getLeads({ status: 'sent_to_operations' });
-        setLeads(response.data.leads || []);
+        // ✅ جلب البيانات بناءً على الفلتر الجديد
+        await fetchData();
         
     } catch (error) {
         console.error('Error sending to operations:', error);
