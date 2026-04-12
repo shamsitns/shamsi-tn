@@ -9,25 +9,28 @@ const NotificationBell = () => {
     const previousUnreadCount = useRef(0);
     const audioRef = useRef(null);
 
-    // تحميل الصوت - استخدام مسار محلي أو رابط
+    // تحميل الصوت - استخدام رابط مضمون
     useEffect(() => {
-        // محاولة استخدام مسار محلي أولاً
-        audioRef.current = new Audio('/sounds/notification.mp3');
+        // إنشاء عنصر صوت جديد
+        const audio = new Audio();
+        audio.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3';
+        audio.load();
+        audioRef.current = audio;
         
-        // إذا فشل المسار المحلي، استخدم الرابط
-        audioRef.current.onerror = () => {
-            console.log('Local sound not found, using online sound');
-            audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        };
+        console.log('🔊 Audio loaded successfully');
     }, []);
 
     const playSound = () => {
         if (audioRef.current) {
-            audioRef.current.play().catch(err => {
+            // إعادة تعيين الوقت إلى البداية
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().then(() => {
+                console.log('🔊 Sound played successfully');
+            }).catch(err => {
                 console.log('Audio play failed:', err);
-                // محاولة تشغيل الصوت عبر رابط آخر
-                const fallbackAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-                fallbackAudio.play().catch(e => console.log('Fallback audio failed:', e));
+                // محاولة بديلة - استخدام عنصر صوت مؤقت
+                const tempAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+                tempAudio.play().catch(e => console.log('Temp audio also failed:', e));
             });
         }
     };
@@ -40,11 +43,11 @@ const NotificationBell = () => {
             const newNotifications = response.data.notifications || [];
             const newUnreadCount = response.data.unreadCount || 0;
             
-            console.log(`Previous unread: ${previousUnreadCount.current}, New unread: ${newUnreadCount}`);
+            console.log(`Previous: ${previousUnreadCount.current}, New: ${newUnreadCount}`);
             
-            // تشغيل الصوت عند وجود إشعارات جديدة
+            // تشغيل الصوت عند وجود إشعارات جديدة غير مقروءة
             if (newUnreadCount > previousUnreadCount.current) {
-                console.log('🔔 New notification detected! Playing sound...');
+                console.log('🔔 New notification! Playing sound...');
                 playSound();
             }
             
@@ -77,8 +80,7 @@ const NotificationBell = () => {
     useEffect(() => {
         if (localStorage.getItem('token')) {
             fetchNotifications();
-            // تحديث كل 10 ثوانٍ (أسرع للاختبار)
-            const interval = setInterval(fetchNotifications, 10000);
+            const interval = setInterval(fetchNotifications, 15000);
             return () => clearInterval(interval);
         }
     }, []);
