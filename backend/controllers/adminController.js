@@ -440,7 +440,6 @@ exports.assignToCallCenter = async (req, res) => {
 };
 
 // تعيين طلب لمدير البنك
-// تعيين طلب لمدير البنك
 exports.assignToBankManager = async (req, res) => {
     try {
         const { leadId } = req.params;
@@ -448,6 +447,11 @@ exports.assignToBankManager = async (req, res) => {
         const adminId = req.user.id;
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
+        
+        // التحقق من وجود leadId
+        if (!leadId || !bankManagerId) {
+            return res.status(400).json({ message: 'معرّف الطلب ومدير البنك مطلوبان' });
+        }
         
         // التحقق من وجود مدير البنك
         const bankResult = await db.query(
@@ -470,12 +474,28 @@ exports.assignToBankManager = async (req, res) => {
             [bankManagerId, leadId]
         );
         
-        // ✅ إدراج في جدول bank_requests (بدلاً من تحديث مباشر)
-        await db.query(
-            `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, created_at)
-             VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)`,
-            [leadId, bankManagerId, bankId || null, notes || null]
-        );
+        // ✅ التحقق من وجود جدول bank_requests قبل الإدراج
+        try {
+            const tableCheck = await db.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'bank_requests'
+                )
+            `);
+            
+            if (tableCheck.rows[0].exists) {
+                await db.query(
+                    `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, created_at)
+                     VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)`,
+                    [leadId, bankManagerId, bankId || null, notes || null]
+                );
+                console.log('✅ Bank request recorded in bank_requests table');
+            } else {
+                console.log('⚠️ bank_requests table not found, skipping');
+            }
+        } catch (tableError) {
+            console.log('Error with bank_requests:', tableError.message);
+        }
         
         console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
         res.json({ 
@@ -486,7 +506,7 @@ exports.assignToBankManager = async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Error in assignToBankManager:', error);
         res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
