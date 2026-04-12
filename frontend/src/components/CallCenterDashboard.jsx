@@ -30,37 +30,45 @@ const CallCenterDashboard = () => {
     }, [filter]);
     
     const fetchData = async () => {
-        setLoading(true);
-        try {
-            const params = filter !== 'all' ? { status: filter } : {};
-            const response = await managerAPI.getLeads(params);
-            console.log('📊 Call Center leads data:', response.data);
-            setLeads(response.data.leads || []);
-        } catch (error) {
-            console.error('Error fetching leads:', error);
-            toast.error('حدث خطأ في جلب البيانات');
-        } finally {
-            setLoading(false);
-        }
-    };
+    setLoading(true);
+    try {
+        const params = filter !== 'all' ? { status: filter } : {};
+        const response = await managerAPI.getLeads(params);
+        console.log('📊 Call Center leads data:', response.data);
+        setLeads(response.data.leads || []);
+    } catch (error) {
+        console.error('Error fetching leads:', error);
+        toast.error('حدث خطأ في جلب البيانات');
+    } finally {
+        setLoading(false);
+    }
+};
     
     // =============================================
     // Update Lead Status
     // =============================================
     const handleSendToOperations = async (leadId) => {
-        if (sendingLeadId === leadId) return;
-        setSendingLeadId(leadId);
-        try {
-            await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
-            toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
-            await fetchData();
-        } catch (error) {
-            console.error('Error sending to operations:', error);
-            toast.error('❌ حدث خطأ أثناء الإرسال');
-        } finally {
-            setSendingLeadId(null);
-        }
-    };
+    if (sendingLeadId === leadId) return;
+    setSendingLeadId(leadId);
+    
+    try {
+        // إرسال الطلب لمدير العمليات
+        await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
+        toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
+        
+        // ✅ إعادة تحميل البيانات من الخادم
+        await fetchData();
+        
+        // ✅ تحديث الإحصائيات إذا كانت موجودة
+        if (fetchStats) await fetchStats();
+        
+    } catch (error) {
+        console.error('Error sending to operations:', error);
+        toast.error('❌ حدث خطأ أثناء الإرسال');
+    } finally {
+        setSendingLeadId(null);
+    }
+};
     
     const handleUpdateStatus = async (leadId, newStatus, notes = '') => {
         if (sendingLeadId === leadId) return;
