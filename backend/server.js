@@ -127,7 +127,9 @@ app.use(`${API_PREFIX}/company-requests`, companyRequestsRoutes);
 // ✅ Create New Lead (POST /api/leads)
 // =============================================
 app.post(`${API_PREFIX}/leads`, async (req, res) => {
+    console.log('🚀🚀🚀 POST /api/leads HIT! 🚀🚀🚀');
     try {
+
         console.log('📝 Creating new lead via server.js');
         console.log('📦 Request body keys:', Object.keys(req.body));
         
