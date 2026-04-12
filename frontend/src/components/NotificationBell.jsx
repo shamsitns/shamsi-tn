@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaBell } from 'react-icons/fa';
 import axios from 'axios';
 
@@ -6,6 +6,23 @@ const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [showDropdown, setShowDropdown] = useState(false);
+    const previousUnreadCount = useRef(0);
+    const audioRef = useRef(null);
+
+    // تحميل الصوت
+    useEffect(() => {
+        audioRef.current = new Audio('/sounds/notification.mp3');
+        // إذا كنت تريد استخدام رابط خارجي:
+        // audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+    }, []);
+
+    const playSound = () => {
+        if (audioRef.current) {
+            audioRef.current.play().catch(err => {
+                console.log('Audio play failed:', err);
+            });
+        }
+    };
 
     const fetchNotifications = async () => {
         try {
@@ -13,8 +30,17 @@ const NotificationBell = () => {
             const response = await axios.get('/api/notifications', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setNotifications(response.data.notifications || []);
-            setUnreadCount(response.data.unreadCount || 0);
+            const newNotifications = response.data.notifications || [];
+            const newUnreadCount = response.data.unreadCount || 0;
+            
+            // ✅ تشغيل الصوت عند وجود إشعارات جديدة غير مقروءة
+            if (newUnreadCount > previousUnreadCount.current) {
+                playSound();
+            }
+            
+            previousUnreadCount.current = newUnreadCount;
+            setNotifications(newNotifications);
+            setUnreadCount(newUnreadCount);
         } catch (error) {
             console.error('Error fetching notifications:', error);
         }
@@ -45,10 +71,12 @@ const NotificationBell = () => {
     };
 
     useEffect(() => {
-        fetchNotifications();
-        // تحديث كل 30 ثانية
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
+        if (localStorage.getItem('token')) {
+            fetchNotifications();
+            // تحديث كل 15 ثانية (بدلاً من 30)
+            const interval = setInterval(fetchNotifications, 15000);
+            return () => clearInterval(interval);
+        }
     }, []);
 
     const getTypeColor = (type) => {
@@ -59,6 +87,10 @@ const NotificationBell = () => {
             default: return 'bg-blue-100 border-blue-500';
         }
     };
+
+    if (!localStorage.getItem('token')) {
+        return null;
+    }
 
     return (
         <div className="relative">
@@ -75,43 +107,49 @@ const NotificationBell = () => {
             </button>
 
             {showDropdown && (
-                <div className="absolute left-0 mt-2 w-80 bg-white rounded-lg shadow-xl z-50">
-                    <div className="p-3 border-b flex justify-between items-center">
-                        <h3 className="font-semibold text-gray-800">الإشعارات</h3>
-                        {unreadCount > 0 && (
-                            <button
-                                onClick={markAllAsRead}
-                                className="text-xs text-blue-500 hover:text-blue-700"
-                            >
-                                تحديد الكل كمقروء
-                            </button>
-                        )}
-                    </div>
-                    
-                    <div className="max-h-96 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                            <div className="p-4 text-center text-gray-500">
-                                لا توجد إشعارات
-                            </div>
-                        ) : (
-                            notifications.map(notif => (
-                                <div
-                                    key={notif.id}
-                                    className={`p-3 border-b hover:bg-gray-50 cursor-pointer ${!notif.is_read ? 'bg-blue-50' : ''}`}
-                                    onClick={() => markAsRead(notif.id)}
+                <>
+                    <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setShowDropdown(false)}
+                    />
+                    <div className="absolute left-0 mt-2 w-80 bg-white rounded-lg shadow-xl z-50">
+                        <div className="p-3 border-b flex justify-between items-center">
+                            <h3 className="font-semibold text-gray-800">الإشعارات</h3>
+                            {unreadCount > 0 && (
+                                <button
+                                    onClick={markAllAsRead}
+                                    className="text-xs text-blue-500 hover:text-blue-700"
                                 >
-                                    <div className={`border-r-4 pl-3 ${getTypeColor(notif.type)}`}>
-                                        <p className="font-semibold text-sm text-gray-800">{notif.title}</p>
-                                        <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {new Date(notif.created_at).toLocaleString('ar-TN')}
-                                        </p>
-                                    </div>
+                                    تحديد الكل كمقروء
+                                </button>
+                            )}
+                        </div>
+                        
+                        <div className="max-h-96 overflow-y-auto">
+                            {notifications.length === 0 ? (
+                                <div className="p-4 text-center text-gray-500">
+                                    لا توجد إشعارات
                                 </div>
-                            ))
-                        )}
+                            ) : (
+                                notifications.map(notif => (
+                                    <div
+                                        key={notif.id}
+                                        className={`p-3 border-b hover:bg-gray-50 cursor-pointer ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                                        onClick={() => markAsRead(notif.id)}
+                                    >
+                                        <div className={`border-r-4 pl-3 ${getTypeColor(notif.type)}`}>
+                                            <p className="font-semibold text-sm text-gray-800">{notif.title}</p>
+                                            <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                {new Date(notif.created_at).toLocaleString('ar-TN')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
-                </div>
+                </>
             )}
         </div>
     );
