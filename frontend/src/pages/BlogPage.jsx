@@ -17,7 +17,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '5 دقائق',
             tag: 'أسعار',
-            image: '/images/blog/solar-cost.jpg'
+            image: '/images/blog/solar-cost.png'
         },
         {
             id: 2,
@@ -28,7 +28,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '4 دقائق',
             tag: 'نصائح',
-            image: '/images/blog/choose-company.jpg'
+            image: '/images/blog/choose-company.png'
         },
         {
             id: 3,
@@ -39,7 +39,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '6 دقائق',
             tag: 'دعم حكومي',
-            image: '/images/blog/government-support.jpg'
+            image: '/images/blog/government-support.png'
         },
         {
             id: 4,
@@ -50,7 +50,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '7 دقائق',
             tag: 'تمويل',
-            image: '/images/blog/prosol.jpg'
+            image: '/images/blog/prosol.png'
         },
         {
             id: 5,
@@ -61,7 +61,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '5 دقائق',
             tag: 'زراعة',
-            image: '/images/blog/agriculture.jpg'
+            image: '/images/blog/agriculture.png'
         },
         {
             id: 6,
@@ -72,7 +72,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '6 دقائق',
             tag: 'أسعار',
-            image: '/images/blog/house-price.jpg'
+            image: '/images/blog/house-price.png'
         },
         {
             id: 7,
@@ -83,7 +83,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '5 دقائق',
             tag: 'دراسة جدوى',
-            image: '/images/blog/profitability.jpg'
+            image: '/images/blog/profitability.png'
         },
         {
             id: 8,
@@ -94,7 +94,7 @@ const BlogPage = () => {
             author: 'فريق Shamsi.tn',
             readTime: '4 دقائق',
             tag: 'حسابات',
-            image: '/images/blog/panels-count.jpg'
+            image: '/images/blog/panels-count.png'
         }
     ];
 
@@ -147,7 +147,8 @@ const BlogPage = () => {
                                         className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                                         onError={(e) => {
                                             e.target.onerror = null;
-                                            e.target.src = 'https://via.placeholder.com/400x200?text=Shamsi.tn';
+                                            // ✅ استخدام صورة افتراضية محلية بدلاً من placeholder.com
+                                            e.target.src = '/images/blog/placeholder.png';
                                         }}
                                     />
                                 </div>
@@ -196,7 +197,7 @@ const BlogPage = () => {
                         ))}
                     </div>
 
-                    {/* CTA Section - مهم جداً لتحويل الزوار إلى عملاء */}
+                    {/* CTA Section */}
                     <div className="mt-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-8 text-center text-white">
                         <FaCalculator className="text-5xl mx-auto mb-4 text-yellow-200" />
                         <h2 className="text-2xl font-bold mb-2">هل تريد معرفة تكلفة النظام الشمسي لمنزلك؟</h2>
