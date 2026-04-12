@@ -11,9 +11,10 @@ const NotificationBell = () => {
 
     // تحميل الصوت
     useEffect(() => {
-        audioRef.current = new Audio('/sounds/notification.mp3');
-        // إذا كنت تريد استخدام رابط خارجي:
-        // audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        // استخدام رابط صوت من الإنترنت
+        audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        // إذا كان لديك ملف صوت محلي:
+        // audioRef.current = new Audio('/sounds/notification.mp3');
     }, []);
 
     const playSound = () => {
@@ -33,7 +34,7 @@ const NotificationBell = () => {
             const newNotifications = response.data.notifications || [];
             const newUnreadCount = response.data.unreadCount || 0;
             
-            // ✅ تشغيل الصوت عند وجود إشعارات جديدة غير مقروءة
+            // تشغيل الصوت عند وجود إشعارات جديدة
             if (newUnreadCount > previousUnreadCount.current) {
                 playSound();
             }
@@ -73,7 +74,7 @@ const NotificationBell = () => {
     useEffect(() => {
         if (localStorage.getItem('token')) {
             fetchNotifications();
-            // تحديث كل 15 ثانية (بدلاً من 30)
+            // تحديث كل 15 ثانية
             const interval = setInterval(fetchNotifications, 15000);
             return () => clearInterval(interval);
         }
