@@ -1648,26 +1648,30 @@ const GeneralManagerDashboard = () => {
                         </h3>
                         <p className="text-gray-600 mb-4">العميل: <span className="font-semibold">{selectedLead?.name}</span></p>
                         <label className="block text-gray-700 mb-2">اختر المستخدم:</label>
-                        <select
-                            onChange={(e) => setSelectedUserId(e.target.value)}
-                            className="w-full px-4 py-2 border rounded-lg mb-4"
-                            value={selectedUserId}
-                        >
-                            <option value="">-- اختر --</option>
-                            {users
-                                .filter(u => {
-                                    if (assignType === 'executive') return u.role === 'executive_manager';
-                                    if (assignType === 'callcenter') return u.role === 'call_center';
-                                    if (assignType === 'bank') return u.role === 'bank_manager';
-                                    if (assignType === 'leasing') return u.role === 'leasing_manager';
-                                    return false;
-                                })
-                                .map((user) => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.name} - {user.phone || 'لا يوجد هاتف'} ({user.email})
-                                    </option>
-                                ))}
-                        </select>
+<select
+    onChange={(e) => setSelectedUserId(e.target.value)}
+    className="w-full px-4 py-2 border rounded-lg mb-4"
+    value={selectedUserId}
+>
+    <option value="">-- اختر --</option>
+    {users
+        .filter(u => {
+            if (assignType === 'executive') return u.role === 'executive_manager';
+            if (assignType === 'callcenter') return u.role === 'call_center';
+            if (assignType === 'bank') return u.role === 'bank_manager';
+            if (assignType === 'leasing') return u.role === 'leasing_manager';
+            return false;
+        })
+        .map((user) => (
+            <option key={user.id} value={user.id}>
+                {user.name} - {user.role === 'executive_manager' ? 'مدير تنفيذي' :
+                              user.role === 'call_center' ? 'مركز اتصال' :
+                              user.role === 'bank_manager' ? 'مدير بنك' :
+                              user.role === 'leasing_manager' ? 'مدير تأجير' : user.role}
+                {' '}({user.email})
+            </option>
+        ))}
+</select>
                         <div className="flex gap-3">
                             <button onClick={handleAssign} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">إرسال</button>
                             <button onClick={() => { setShowAssignModal(false); setSelectedLead(null); setSelectedUserId(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
