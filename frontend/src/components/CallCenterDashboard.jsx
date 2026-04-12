@@ -59,8 +59,7 @@ const CallCenterDashboard = () => {
         // ✅ إعادة تحميل البيانات من الخادم
         await fetchData();
         
-        // ✅ تحديث الإحصائيات إذا كانت موجودة
-        if (fetchStats) await fetchStats();
+        // ✅ تم حذف السطر الذي يسبب المشكلة
         
     } catch (error) {
         console.error('Error sending to operations:', error);
