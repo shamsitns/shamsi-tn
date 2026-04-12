@@ -52,14 +52,14 @@ const CallCenterDashboard = () => {
     setSendingLeadId(leadId);
     
     try {
-        // إرسال الطلب لمدير العمليات
         await managerAPI.sendToOperationsManager(leadId, 'تم الإرسال من مركز الاتصال');
         toast.success('✅ تم إرسال الطلب لمدير العمليات بنجاح');
         
-        // ✅ إعادة تحميل البيانات من الخادم
-        await fetchData();
+        // ✅ تغيير الفلتر إلى sent_to_operations
+        setFilter('sent_to_operations');
         
-        // ✅ تم حذف السطر الذي يسبب المشكلة
+        // ✅ ثم جلب البيانات
+        await fetchData();
         
     } catch (error) {
         console.error('Error sending to operations:', error);
