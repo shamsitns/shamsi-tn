@@ -10,10 +10,10 @@ const {
 
 const router = express.Router();
 
-// ✅ إضافة مسار اختبار بسيط
+// ✅ إضافة مسار اختبار بسيط (يمكنك إزالته لاحقاً)
 router.get('/test', (req, res) => {
     console.log('🔍 Bank test endpoint hit!');
-    res.json({ message: 'Bank routes are working!', user: req.user });
+    res.json({ message: 'Bank routes are working!' });
 });
 
 // جميع المسارات تحتاج مصادقة وصلاحيات مدير بنك
@@ -29,7 +29,7 @@ router.get('/stats', getBankStats);
 // الحصول على تفاصيل طلب تمويل محدد
 router.get('/requests/:requestId', getFinancingRequestDetails);
 
-// تحديث حالة طلب تمويل
+// تحديث حالة طلب تمويلd
 router.put('/requests/:requestId/status', updateFinancingStatus);
 
 // الحصول على قائمة البنوك المتاحة
