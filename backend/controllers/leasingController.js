@@ -45,6 +45,13 @@ exports.getMyLeasingRequests = async (req, res) => {
         const result = await db.query(query, params);
         const requests = getRows(result);
         
+        // ✅ إضافة requested_amount و amount
+        const formattedRequests = requests.map(req => ({
+            ...req,
+            requested_amount: req.bill_amount || 0,
+            amount: req.bill_amount || 0
+        }));
+        
         let countQuery = `
             SELECT COUNT(*) as total 
             FROM financing_requests fr
@@ -61,7 +68,7 @@ exports.getMyLeasingRequests = async (req, res) => {
         const total = getFirstRow(countResult)?.total || 0;
         
         res.json({
-            requests: requests || [],
+            requests: formattedRequests || [],
             total: total,
             page: parseInt(page),
             totalPages: Math.ceil(total / limit)
@@ -252,7 +259,7 @@ exports.getAvailableLeasingCompanies = async (req, res) => {
         const result = await db.query(`
             SELECT id, name, contact_person, email, phone, down_payment_percent, max_contract_years
             FROM leasing_companies
-            WHERE is_active = 1
+            WHERE is_active = true
             ORDER BY name ASC
         `);
         
