@@ -28,19 +28,59 @@ const BankManagerDashboard = () => {
     }, [filter]);
 
     const fetchRequests = async () => {
-        setLoading(true);
-        try {
-            const params = filter !== 'all' ? { status: filter } : {};
-            const response = await bankAPI.getRequests(params);
-            setRequests(response.data.requests || []);
-        } catch (error) {
-            console.error('Error fetching requests:', error);
-            toast.error('حدث خطأ في جلب الطلبات');
-        } finally {
-            setLoading(false);
+    setLoading(true);
+    try {
+        const params = filter !== 'all' ? { status: filter } : {};
+        const response = await bankAPI.getRequests(params);
+        console.log('📊 Bank API Response:', response.data);
+        
+        // ✅ تنسيق البيانات لتتناسب مع الواجهة
+        let requestsData = [];
+        
+        if (response.data.requests && Array.isArray(response.data.requests)) {
+            requestsData = response.data.requests.map(req => ({
+                id: req.id,
+                lead_id: req.lead_id,
+                client_name: req.client_name || req.name || 'غير محدد',
+                client_phone: req.client_phone || req.phone || 'غير محدد',
+                client_city: req.client_city || req.city || 'غير محدد',
+                bill_amount: req.bill_amount || 0,
+                required_kw: req.required_kw || 0,
+                requested_amount: req.requested_amount || req.amount || 0,
+                status: req.status || 'pending',
+                approved_amount: req.approved_amount,
+                interest_rate: req.interest_rate,
+                duration_years: req.duration_years,
+                notes: req.notes,
+                created_at: req.created_at
+            }));
+        } else if (Array.isArray(response.data)) {
+            requestsData = response.data.map(req => ({
+                id: req.id,
+                lead_id: req.lead_id,
+                client_name: req.client_name || req.name || 'غير محدد',
+                client_phone: req.client_phone || req.phone || 'غير محدد',
+                client_city: req.client_city || req.city || 'غير محدد',
+                bill_amount: req.bill_amount || 0,
+                required_kw: req.required_kw || 0,
+                requested_amount: req.requested_amount || req.amount || 0,
+                status: req.status || 'pending',
+                approved_amount: req.approved_amount,
+                interest_rate: req.interest_rate,
+                duration_years: req.duration_years,
+                notes: req.notes,
+                created_at: req.created_at
+            }));
         }
-    };
-
+        
+        setRequests(requestsData);
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        toast.error('حدث خطأ في جلب الطلبات');
+    } finally {
+        setLoading(false);
+    }
+};
     const fetchStats = async () => {
         try {
             const response = await bankAPI.getStats();
