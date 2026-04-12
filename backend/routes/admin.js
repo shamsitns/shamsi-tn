@@ -20,7 +20,10 @@ const {
     addCompany,
     updateCompany,
     deleteCompany,
-    getCommissionStats
+    getCommissionStats,
+    // ✅ NEW: استيراد الدوال الجديدة
+    getLeadFollow,
+    updateLeadSections
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -66,6 +69,19 @@ router.get('/leads/:id', [
     param('id').isInt().withMessage('معرّف الطلب غير صالح'),
     validate
 ], getLeadById);
+
+// ✅ NEW: مسار جلب تتبع الطلب (assigned_sections)
+router.get('/leads/:leadId/follow', [
+    param('leadId').isInt().withMessage('معرّف الطلب غير صالح'),
+    validate
+], getLeadFollow);
+
+// ✅ NEW: مسار تحديث الأقسام المرسل إليها
+router.patch('/leads/:leadId/update-sections', [
+    param('leadId').isInt().withMessage('معرّف الطلب غير صالح'),
+    body('assigned_sections').isArray().withMessage('يجب أن يكون مصفوفة من الأقسام'),
+    validate
+], updateLeadSections);
 
 // =============================================
 // 📋 مسارات الطلبات (Leads) - POST (للتطابق مع Frontend)

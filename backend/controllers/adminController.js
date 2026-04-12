@@ -89,6 +89,69 @@ exports.getAllLeads = async (req, res) => {
 };
 
 // =============================================
+// ✅ NEW: جلب تتبع الطلب (assigned_sections)
+// =============================================
+exports.getLeadFollow = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        
+        // جلب معلومات الطلب مع assigned_sections
+        const leadResult = await db.query(
+            `SELECT id, name, phone, city, status, assigned_sections, created_at, updated_at 
+             FROM leads WHERE id = $1`,
+            [leadId]
+        );
+        const lead = getFirstRow(leadResult);
+        
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        // جلب تاريخ التعيينات من lead_assignments
+        const assignmentsResult = await db.query(`
+            SELECT * FROM lead_assignments 
+            WHERE lead_id = $1 
+            ORDER BY assigned_at DESC
+        `, [leadId]);
+        const assignments = getRows(assignmentsResult);
+        
+        res.json({
+            lead: lead,
+            history: assignments,
+            sections: lead.assigned_sections || []
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting lead follow:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+    }
+};
+
+// =============================================
+// ✅ NEW: تحديث الأقسام المرسل إليها
+// =============================================
+exports.updateLeadSections = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+        const { assigned_sections } = req.body;
+        
+        await db.query(
+            `UPDATE leads 
+             SET assigned_sections = $1, 
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [JSON.stringify(assigned_sections), leadId]
+        );
+        
+        res.json({ message: 'تم تحديث الأقسام بنجاح' });
+        
+    } catch (error) {
+        console.error('❌ Error updating sections:', error);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+    }
+};
+
+// =============================================
 // إحصائيات متقدمة
 // =============================================
 exports.getDashboardStats = async (req, res) => {
@@ -533,12 +596,12 @@ exports.assignToLeasingManager = async (req, res) => {
         );
         
         // إدراج في financing_requests (يجب أن يتم دائماً)
-await db.query(
-    `INSERT INTO financing_requests (lead_id, manager_id, assigned_to, financing_type, status, notes, created_at)
-     VALUES ($1, $2, $3, $4, 'pending', $5, CURRENT_TIMESTAMP)
-     ON CONFLICT (lead_id, financing_type) DO NOTHING`,
-    [leadId, leasingManagerId, leasingManagerId, 'leasing', notes || null]
-);
+        await db.query(
+            `INSERT INTO financing_requests (lead_id, manager_id, assigned_to, financing_type, status, notes, created_at)
+             VALUES ($1, $2, $3, $4, 'pending', $5, CURRENT_TIMESTAMP)
+             ON CONFLICT (lead_id, financing_type) DO NOTHING`,
+            [leadId, leasingManagerId, leasingManagerId, 'leasing', notes || null]
+        );
         
         console.log(`✅ Lead ${leadId} assigned to leasing manager ${leasingManager.name}`);
         res.json({ 
