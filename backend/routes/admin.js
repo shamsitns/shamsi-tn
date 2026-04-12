@@ -97,7 +97,7 @@ router.post('/leads/:leadId/assign-callcenter', [
 router.post('/leads/:leadId/assign-bank', [
     param('leadId').isInt(),
     body('bankManagerId').optional().isInt(),
-    body('bankId').optional().isInt(),
+    body('bankId').optional({ nullable: true }).isInt(),
     validate
 ], assignToBankManager);
 
