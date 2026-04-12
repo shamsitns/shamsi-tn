@@ -224,9 +224,19 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         
-        // ✅ إضافة إشعارات مباشرة باستخدام SQL مع RETURNING
+        // ✅ إضافة إشعارات مباشرة باستخدام SQL مع تصحيح الأخطاء
         try {
+            console.log('🔍 Attempting to insert notifications for lead:', leadId);
+            
             const dbInsert = getDb();
+            
+            // التحقق من وجود المستخدمين
+            const userCheck = await dbInsert.query('SELECT id, email FROM users WHERE id IN (19, 26)');
+            console.log('👥 Users found:', userCheck.rows);
+            
+            if (userCheck.rows.length === 0) {
+                console.error('❌ Users 19 or 26 not found!');
+            }
             
             // إشعار للمدير العام (ID: 19)
             const gmResult = await dbInsert.query(
@@ -248,6 +258,8 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
             
         } catch (notifError) {
             console.error('❌ Error sending SQL notifications:', notifError);
+            console.error('Error details:', notifError.message);
+            console.error('Error stack:', notifError.stack);
         }
         
         res.status(201).json({
@@ -623,7 +635,7 @@ const startServer = async () => {
     📝 Request ID: Enabled
     ✅ Company Requests API: Enabled (/api/company-requests)
     ✅ POST /api/leads: Enabled (for lead creation with images)
-    ✅ Notification System: Enabled with direct SQL inserts
+    ✅ Notification System: Enabled with direct SQL inserts and debug logging
     ════════════════════════════════════════════════════════
             `);
         });
