@@ -37,17 +37,24 @@ exports.getMyLeads = async (req, res) => {
             paramIndex++;
         }
         
-        // ✅ لمركز الاتصال: جلب الطلبات التي حالتها pending أو contacted فقط
-        if (role === 'call_center') {
-            if (!status || status === 'all') {
-                query += ` AND l.status IN ('pending', 'contacted')`;
-            }
-        } else if (role === 'executive_manager' || role === 'operations_manager') {
-            query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
-            queryParams.push(managerId);
-            paramIndex++;
-        }
-        
+        // ✅ لمركز الاتصال: فقط الطلبات التي حالتها pending أو contacted
+if (role === 'call_center') {
+    if (!status || status === 'all') {
+        query += ` AND l.status IN ('pending', 'contacted')`;
+    }
+} 
+// ✅ للمدير التنفيذي: الطلبات المعينة له
+else if (role === 'executive_manager') {
+    query += ` AND l.assigned_to = $${paramIndex}`;
+    queryParams.push(managerId);
+    paramIndex++;
+}
+// ✅ لمدير العمليات
+else if (role === 'operations_manager') {
+    query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
+    queryParams.push(managerId);
+   paramIndex++;
+}
         query += ` ORDER BY l.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
         queryParams.push(parseInt(limit), parseInt(offset));
         
