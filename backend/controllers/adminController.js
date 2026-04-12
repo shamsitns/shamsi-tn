@@ -560,41 +560,89 @@ exports.assignToBankManager = async (req, res) => {
     try {
         const { leadId } = req.params;
         const { bankManagerId, bankId, notes } = req.body;
+        const adminId = req.user.id;
+        
+        console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
+        
+        // التحقق من وجود الطلب
+        const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+        const lead = getFirstRow(leadResult);
+        if (!lead) {
+            return res.status(404).json({ message: 'الطلب غير موجود' });
+        }
+        
+        // التحقق من وجود مدير البنك
+        const bankResult = await db.query(
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
+            [bankManagerId, 'bank_manager']
+        );
+        const bankManager = getFirstRow(bankResult);
+        if (!bankManager) {
+            return res.status(404).json({ message: 'مدير البنك غير موجود' });
+        }
         
         // ✅ تحديث assigned_sections
-        const leadResult = await db.query('SELECT assigned_sections FROM leads WHERE id = $1', [leadId]);
-        let sections = leadResult.rows[0]?.assigned_sections || [];
-        if (typeof sections === 'string') sections = JSON.parse(sections);
+        let sections = lead.assigned_sections || [];
+        if (typeof sections === 'string') {
+            try {
+                sections = JSON.parse(sections);
+            } catch(e) {
+                sections = [];
+            }
+        }
         
         if (!sections.includes('bank_manager')) {
             sections.push('bank_manager');
             await db.query(
-                'UPDATE leads SET assigned_sections = $1 WHERE id = $2',
+                `UPDATE leads SET assigned_sections = $1 WHERE id = $2`,
                 [JSON.stringify(sections), leadId]
             );
         }
         
-        // ✅ إدراج في financing_requests (الأهم)
+        // تحديث الطلب
         await db.query(
-            `INSERT INTO financing_requests (lead_id, manager_id, financing_type, status, created_at)
-             VALUES ($1, $2, 'bank', 'pending', CURRENT_TIMESTAMP)
-             ON CONFLICT (lead_id, financing_type) DO UPDATE SET status = 'pending'`,
-            [leadId, bankManagerId]
+            `UPDATE leads 
+             SET financing_type = 'bank', 
+                 assigned_to = $1,
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [bankManagerId, leadId]
         );
         
-        // ✅ إدراج في bank_requests
+        // ✅ إدراج في financing_requests (بدون ON CONFLICT)
+        // حذف السجل القديم إذا وجد
+        await db.query(`DELETE FROM financing_requests WHERE lead_id = $1 AND financing_type = 'bank'`, [leadId]);
+        
+        // إدراج سجل جديد
+        await db.query(
+            `INSERT INTO financing_requests (lead_id, manager_id, financing_type, status, notes, created_at)
+             VALUES ($1, $2, 'bank', 'pending', $3, CURRENT_TIMESTAMP)`,
+            [leadId, bankManagerId, notes || null]
+        );
+        
+        // ✅ إدراج في bank_requests (بدون ON CONFLICT)
+        // حذف السجل القديم إذا وجد
+        await db.query(`DELETE FROM bank_requests WHERE lead_id = $1`, [leadId]);
+        
+        // إدراج سجل جديد
         await db.query(
             `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, created_at)
-             VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)
-             ON CONFLICT (lead_id) DO UPDATE SET status = 'pending'`,
+             VALUES ($1, $2, $3, $4, 'pending', CURRENT_TIMESTAMP)`,
             [leadId, bankManagerId, bankId || null, notes || null]
         );
         
-        res.json({ message: 'تم إرسال الطلب لمدير البنك' });
+        console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
+        res.json({ 
+            message: `تم إرسال الطلب لمدير البنك: ${bankManager.name}`,
+            leadId,
+            bankManagerId,
+            bankManagerName: bankManager.name
+        });
         
     } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ message: 'حدث خطأ' });
+        console.error('❌ Error in assignToBankManager:', error);
+        console.error('Error details:', error.message);
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
 
