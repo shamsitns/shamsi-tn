@@ -27,6 +27,7 @@ const companyRoutes = require('./routes/companies');
 const bankRoutes = require('./routes/bank');
 const leasingRoutes = require('./routes/leasing');
 const companyDashboardRoutes = require('./routes/companyDashboard');
+const notificationRoutes = require('./routes/notifications'); // ✅ إضافة الإشعارات
 
 // ✅ NEW: Import company requests routes
 const companyRequestsRoutes = require('./routes/companyRequests');
@@ -121,6 +122,7 @@ app.use(`${API_PREFIX}/companies`, companyRoutes);
 app.use(`${API_PREFIX}/bank`, bankRoutes);
 app.use(`${API_PREFIX}/leasing`, leasingRoutes);
 app.use(`${API_PREFIX}/company`, companyDashboardRoutes);
+app.use(`${API_PREFIX}/notifications`, notificationRoutes); // ✅ إضافة مسار الإشعارات
 
 // ✅ NEW: Company Requests Routes (لصفحة JoinAsCompany)
 app.use(`${API_PREFIX}/company-requests`, companyRequestsRoutes);

@@ -6,6 +6,7 @@ import {
     FaUserTie, FaChartLine, FaUsers, FaHeadset, FaCrown,
     FaUniversity, FaCar
 } from 'react-icons/fa';
+import NotificationBell from './NotificationBell'; // ✅ إضافة أيقونة الإشعارات
 
 // ✅ استيراد الشعار الجديد (PNG)
 import logo from '../assets/images/logo-black.png';
@@ -84,7 +85,7 @@ const Navbar = () => {
                         <FaSun className="text-yellow-500 text-xl sm:text-2xl fallback-icon" style={{ display: 'none' }} />
                     </Link>
                     
-                    {/* Desktop Menu - لم يتغير */}
+                    {/* Desktop Menu - مع إضافة أيقونة الإشعارات */}
                     <div className="hidden md:flex items-center gap-3 lg:gap-6">
                         {navLinks.map((link) => {
                             const Icon = link.icon;
@@ -113,6 +114,10 @@ const Navbar = () => {
                                         {dashboardLink.label}
                                     </Link>
                                 )}
+                                
+                                {/* ✅ أيقونة الإشعارات */}
+                                <NotificationBell />
+                                
                                 <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                                     {getRoleName(user.role)}
                                 </div>
@@ -146,7 +151,7 @@ const Navbar = () => {
                     </button>
                 </div>
                 
-                {/* Mobile Menu - لم يتغير */}
+                {/* Mobile Menu - مع إضافة أيقونة الإشعارات */}
                 {isOpen && (
                     <div className="md:hidden py-3 border-t animate-fadeIn">
                         <div className="flex flex-col gap-1">
@@ -177,6 +182,12 @@ const Navbar = () => {
                                             <span>{dashboardLink.label}</span>
                                         </Link>
                                     )}
+                                    
+                                    {/* ✅ أيقونة الإشعارات في القائمة المتنقلة */}
+                                    <div className="mx-3 my-1">
+                                        <NotificationBell />
+                                    </div>
+                                    
                                     <div className="flex items-center gap-3 text-gray-500 bg-gray-50 py-2 px-3 rounded-lg mx-3 my-1 text-sm">
                                         <FaUser className="text-lg text-gray-400" />
                                         <span>{user.name}</span>
