@@ -30,13 +30,22 @@ exports.getMyLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
-        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
+        if (role === 'executive_manager' || role === 'operations_manager') {
             query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
             queryParams.push(managerId);
             paramIndex++;
+        } else if (role === 'call_center') {
+            // ✅ مركز الاتصال: جلب الطلبات التي تحتاج إلى اتصال
+            if (status && status !== 'all') {
+                query += ` AND l.status = $${paramIndex}`;
+                queryParams.push(status);
+                paramIndex++;
+            } else {
+                query += ` AND l.status IN ('pending', 'contacted')`;
+            }
         }
         
-        if (status && status !== 'all') {
+        if (status && status !== 'all' && role !== 'call_center') {
             query += ` AND l.status = $${paramIndex}`;
             queryParams.push(status);
             paramIndex++;
@@ -52,13 +61,21 @@ exports.getMyLeads = async (req, res) => {
         const countParams = [];
         let countIndex = 1;
         
-        if (role === 'executive_manager' || role === 'operations_manager' || role === 'call_center') {
+        if (role === 'executive_manager' || role === 'operations_manager') {
             countQuery += ` AND (assigned_to = $${countIndex} OR created_by = $${countIndex})`;
             countParams.push(managerId);
             countIndex++;
+        } else if (role === 'call_center') {
+            if (status && status !== 'all') {
+                countQuery += ` AND status = $${countIndex}`;
+                countParams.push(status);
+                countIndex++;
+            } else {
+                countQuery += ` AND status IN ('pending', 'contacted')`;
+            }
         }
         
-        if (status && status !== 'all') {
+        if (status && status !== 'all' && role !== 'call_center') {
             countQuery += ` AND status = $${countIndex}`;
             countParams.push(status);
             countIndex++;
