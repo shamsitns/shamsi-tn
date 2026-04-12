@@ -6,15 +6,37 @@ const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [showDropdown, setShowDropdown] = useState(false);
+    const previousUnreadCount = React.useRef(0);
+
+    const playSound = () => {
+        // استخدام رابط صوت مضمون 100%
+        const audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        audio.volume = 1.0;
+        audio.play().then(() => {
+            console.log('🔊 Sound played successfully');
+        }).catch(err => {
+            console.log('Audio play failed:', err);
+            // محاولة بديلة
+            const audio2 = new Audio('https://actions.google.com/sound/bar.mp3');
+            audio2.play().catch(e => console.log('Fallback failed:', e));
+        });
+    };
 
     const fetchNotifications = async () => {
         try {
-            console.log('🔍 Fetching notifications...');
             const response = await api.get('/notifications');
-            console.log('📬 Response:', response.data);
+            console.log('📬 Notifications response:', response.data);
             
+            const newUnreadCount = response.data.unreadCount || 0;
+            
+            if (newUnreadCount > previousUnreadCount.current) {
+                console.log('🔔 New notification! Playing sound...');
+                playSound();
+            }
+            
+            previousUnreadCount.current = newUnreadCount;
             setNotifications(response.data.notifications || []);
-            setUnreadCount(response.data.unreadCount || 0);
+            setUnreadCount(newUnreadCount);
         } catch (error) {
             console.error('Error fetching notifications:', error);
         }
