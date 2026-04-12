@@ -17,7 +17,6 @@ export const usePushNotifications = () => {
 
   const subscribeToPush = async () => {
     try {
-      // 1. طلب الإذن
       const permissionResult = await Notification.requestPermission();
       setPermission(permissionResult);
       
@@ -26,22 +25,14 @@ export const usePushNotifications = () => {
         return false;
       }
       
-      // 2. انتظار Service Worker
       const registration = await navigator.serviceWorker.ready;
-      console.log('Service Worker ready:', registration);
+      const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
       
-      // 3. استخدام المفاتيح الجديدة
-      const vapidPublicKey = 'BLYYBKOnF8app7BWGvTnDOKFatYSKRRM5jCsgBkE5Zd8J1lWvGZhEHUFvRuq0mm95uJYJzZ34hu6r4bJvmbEjCY';
-      
-      // 4. الاشتراك
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
       });
       
-      console.log('Push subscription:', subscription);
-      
-      // 5. إرسال إلى الخادم
       const token = localStorage.getItem('token');
       const response = await fetch('/api/notifications/subscribe', {
         method: 'POST',
@@ -96,7 +87,6 @@ export const usePushNotifications = () => {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       setIsSubscribed(!!subscription);
-      console.log('Current subscription:', !!subscription);
     } catch (error) {
       console.error('Error checking subscription:', error);
     }
@@ -104,15 +94,9 @@ export const usePushNotifications = () => {
 
   useEffect(() => {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
-      // تسجيل Service Worker
       navigator.serviceWorker.register('/sw.js')
-        .then(reg => {
-          console.log('✅ Service Worker registered:', reg);
-          checkSubscription();
-        })
-        .catch(err => {
-          console.error('❌ Service Worker registration failed:', err);
-        });
+        .then(() => checkSubscription())
+        .catch(err => console.error('Service Worker registration failed:', err));
     }
   }, []);
 
