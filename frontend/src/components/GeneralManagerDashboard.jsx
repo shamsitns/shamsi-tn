@@ -338,30 +338,14 @@ const GeneralManagerDashboard = () => {
     // Lead Management
     // =============================================
     const handleApprove = async (leadId) => {
-    try {
-        // 1. الموافقة على الطلب
-        await adminAPI.approveLead(leadId);
-        toast.success('✅ تمت الموافقة على الطلب');
-        
-        // 2. البحث عن أول مدير تنفيذي
-        const executive = users.find(u => u.role === 'executive_manager');
-        
-        if (executive) {
-            // 3. إرسال الطلب للمدير التنفيذي
-            await adminAPI.assignToExecutive(leadId, executive.id, 'تمت الموافقة وإرساله تلقائياً');
-            toast.success('📨 تم إرسال الطلب للمدير التنفيذي');
-        } else {
-            toast.warning('⚠️ لا يوجد مدير تنفيذي لإرسال الطلب إليه');
-        }
-        
-        showNotificationMessage('تمت الموافقة على الطلب وإرساله للمدير التنفيذي');
-        fetchLeads();
-        fetchStats();
-    } catch (error) {
-        console.error('Error approving lead:', error);
-        toast.error('❌ حدث خطأ في الموافقة');
+    // ✅ البحث عن الطلب وفتح نافذة التعيين
+    const lead = leads.find(l => l.id === leadId);
+    if (lead) {
+        setSelectedLead(lead);
+        setShowAssignModal(true);    // فتح نافذة الاختيار
     }
 };
+        
 
     const handleReject = async () => {
         if (!selectedLead || !rejectReason) {
