@@ -10,6 +10,24 @@ const getFirstRow = (result) => {
 };
 
 // =============================================
+// حساب السعر التقديري حسب القدرة (دينار تونسي) - للاستخدام الداخلي فقط
+// =============================================
+const getPricePerKw = (systemKw) => {
+    if (systemKw <= 2) return 3500;
+    if (systemKw <= 3) return 3067;
+    if (systemKw <= 4) return 2750;
+    if (systemKw <= 6) return 2300;
+    if (systemKw <= 7) return 2357;
+    if (systemKw <= 8) return 2250;
+    return 2200;
+};
+
+const getEstimatedPrice = (systemKw) => {
+    const pricePerKw = getPricePerKw(systemKw);
+    return Math.round(systemKw * pricePerKw);
+};
+
+// =============================================
 // الحصول على طلبات التمويل الخاصة بالمدير
 // =============================================
 exports.getMyFinancingRequests = async (req, res) => {
@@ -27,7 +45,8 @@ exports.getMyFinancingRequests = async (req, res) => {
                    l.city as client_city,
                    l.bill_amount,
                    l.required_kw,
-                   l.property_type
+                   l.property_type,
+                   l.estimated_price
             FROM financing_requests fr
             JOIN leads l ON fr.lead_id = l.id
             WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
@@ -47,10 +66,21 @@ exports.getMyFinancingRequests = async (req, res) => {
         const result = await db.query(query, params);
         const requests = getRows(result);
         
-        const formattedRequests = requests.map(req => ({
-            ...req,
-            requested_amount: req.bill_amount || 0
-        }));
+        // ✅ إضافة requested_amount و amount بناءً على السعر التقديري أو القدرة
+        const formattedRequests = requests.map(req => {
+            // استخدام estimated_price من جدول leads إذا كان موجوداً
+            let estimatedPrice = req.estimated_price;
+            if (!estimatedPrice && req.required_kw) {
+                estimatedPrice = getEstimatedPrice(req.required_kw);
+            }
+            
+            return {
+                ...req,
+                requested_amount: estimatedPrice || 0,
+                amount: estimatedPrice || 0,
+                price_per_kw: req.required_kw ? getPricePerKw(req.required_kw) : 0
+            };
+        });
         
         let countQuery = `
             SELECT COUNT(*) as total 
@@ -238,6 +268,7 @@ exports.getFinancingRequestDetails = async (req, res) => {
                    l.required_kw,
                    l.roof_availability,
                    l.additional_info,
+                   l.estimated_price,
                    b.name as bank_name
             FROM financing_requests fr
             JOIN leads l ON fr.lead_id = l.id
@@ -249,6 +280,11 @@ exports.getFinancingRequestDetails = async (req, res) => {
         
         if (!request) {
             return res.status(404).json({ message: 'طلب التمويل غير موجود' });
+        }
+        
+        // إضافة السعر التقديري إذا لم يكن موجوداً
+        if (!request.estimated_price && request.required_kw) {
+            request.estimated_price = getEstimatedPrice(request.required_kw);
         }
         
         res.json(request);
