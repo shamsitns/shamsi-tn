@@ -30,54 +30,51 @@ exports.getMyLeads = async (req, res) => {
         const queryParams = [];
         let paramIndex = 1;
         
-        if (role === 'executive_manager' || role === 'operations_manager') {
-            query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
-            queryParams.push(managerId);
-            paramIndex++;
-        } else if (role === 'call_center') {
-            // ✅ مركز الاتصال: جلب الطلبات التي تحتاج إلى اتصال
-            if (status && status !== 'all') {
-                query += ` AND l.status = $${paramIndex}`;
-                queryParams.push(status);
-                paramIndex++;
-            } else {
-                query += ` AND l.status IN ('pending', 'contacted')`;
-            }
-        }
-        
-        if (status && status !== 'all' && role !== 'call_center') {
+        // ✅ إضافة فلتر الحالة أولاً
+        if (status && status !== 'all' && status !== 'undefined') {
             query += ` AND l.status = $${paramIndex}`;
             queryParams.push(status);
+            paramIndex++;
+        }
+        
+        // ✅ لمركز الاتصال: جلب الطلبات التي حالتها pending أو contacted فقط
+        if (role === 'call_center') {
+            if (!status || status === 'all') {
+                query += ` AND l.status IN ('pending', 'contacted')`;
+            }
+        } else if (role === 'executive_manager' || role === 'operations_manager') {
+            query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
+            queryParams.push(managerId);
             paramIndex++;
         }
         
         query += ` ORDER BY l.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
         queryParams.push(parseInt(limit), parseInt(offset));
         
+        console.log('🔍 Query:', query);
+        console.log('🔍 Params:', queryParams);
+        
         const result = await db.query(query, queryParams);
         const leads = getRows(result);
         
+        // ✅ Count query with same filters
         let countQuery = `SELECT COUNT(*) as total FROM leads WHERE 1=1`;
         const countParams = [];
         let countIndex = 1;
         
-        if (role === 'executive_manager' || role === 'operations_manager') {
-            countQuery += ` AND (assigned_to = $${countIndex} OR created_by = $${countIndex})`;
-            countParams.push(managerId);
-            countIndex++;
-        } else if (role === 'call_center') {
-            if (status && status !== 'all') {
-                countQuery += ` AND status = $${countIndex}`;
-                countParams.push(status);
-                countIndex++;
-            } else {
-                countQuery += ` AND status IN ('pending', 'contacted')`;
-            }
-        }
-        
-        if (status && status !== 'all' && role !== 'call_center') {
+        if (status && status !== 'all' && status !== 'undefined') {
             countQuery += ` AND status = $${countIndex}`;
             countParams.push(status);
+            countIndex++;
+        }
+        
+        if (role === 'call_center') {
+            if (!status || status === 'all') {
+                countQuery += ` AND status IN ('pending', 'contacted')`;
+            }
+        } else if (role === 'executive_manager' || role === 'operations_manager') {
+            countQuery += ` AND (assigned_to = $${countIndex} OR created_by = $${countIndex})`;
+            countParams.push(managerId);
             countIndex++;
         }
         
