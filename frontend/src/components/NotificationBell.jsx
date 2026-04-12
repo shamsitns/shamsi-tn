@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBell } from 'react-icons/fa';
-import axios from 'axios';
+import api from '../services/api';
 
 const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
@@ -13,8 +13,6 @@ const NotificationBell = () => {
     useEffect(() => {
         // استخدام رابط صوت من الإنترنت
         audioRef.current = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        // إذا كان لديك ملف صوت محلي:
-        // audioRef.current = new Audio('/sounds/notification.mp3');
     }, []);
 
     const playSound = () => {
@@ -27,10 +25,9 @@ const NotificationBell = () => {
 
     const fetchNotifications = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get('/api/notifications', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/notifications');
+            console.log('📬 Notifications response:', response.data);
+            
             const newNotifications = response.data.notifications || [];
             const newUnreadCount = response.data.unreadCount || 0;
             
@@ -49,10 +46,7 @@ const NotificationBell = () => {
 
     const markAsRead = async (id) => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.put(`/api/notifications/${id}/read`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.put(`/notifications/${id}/read`);
             fetchNotifications();
         } catch (error) {
             console.error('Error marking as read:', error);
@@ -61,10 +55,7 @@ const NotificationBell = () => {
 
     const markAllAsRead = async () => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.put('/api/notifications/read-all', {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.put('/notifications/read-all');
             fetchNotifications();
         } catch (error) {
             console.error('Error marking all as read:', error);
