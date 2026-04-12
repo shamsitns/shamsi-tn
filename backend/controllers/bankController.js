@@ -10,6 +10,77 @@ const getFirstRow = (result) => {
 };
 
 // =============================================
+// الحصول على طلبات التمويل الخاصة بالمدير
+// =============================================
+exports.getMyFinancingRequests = async (req, res) => {
+    try {
+        const bankManagerId = req.user.id;
+        const { status, page = 1, limit = 20 } = req.query;
+        const offset = (page - 1) * limit;
+        
+        console.log('🏦 Fetching financing requests for manager:', bankManagerId);
+        
+        let query = `
+            SELECT fr.*, 
+                   l.name as client_name, 
+                   l.phone as client_phone,
+                   l.city as client_city,
+                   l.bill_amount,
+                   l.required_kw,
+                   l.property_type
+            FROM financing_requests fr
+            JOIN leads l ON fr.lead_id = l.id
+            WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
+        `;
+        const params = [bankManagerId];
+        let paramIndex = 2;
+        
+        if (status && status !== 'all') {
+            query += ` AND fr.status = $${paramIndex}`;
+            params.push(status);
+            paramIndex++;
+        }
+        
+        query += ` ORDER BY fr.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        params.push(parseInt(limit), parseInt(offset));
+        
+        const result = await db.query(query, params);
+        const requests = getRows(result);
+        
+        const formattedRequests = requests.map(req => ({
+            ...req,
+            requested_amount: req.bill_amount || 0
+        }));
+        
+        let countQuery = `
+            SELECT COUNT(*) as total 
+            FROM financing_requests fr
+            WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
+        `;
+        const countParams = [bankManagerId];
+        
+        if (status && status !== 'all') {
+            countQuery += ` AND fr.status = $2`;
+            countParams.push(status);
+        }
+        
+        const countResult = await db.query(countQuery, countParams);
+        const total = getFirstRow(countResult)?.total || 0;
+        
+        res.json({
+            requests: formattedRequests || [],
+            total: total,
+            page: parseInt(page),
+            totalPages: Math.ceil(total / limit)
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting financing requests:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب طلبات التمويل', error: error.message });
+    }
+};
+
+// =============================================
 // تحديث حالة طلب تمويل
 // =============================================
 exports.updateFinancingStatus = async (req, res) => {
@@ -196,7 +267,7 @@ exports.getAvailableBanks = async (req, res) => {
         const result = await db.query(`
             SELECT id, name, contact_person, email, phone, interest_rate, max_financing_years
             FROM banks
-            WHERE is_active = 1
+            WHERE is_active = true
             ORDER BY name ASC
         `);
         
