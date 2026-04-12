@@ -319,60 +319,63 @@ exports.rejectLead = async (req, res) => {
 // =============================================
 
 // ✅ تعيين طلب للمدير التنفيذي (يستخدم ID المستلم من الواجهة)
+// تعيين طلب لمدير تنفيذي
 exports.assignToExecutive = async (req, res) => {
     try {
         const { leadId } = req.params;
-        const { executiveId, notes } = req.body;  // استقبال ID من الواجهة
+        const { executiveId, notes } = req.body;
         const adminId = req.user.id;
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to executive ${executiveId}`);
         
-        if (!executiveId) {
-            return res.status(400).json({ message: 'يرجى تحديد المدير التنفيذي' });
-        }
-        
-        // التحقق من وجود المستخدم وصلاحية executive_manager
-        const executiveResult = await db.query(
-            "SELECT id, name FROM users WHERE id = $1 AND role = 'executive_manager' AND is_active = true",
-            [executiveId]
-        );
-        const executive = getFirstRow(executiveResult);
-        
-        if (!executive) {
-            return res.status(404).json({ message: 'المدير التنفيذي المحدد غير موجود' });
-        }
-        
-        console.log(`✅ Found executive: ${executive.name} (ID: ${executive.id})`);
-        
         // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
+        
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // تحديث الطلب: تغيير الحالة وتعيينه للمدير التنفيذي المختار
+        // التحقق من وجود المدير التنفيذي
+        const execResult = await db.query(
+            'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
+            [executiveId, 'executive_manager']
+        );
+        const executive = getFirstRow(execResult);
+        
+        if (!executive) {
+            return res.status(404).json({ message: 'المدير التنفيذي غير موجود' });
+        }
+        
+        // ✅ تحديث الطلب: فقط للمدير التنفيذي
         await db.query(
             `UPDATE leads 
-             SET status = 'contacted', 
-                 assigned_to = $1,
-                 updated_at = CURRENT_TIMESTAMP 
+             SET assigned_to = $1,
+                 status = 'approved',
+                 updated_at = CURRENT_TIMESTAMP
              WHERE id = $2`,
-            [executive.id, leadId]
+            [executiveId, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executive.id})`);
+        // إضافة سجل في جدول التعيينات
+        await db.query(
+            `INSERT INTO lead_assignments (lead_id, assigned_to, assigned_by, notes, assigned_at)
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [leadId, executiveId, adminId, notes || null]
+        );
         
-        res.json({ 
-            message: `تم إرسال الطلب للمدير التنفيذي: ${executive.name}`,
-            leadId,
-            executiveId: executive.id,
+        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
+        
+        res.json({
+            message: `تم تعيين الطلب للمدير التنفيذي: ${executive.name}`,
+            leadId: leadId,
+            executiveId: executiveId,
             executiveName: executive.name
         });
         
     } catch (error) {
         console.error('❌ Error assigning to executive:', error);
-        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+        res.status(500).json({ message: 'حدث خطأ في تعيين الطلب للمدير التنفيذي', error: error.message });
     }
 };
 
