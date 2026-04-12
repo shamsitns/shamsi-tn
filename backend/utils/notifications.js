@@ -1,19 +1,15 @@
 const db = require('../config/database');
-const webPush = require('web-push');
 
-// إعداد VAPID للإشعارات
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    webPush.setVapidDetails(
-        'mailto:shamsi.tns@gmail.com',
-        process.env.VAPID_PUBLIC_KEY,
-        process.env.VAPID_PRIVATE_KEY
-    );
-    console.log('✅ Web Push configured successfully');
-} else {
-    console.warn('⚠️ VAPID keys not set. Push notifications disabled.');
+// ✅ محاولة تحميل web-push بشكل اختياري (لن يسبب خطأ إذا لم يكن موجوداً)
+let webPush = null;
+try {
+    webPush = require('web-push');
+    console.log('✅ web-push loaded successfully');
+} catch (error) {
+    console.warn('⚠️ web-push not installed. Push notifications disabled.');
 }
 
-// Helper function
+// Helper functions
 const getRows = (result) => {
     return result.rows || result || [];
 };
@@ -23,7 +19,21 @@ const getFirstRow = (result) => {
     return rows[0] || null;
 };
 
+// إعداد VAPID للإشعارات (فقط إذا كانت web-push موجودة والمفاتيح متاحة)
+if (webPush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webPush.setVapidDetails(
+        'mailto:shamsi.tns@gmail.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+    console.log('✅ Web Push configured successfully');
+} else if (webPush) {
+    console.warn('⚠️ VAPID keys not set. Push notifications disabled.');
+}
+
+// =============================================
 // دالة إرسال إشعار لمستخدم واحد
+// =============================================
 async function sendNotification(userId, leadId, title, message, type = 'info') {
     try {
         const result = await db.query(
@@ -34,8 +44,10 @@ async function sendNotification(userId, leadId, title, message, type = 'info') {
         );
         console.log(`✅ Notification sent to user ${userId}: ${title}`);
         
-        // ✅ إرسال Push Notification أيضاً
-        await sendPushNotification(userId, title, message, `/lead/${leadId}`, leadId);
+        // ✅ إرسال Push Notification إذا كانت متاحة
+        if (webPush) {
+            await sendPushNotification(userId, title, message, `/lead/${leadId}`, leadId);
+        }
         
         return result.rows[0]?.id;
     } catch (error) {
@@ -44,7 +56,9 @@ async function sendNotification(userId, leadId, title, message, type = 'info') {
     }
 }
 
+// =============================================
 // دالة إرسال إشعار لعدة مستخدمين
+// =============================================
 async function sendNotificationToMultipleUsers(userIds, leadId, title, message, type = 'info') {
     const results = [];
     for (const userId of userIds) {
@@ -54,7 +68,9 @@ async function sendNotificationToMultipleUsers(userIds, leadId, title, message, 
     return results;
 }
 
+// =============================================
 // دالة إرسال إشعار لجميع المستخدمين من دور معين
+// =============================================
 async function sendNotificationToRole(role, leadId, title, message, type = 'info') {
     try {
         const usersResult = await db.query(
@@ -69,7 +85,9 @@ async function sendNotificationToRole(role, leadId, title, message, type = 'info
     }
 }
 
-// دالة إرسال إشعار لجميع المستخدمين (إداريين فقط)
+// =============================================
+// دالة إرسال إشعار لجميع الإداريين
+// =============================================
 async function sendNotificationToAllAdmins(leadId, title, message, type = 'info') {
     const adminRoles = ['general_manager', 'owner', 'executive_manager'];
     const results = [];
@@ -81,7 +99,9 @@ async function sendNotificationToAllAdmins(leadId, title, message, type = 'info'
     return results;
 }
 
+// =============================================
 // دالة جلب إشعارات المستخدم
+// =============================================
 async function getUserNotifications(userId, limit = 20, offset = 0) {
     try {
         const result = await db.query(
@@ -110,7 +130,9 @@ async function getUserNotifications(userId, limit = 20, offset = 0) {
     }
 }
 
-// دالة تحديث حالة الإشعار (قراءة)
+// =============================================
+// دالة تحديث إشعار كمقروء
+// =============================================
 async function markNotificationAsRead(notificationId, userId) {
     try {
         await db.query(
@@ -126,7 +148,9 @@ async function markNotificationAsRead(notificationId, userId) {
     }
 }
 
+// =============================================
 // دالة تحديث جميع الإشعارات كمقروءة
+// =============================================
 async function markAllNotificationsAsRead(userId) {
     try {
         await db.query(
@@ -140,11 +164,15 @@ async function markAllNotificationsAsRead(userId) {
     }
 }
 
-// ✅ دالة إرسال Push Notification لمستخدم معين (للموبايل)
+// =============================================
+// دالة إرسال Push Notification (للموبايل)
+// =============================================
 async function sendPushNotification(userId, title, body, url = '/', leadId = null) {
-    // التحقق من تفعيل Web Push
+    if (!webPush) {
+        return false;
+    }
+    
     if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-        console.log('⚠️ Web Push not configured, skipping push notification');
         return false;
     }
     
@@ -155,7 +183,6 @@ async function sendPushNotification(userId, title, body, url = '/', leadId = nul
         );
         
         if (result.rows.length === 0) {
-            console.log(`📱 User ${userId} has no push subscription`);
             return false;
         }
         
@@ -169,7 +196,7 @@ async function sendPushNotification(userId, title, body, url = '/', leadId = nul
         });
         
         await webPush.sendNotification(subscription, payload);
-        console.log(`📱 Push notification sent to user ${userId}: ${title}`);
+        console.log(`📱 Push notification sent to user ${userId}`);
         return true;
         
     } catch (error) {
@@ -178,7 +205,9 @@ async function sendPushNotification(userId, title, body, url = '/', leadId = nul
     }
 }
 
+// =============================================
 // دالة إرسال Push Notification لعدة مستخدمين
+// =============================================
 async function sendPushNotificationToMultipleUsers(userIds, title, body, url = '/', leadId = null) {
     const results = [];
     for (const userId of userIds) {
@@ -188,7 +217,9 @@ async function sendPushNotificationToMultipleUsers(userIds, title, body, url = '
     return results;
 }
 
+// =============================================
 // دالة إرسال Push Notification لدور معين
+// =============================================
 async function sendPushNotificationToRole(role, title, body, url = '/', leadId = null) {
     try {
         const usersResult = await db.query(
@@ -203,6 +234,9 @@ async function sendPushNotificationToRole(role, title, body, url = '/', leadId =
     }
 }
 
+// =============================================
+// تصدير الدوال
+// =============================================
 module.exports = {
     sendNotification,
     sendNotificationToMultipleUsers,
