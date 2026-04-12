@@ -28,8 +28,6 @@ const bankRoutes = require('./routes/bank');
 const leasingRoutes = require('./routes/leasing');
 const companyDashboardRoutes = require('./routes/companyDashboard');
 const notificationRoutes = require('./routes/notifications');
-
-// ✅ NEW: Import company requests routes
 const companyRequestsRoutes = require('./routes/companyRequests');
 
 // =============================================
@@ -226,18 +224,21 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         
-        // ✅ إرسال إشعار للمدير العام والمدير التنفيذي
+        // ✅ إرسال إشعارات للمدير العام والمدير التنفيذي
         try {
-            const { sendNotificationToRole } = require('./utils/notifications');
+            const { sendNotification, sendNotificationToRole } = require('./utils/notifications');
             
-            await sendNotificationToRole(
-                'general_manager',
+            // إرسال إشعار مباشر للمدير العام (ID: 19)
+            await sendNotification(
+                19,
                 leadId,
                 '📋 طلب جديد',
                 `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
                 'info'
             );
+            console.log(`✅ Direct notification sent to GM (ID: 19)`);
             
+            // إرسال إشعار لجميع المديرين التنفيذيين
             await sendNotificationToRole(
                 'executive_manager',
                 leadId,
@@ -624,7 +625,7 @@ const startServer = async () => {
     📝 Request ID: Enabled
     ✅ Company Requests API: Enabled (/api/company-requests)
     ✅ POST /api/leads: Enabled (for lead creation with images)
-    ✅ Notification System: Enabled
+    ✅ Notification System: Enabled (with direct GM notifications)
     ════════════════════════════════════════════════════════
             `);
         });
