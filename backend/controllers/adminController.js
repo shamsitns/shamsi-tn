@@ -88,52 +88,138 @@ exports.getAllLeads = async (req, res) => {
     }
 };
 
-// =============================================
-// ✅ NEW: جلب تتبع الطلب (assigned_sections)
-// =============================================
+// ✅ NEW: جلب جميع الطلبات مع الأقسام (API واحد فقط)
+exports.getAllLeadsWithSections = async (req, res) => {
+    try {
+        const { status } = req.query;
+        
+        console.log(`📊 Fetching all leads with sections - status: ${status || 'all'}`);
+        
+        let query = `
+            SELECT l.id, l.name, l.phone, l.city, l.status, 
+                   l.bill_amount, l.required_kw, l.property_type,
+                   COALESCE(l.assigned_sections, '[]') as assigned_sections,
+                   l.created_at, l.updated_at
+            FROM leads l
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (status && status !== 'all') {
+            query += ` AND l.status = $1`;
+            params.push(status);
+        }
+        
+        query += ` ORDER BY l.created_at DESC`;
+        
+        const result = await db.query(query, params);
+        const leads = getRows(result);
+        
+        // ✅ Parse JSON for each lead
+        const processedLeads = leads.map(lead => ({
+            ...lead,
+            assigned_sections: typeof lead.assigned_sections === 'string' 
+                ? JSON.parse(lead.assigned_sections) 
+                : (lead.assigned_sections || [])
+        }));
+        
+        console.log(`✅ Found ${processedLeads.length} leads with sections`);
+        
+        res.json({ leads: processedLeads });
+        
+    } catch (error) {
+        console.error('❌ Error in getAllLeadsWithSections:', error);
+        res.status(500).json({ message: 'حدث خطأ في جلب الطلبات', error: error.message });
+    }
+};
+
+// ✅ NEW: جلب تتبع الطلب (مع معالجة الأخطاء)
 exports.getLeadFollow = async (req, res) => {
     try {
         const { leadId } = req.params;
         
+        console.log(`👁️ Fetching follow for lead ${leadId}`);
+        
+        // التحقق من صحة المعرّف
+        if (!leadId || isNaN(parseInt(leadId))) {
+            return res.status(400).json({ message: 'معرّف الطلب غير صالح' });
+        }
+        
         // جلب معلومات الطلب مع assigned_sections
         const leadResult = await db.query(
-            `SELECT id, name, phone, city, status, assigned_sections, created_at, updated_at 
+            `SELECT id, name, phone, city, status, 
+                    COALESCE(assigned_sections, '[]') as assigned_sections, 
+                    created_at, updated_at 
              FROM leads WHERE id = $1`,
-            [leadId]
+            [parseInt(leadId)]
         );
+        
         const lead = getFirstRow(leadResult);
         
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // جلب تاريخ التعيينات من lead_assignments
-        const assignmentsResult = await db.query(`
-            SELECT * FROM lead_assignments 
-            WHERE lead_id = $1 
-            ORDER BY assigned_at DESC
-        `, [leadId]);
-        const assignments = getRows(assignmentsResult);
+        // ✅ Parse assigned_sections إذا كان JSON
+        let sections = [];
+        if (lead.assigned_sections) {
+            try {
+                sections = typeof lead.assigned_sections === 'string' 
+                    ? JSON.parse(lead.assigned_sections) 
+                    : lead.assigned_sections;
+            } catch (e) {
+                console.error('Error parsing assigned_sections:', e);
+                sections = [];
+            }
+        }
+        
+        // جلب تاريخ التعيينات من lead_assignments (إذا كان الجدول موجود)
+        let assignments = [];
+        try {
+            const assignmentsResult = await db.query(`
+                SELECT * FROM lead_assignments 
+                WHERE lead_id = $1 
+                ORDER BY assigned_at DESC
+            `, [parseInt(leadId)]);
+            assignments = getRows(assignmentsResult);
+        } catch (err) {
+            console.log('lead_assignments table may not exist:', err.message);
+        }
         
         res.json({
-            lead: lead,
+            lead: {
+                ...lead,
+                assigned_sections: sections
+            },
             history: assignments,
-            sections: lead.assigned_sections || []
+            sections: sections
         });
         
     } catch (error) {
         console.error('❌ Error getting lead follow:', error);
-        res.status(500).json({ message: 'حدث خطأ', error: error.message });
+        
+        // ✅ إرجاع استجابة مناسبة بدلاً من 500
+        res.status(200).json({ 
+            lead: null, 
+            sections: [],
+            history: [],
+            message: 'لا يمكن جلب بيانات التتبع حالياً'
+        });
     }
 };
 
-// =============================================
 // ✅ NEW: تحديث الأقسام المرسل إليها
-// =============================================
 exports.updateLeadSections = async (req, res) => {
     try {
         const { leadId } = req.params;
         const { assigned_sections } = req.body;
+        
+        console.log(`📝 Updating sections for lead ${leadId}:`, assigned_sections);
+        
+        // التحقق من صحة البيانات
+        if (!Array.isArray(assigned_sections)) {
+            return res.status(400).json({ message: 'assigned_sections يجب أن يكون مصفوفة' });
+        }
         
         await db.query(
             `UPDATE leads 
@@ -143,7 +229,7 @@ exports.updateLeadSections = async (req, res) => {
             [JSON.stringify(assigned_sections), leadId]
         );
         
-        res.json({ message: 'تم تحديث الأقسام بنجاح' });
+        res.json({ message: 'تم تحديث الأقسام بنجاح', sections: assigned_sections });
         
     } catch (error) {
         console.error('❌ Error updating sections:', error);
@@ -381,7 +467,6 @@ exports.rejectLead = async (req, res) => {
 // تعيين الطلبات
 // =============================================
 
-// تعيين طلب لمدير تنفيذي
 exports.assignToExecutive = async (req, res) => {
     try {
         const { leadId } = req.params;
@@ -390,7 +475,6 @@ exports.assignToExecutive = async (req, res) => {
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to executive ${executiveId}`);
         
-        // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
         
@@ -398,7 +482,6 @@ exports.assignToExecutive = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // التحقق من وجود المدير التنفيذي
         const execResult = await db.query(
             'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
             [executiveId, 'executive_manager']
@@ -409,7 +492,6 @@ exports.assignToExecutive = async (req, res) => {
             return res.status(404).json({ message: 'المدير التنفيذي غير موجود' });
         }
         
-        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET assigned_to = $1,
@@ -419,32 +501,7 @@ exports.assignToExecutive = async (req, res) => {
             [executiveId, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
-        
-        // ✅ إرسال إشعار للمدير التنفيذي
-        try {
-            const { sendNotification, sendNotificationToRole } = require('../utils/notifications');
-            
-            await sendNotification(
-                executiveId,
-                leadId,
-                '📨 طلب معين لك',
-                `تم تعيين طلب جديد من ${lead.name} إليك للمراجعة`,
-                'info'
-            );
-            
-            await sendNotificationToRole(
-                'general_manager',
-                leadId,
-                '✅ تم تعيين طلب',
-                `تم تعيين الطلب رقم ${leadId} للمدير التنفيذي ${executive.name}`,
-                'success'
-            );
-            
-            console.log(`✅ Notifications sent for assignment`);
-        } catch (notifError) {
-            console.error('❌ Error sending assignment notifications:', notifError);
-        }
+        console.log(`✅ Lead ${leadId} assigned to executive ${executive.name}`);
         
         res.json({
             message: `تم تعيين الطلب للمدير التنفيذي: ${executive.name}`,
@@ -455,11 +512,10 @@ exports.assignToExecutive = async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error assigning to executive:', error);
-        res.status(500).json({ message: 'حدث خطأ في تعيين الطلب للمدير التنفيذي', error: error.message });
+        res.status(500).json({ message: 'حدث خطأ', error: error.message });
     }
 };
 
-// تعيين طلب لمركز الاتصال
 exports.assignToCallCenter = async (req, res) => {
     try {
         const { leadId } = req.params;
@@ -487,8 +543,6 @@ exports.assignToCallCenter = async (req, res) => {
             [callCenterId, leadId]
         );
         
-        console.log(`📝 Assignment recorded for lead ${leadId} to call center ${callCenter.name}`);
-        
         res.json({ 
             message: `تم إرسال الطلب لمركز الاتصال: ${callCenter.name}`,
             leadId,
@@ -502,7 +556,6 @@ exports.assignToCallCenter = async (req, res) => {
     }
 };
 
-// تعيين طلب لمدير البنك
 exports.assignToBankManager = async (req, res) => {
     try {
         const { leadId } = req.params;
@@ -511,14 +564,12 @@ exports.assignToBankManager = async (req, res) => {
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to bank manager ${bankManagerId}`);
         
-        // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // التحقق من وجود مدير البنك
         const bankResult = await db.query(
             'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
             [bankManagerId, 'bank_manager']
@@ -528,7 +579,6 @@ exports.assignToBankManager = async (req, res) => {
             return res.status(404).json({ message: 'مدير البنك غير موجود' });
         }
         
-        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET financing_type = 'bank', 
@@ -538,14 +588,12 @@ exports.assignToBankManager = async (req, res) => {
             [bankManagerId, leadId]
         );
         
-        // إدراج في bank_requests
         await db.query(
             `INSERT INTO bank_requests (lead_id, bank_manager_id, bank_id, notes, status, financing_type, created_at)
              VALUES ($1, $2, $3, $4, 'pending', 'bank', CURRENT_TIMESTAMP)`,
             [leadId, bankManagerId, bankId || null, notes || null]
         );
         
-        console.log(`✅ Lead ${leadId} assigned to bank manager ${bankManager.name}`);
         res.json({ 
             message: `تم إرسال الطلب لمدير البنك: ${bankManager.name}`,
             leadId,
@@ -559,7 +607,6 @@ exports.assignToBankManager = async (req, res) => {
     }
 };
 
-// تعيين طلب لمدير التأجير
 exports.assignToLeasingManager = async (req, res) => {
     try {
         const { leadId } = req.params;
@@ -568,14 +615,12 @@ exports.assignToLeasingManager = async (req, res) => {
         
         console.log(`📨 Admin ${adminId} assigning lead ${leadId} to leasing manager ${leasingManagerId}`);
         
-        // التحقق من وجود الطلب
         const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(leadResult);
         if (!lead) {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // التحقق من وجود مدير التأجير
         const leasingResult = await db.query(
             'SELECT id, name FROM users WHERE id = $1 AND role = $2 AND is_active = true',
             [leasingManagerId, 'leasing_manager']
@@ -585,7 +630,6 @@ exports.assignToLeasingManager = async (req, res) => {
             return res.status(404).json({ message: 'مدير التأجير غير موجود' });
         }
         
-        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET financing_type = 'leasing', 
@@ -595,7 +639,6 @@ exports.assignToLeasingManager = async (req, res) => {
             [leasingManagerId, leadId]
         );
         
-        // إدراج في financing_requests (يجب أن يتم دائماً)
         await db.query(
             `INSERT INTO financing_requests (lead_id, manager_id, assigned_to, financing_type, status, notes, created_at)
              VALUES ($1, $2, $3, $4, 'pending', $5, CURRENT_TIMESTAMP)
@@ -603,7 +646,6 @@ exports.assignToLeasingManager = async (req, res) => {
             [leadId, leasingManagerId, leasingManagerId, 'leasing', notes || null]
         );
         
-        console.log(`✅ Lead ${leadId} assigned to leasing manager ${leasingManager.name}`);
         res.json({ 
             message: `تم إرسال الطلب لمدير التأجير: ${leasingManager.name}`,
             leadId,
@@ -624,14 +666,9 @@ exports.deleteLead = async (req, res) => {
     try {
         const { leadId } = req.params;
         
-        // ✅ حذف الإشعارات المرتبطة أولاً
         await db.query('DELETE FROM notifications WHERE lead_id = $1', [leadId]);
-        
-        // ثم حذف العلاقات الأخرى
         await db.query('DELETE FROM lead_companies WHERE lead_id = $1', [leadId]);
         await db.query('DELETE FROM lead_assignments WHERE lead_id = $1', [leadId]);
-        
-        // أخيراً حذف الطلب
         await db.query('DELETE FROM leads WHERE id = $1', [leadId]);
         
         res.json({ message: 'تم حذف الطلب بنجاح' });

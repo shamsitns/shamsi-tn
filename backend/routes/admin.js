@@ -21,9 +21,10 @@ const {
     updateCompany,
     deleteCompany,
     getCommissionStats,
-    // ✅ NEW: استيراد الدوال الجديدة
+    // ✅ NEW: الدوال الجديدة
     getLeadFollow,
-    updateLeadSections
+    updateLeadSections,
+    getAllLeadsWithSections
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -65,12 +66,18 @@ router.get('/leads', [
     validate
 ], getAllLeads);
 
+// ✅ NEW: مسار واحد لجلب كل الطلبات مع الأقسام (يحل مشكلة الاتصالات المتعددة)
+router.get('/leads-with-sections', [
+    query('status').optional().isString(),
+    validate
+], getAllLeadsWithSections);
+
 router.get('/leads/:id', [
     param('id').isInt().withMessage('معرّف الطلب غير صالح'),
     validate
 ], getLeadById);
 
-// ✅ NEW: مسار جلب تتبع الطلب (assigned_sections)
+// ✅ NEW: مسار جلب تتبع الطلب
 router.get('/leads/:leadId/follow', [
     param('leadId').isInt().withMessage('معرّف الطلب غير صالح'),
     validate
@@ -84,7 +91,7 @@ router.patch('/leads/:leadId/update-sections', [
 ], updateLeadSections);
 
 // =============================================
-// 📋 مسارات الطلبات (Leads) - POST (للتطابق مع Frontend)
+// 📋 مسارات الطلبات (Leads) - POST
 // =============================================
 router.post('/leads/:leadId/approve', [
     param('leadId').isInt(),
