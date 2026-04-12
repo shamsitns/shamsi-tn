@@ -13,20 +13,25 @@ const NotificationBell = () => {
     // تهيئة الصوت - يتم استدعاؤها عند أول نقرة من المستخدم
     const initAudio = () => {
         if (!audioReady && audioRef.current === null) {
-            const audio = new Audio();
-            audio.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3';
+            // ✅ استخدام ملف الصوت المحلي
+            const audio = new Audio('/sounds/notification.mp3');
             audio.load();
             audioRef.current = audio;
             setAudioReady(true);
-            console.log('🔊 Audio initialized');
+            console.log('🔊 Audio initialized with local file');
             
-            // محاولة تشغيل الصوت لتأكيد التهيئة (بدون صوت)
+            // اختبار الصوت
             audio.play().then(() => {
                 audio.pause();
                 audio.currentTime = 0;
-                console.log('🔊 Audio test successful');
+                console.log('🔊 Local audio test successful');
             }).catch(err => {
-                console.log('Audio test failed:', err);
+                console.log('Local audio test failed:', err);
+                // استخدام رابط بديل إذا فشل المحلي
+                const fallbackAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+                fallbackAudio.load();
+                audioRef.current = fallbackAudio;
+                console.log('🔊 Using fallback audio');
             });
         }
     };
@@ -38,12 +43,7 @@ const NotificationBell = () => {
                 console.log('🔊 Sound played successfully');
             }).catch(err => {
                 console.log('Audio play failed:', err);
-                // محاولة بديلة
-                const tempAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-                tempAudio.play().catch(e => console.log('Fallback failed:', e));
             });
-        } else {
-            console.log('Audio not ready yet');
         }
     };
 
@@ -57,7 +57,6 @@ const NotificationBell = () => {
             
             console.log(`Previous: ${previousUnreadCount.current}, New: ${newUnreadCount}`);
             
-            // تشغيل الصوت فقط إذا كان الصوت جاهزاً وهناك إشعار جديد
             if (newUnreadCount > previousUnreadCount.current && audioReady) {
                 console.log('🔔 New notification! Playing sound...');
                 playSound();
@@ -114,7 +113,7 @@ const NotificationBell = () => {
         <div className="relative">
             <button
                 onClick={() => {
-                    initAudio(); // ✅ تهيئة الصوت عند أول نقرة
+                    initAudio();
                     setShowDropdown(!showDropdown);
                 }}
                 className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
