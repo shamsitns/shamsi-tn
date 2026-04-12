@@ -309,6 +309,27 @@ exports.createLead = async (req, res) => {
             );
             console.log(`✅ Executive notification inserted for lead ${leadId}`);
             
+            // ✅ ✅ ✅ إضافة Push Notifications (للموبايل) ✅ ✅ ✅
+            const { sendPushNotificationToRole } = require('../utils/notifications');
+            
+            // إرسال Push للمدير العام
+            await sendPushNotificationToRole(
+                'general_manager',
+                '📋 طلب جديد',
+                `طلب جديد من ${name} (${phone})`,
+                `/admin/leads/${leadId}`
+            );
+            console.log(`📱 Push notification sent to GM for lead ${leadId}`);
+            
+            // إرسال Push للمدير التنفيذي
+            await sendPushNotificationToRole(
+                'executive_manager',
+                '📋 طلب جديد',
+                `طلب جديد من ${name} (${phone})`,
+                `/manager/leads/${leadId}`
+            );
+            console.log(`📱 Push notification sent to Executive for lead ${leadId}`);
+            
         } catch (notifError) {
             console.error('❌ Error sending notifications:', notifError);
         }
