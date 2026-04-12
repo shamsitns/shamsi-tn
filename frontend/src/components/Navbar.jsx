@@ -6,7 +6,8 @@ import {
     FaUserTie, FaChartLine, FaUsers, FaHeadset, FaCrown,
     FaUniversity, FaCar
 } from 'react-icons/fa';
-import NotificationBell from './NotificationBell'; // ✅ إضافة أيقونة الإشعارات
+import NotificationBell from './NotificationBell';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 // ✅ استيراد الشعار الجديد (PNG)
 import logo from '../assets/images/logo-black.png';
@@ -15,6 +16,9 @@ const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('user') || 'null');
+    
+    // ✅ Push Notifications Hook
+    const { isSubscribed, permission, subscribeToPush, isSupported } = usePushNotifications();
     
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -64,9 +68,8 @@ const Navbar = () => {
     return (
         <nav className="bg-white shadow-md sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-                {/* ✅ زيادة ارتفاع الشريط قليلاً ليتناسب مع الشعار الأكبر */}
                 <div className="flex justify-between items-center h-16 sm:h-18 md:h-20">
-                    {/* ✅ Logo with new PNG file - حجم متوسط (أكبر قليلاً من الأصلي) */}
+                    {/* Logo */}
                     <Link 
                         to="/" 
                         className="flex items-center gap-2 touch-target"
@@ -85,7 +88,7 @@ const Navbar = () => {
                         <FaSun className="text-yellow-500 text-xl sm:text-2xl fallback-icon" style={{ display: 'none' }} />
                     </Link>
                     
-                    {/* Desktop Menu - مع إضافة أيقونة الإشعارات */}
+                    {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-3 lg:gap-6">
                         {navLinks.map((link) => {
                             const Icon = link.icon;
@@ -117,6 +120,17 @@ const Navbar = () => {
                                 
                                 {/* ✅ أيقونة الإشعارات */}
                                 <NotificationBell />
+                                
+                                {/* ✅ زر تفعيل Push Notifications للموبايل */}
+                                {isSupported && !isSubscribed && permission !== 'denied' && (
+                                    <button
+                                        onClick={subscribeToPush}
+                                        className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition"
+                                        title="تفعيل الإشعارات على الموبايل"
+                                    >
+                                        🔔 تفعيل
+                                    </button>
+                                )}
                                 
                                 <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                                     {getRoleName(user.role)}
@@ -151,7 +165,7 @@ const Navbar = () => {
                     </button>
                 </div>
                 
-                {/* Mobile Menu - مع إضافة أيقونة الإشعارات */}
+                {/* Mobile Menu */}
                 {isOpen && (
                     <div className="md:hidden py-3 border-t animate-fadeIn">
                         <div className="flex flex-col gap-1">
@@ -183,10 +197,20 @@ const Navbar = () => {
                                         </Link>
                                     )}
                                     
-                                    {/* ✅ أيقونة الإشعارات في القائمة المتنقلة */}
+                                    {/* أيقونة الإشعارات في القائمة المتنقلة */}
                                     <div className="mx-3 my-1">
                                         <NotificationBell />
                                     </div>
+                                    
+                                    {/* زر تفعيل Push Notifications في القائمة المتنقلة */}
+                                    {isSupported && !isSubscribed && permission !== 'denied' && (
+                                        <button
+                                            onClick={subscribeToPush}
+                                            className="mx-3 my-1 bg-blue-500 text-white py-2 px-3 rounded-lg text-sm flex items-center gap-2"
+                                        >
+                                            🔔 تفعيل الإشعارات
+                                        </button>
+                                    )}
                                     
                                     <div className="flex items-center gap-3 text-gray-500 bg-gray-50 py-2 px-3 rounded-lg mx-3 my-1 text-sm">
                                         <FaUser className="text-lg text-gray-400" />

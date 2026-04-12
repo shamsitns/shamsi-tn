@@ -1,4 +1,27 @@
 const db = require('../config/database');
+const webPush = require('web-push');
+
+// إعداد VAPID للإشعارات
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webPush.setVapidDetails(
+        'mailto:shamsi.tns@gmail.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+    console.log('✅ Web Push configured successfully');
+} else {
+    console.warn('⚠️ VAPID keys not set. Push notifications disabled.');
+}
+
+// Helper function
+const getRows = (result) => {
+    return result.rows || result || [];
+};
+
+const getFirstRow = (result) => {
+    const rows = getRows(result);
+    return rows[0] || null;
+};
 
 // دالة إرسال إشعار لمستخدم واحد
 async function sendNotification(userId, leadId, title, message, type = 'info') {
@@ -10,6 +33,10 @@ async function sendNotification(userId, leadId, title, message, type = 'info') {
             [userId, leadId, title, message, type]
         );
         console.log(`✅ Notification sent to user ${userId}: ${title}`);
+        
+        // ✅ إرسال Push Notification أيضاً
+        await sendPushNotification(userId, title, message, `/lead/${leadId}`, leadId);
+        
         return result.rows[0]?.id;
     } catch (error) {
         console.error('❌ Error sending notification:', error);
@@ -113,6 +140,69 @@ async function markAllNotificationsAsRead(userId) {
     }
 }
 
+// ✅ دالة إرسال Push Notification لمستخدم معين (للموبايل)
+async function sendPushNotification(userId, title, body, url = '/', leadId = null) {
+    // التحقق من تفعيل Web Push
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+        console.log('⚠️ Web Push not configured, skipping push notification');
+        return false;
+    }
+    
+    try {
+        const result = await db.query(
+            'SELECT subscription FROM push_subscriptions WHERE user_id = $1',
+            [userId]
+        );
+        
+        if (result.rows.length === 0) {
+            console.log(`📱 User ${userId} has no push subscription`);
+            return false;
+        }
+        
+        const subscription = result.rows[0].subscription;
+        
+        const payload = JSON.stringify({
+            title: title,
+            body: body,
+            url: url,
+            leadId: leadId
+        });
+        
+        await webPush.sendNotification(subscription, payload);
+        console.log(`📱 Push notification sent to user ${userId}: ${title}`);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error sending push notification:', error);
+        return false;
+    }
+}
+
+// دالة إرسال Push Notification لعدة مستخدمين
+async function sendPushNotificationToMultipleUsers(userIds, title, body, url = '/', leadId = null) {
+    const results = [];
+    for (const userId of userIds) {
+        const result = await sendPushNotification(userId, title, body, url, leadId);
+        results.push(result);
+    }
+    return results;
+}
+
+// دالة إرسال Push Notification لدور معين
+async function sendPushNotificationToRole(role, title, body, url = '/', leadId = null) {
+    try {
+        const usersResult = await db.query(
+            'SELECT id FROM users WHERE role = $1 AND is_active = true',
+            [role]
+        );
+        const userIds = usersResult.rows.map(row => row.id);
+        return await sendPushNotificationToMultipleUsers(userIds, title, body, url, leadId);
+    } catch (error) {
+        console.error('❌ Error sending push to role:', error);
+        return [];
+    }
+}
+
 module.exports = {
     sendNotification,
     sendNotificationToMultipleUsers,
@@ -120,5 +210,8 @@ module.exports = {
     sendNotificationToAllAdmins,
     getUserNotifications,
     markNotificationAsRead,
-    markAllNotificationsAsRead
+    markAllNotificationsAsRead,
+    sendPushNotification,
+    sendPushNotificationToMultipleUsers,
+    sendPushNotificationToRole
 };
