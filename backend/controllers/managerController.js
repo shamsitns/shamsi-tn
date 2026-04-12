@@ -90,13 +90,15 @@ exports.updateLeadStatus = async (req, res) => {
         const { status, notes } = req.body;
         const managerId = req.user.id;
         
+        console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
+        console.log(`📝 Request body:`, req.body);
+        console.log(`👤 User:`, managerId);
+        
         const validStatuses = ['pending', 'approved', 'contacted', 'sent_to_operations', 'assigned_to_company', 'completed', 'cancelled'];
         
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'حالة غير صالحة' });
         }
-        
-        console.log(`🔄 Updating lead ${leadId} to status: ${status}`);
         
         let updateQuery = `UPDATE leads SET status = $1, updated_at = CURRENT_TIMESTAMP`;
         const updateParams = [status];
@@ -121,7 +123,8 @@ exports.updateLeadStatus = async (req, res) => {
         updateQuery += ` WHERE id = $${paramIndex}`;
         updateParams.push(leadId);
         
-        await db.query(updateQuery, updateParams);
+        const result = await db.query(updateQuery, updateParams);
+        console.log(`✅ Query result:`, result);
         
         console.log(`✅ Lead ${leadId} updated to ${status}`);
         res.json({ 
