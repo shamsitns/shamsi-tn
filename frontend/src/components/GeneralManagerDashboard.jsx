@@ -374,28 +374,29 @@ const GeneralManagerDashboard = () => {
     // =============================================
     
     // ✅ التعديل 1: الموافقة فقط - تغير حالة الطلب ولا تفتح نافذة
-    const handleApprove = async (leadId) => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`https://shamsi-tn.onrender.com/api/admin/leads/${leadId}/approve`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (!response.ok) throw new Error('Approval failed');
-            
-            toast.success('✅ تم قبول الطلب');
-            showNotificationMessage('تم قبول الطلب بنجاح');
-            fetchLeads();
-            fetchStats();
-        } catch (error) {
-            console.error('Error approving lead:', error);
-            toast.error('حدث خطأ في قبول الطلب');
-        }
-    };
+    // ✅ التعديل: استخدم POST بدلاً من PUT
+const handleApprove = async (leadId) => {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`https://shamsi-tn.onrender.com/api/admin/leads/${leadId}/approve`, {
+            method: 'POST',  // ✅ غير من PUT إلى POST
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Approval failed');
+        
+        toast.success('✅ تم قبول الطلب');
+        showNotificationMessage('تم قبول الطلب بنجاح');
+        fetchLeads();
+        fetchStats();
+    } catch (error) {
+        console.error('Error approving lead:', error);
+        toast.error('حدث خطأ في قبول الطلب');
+    }
+};
     
     // ✅ جديد: فتح نافذة الإرسال (لإرسال الطلب لقسم معين)
     const openSendModal = (lead, type) => {
