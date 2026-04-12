@@ -10,70 +10,6 @@ const getFirstRow = (result) => {
 };
 
 // =============================================
-// الحصول على طلبات التمويل المخصصة للبنك
-// =============================================
-exports.getMyFinancingRequests = async (req, res) => {
-    try {
-        const bankManagerId = req.user.id;
-        const { status, page = 1, limit = 20 } = req.query;
-        const offset = (page - 1) * limit;
-        
-        let query = `
-            SELECT fr.*, 
-                   l.name as client_name, 
-                   l.phone as client_phone,
-                   l.city as client_city,
-                   l.bill_amount,
-                   l.required_kw,
-                   l.property_type
-            FROM financing_requests fr
-            JOIN leads l ON fr.lead_id = l.id
-            WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
-        `;
-        const params = [bankManagerId];
-        let paramIndex = 2;
-        
-        if (status && status !== 'all') {
-            query += ` AND fr.status = $${paramIndex}`;
-            params.push(status);
-            paramIndex++;
-        }
-        
-        query += ` ORDER BY fr.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-        params.push(parseInt(limit), parseInt(offset));
-        
-        const result = await db.query(query, params);
-        const requests = getRows(result);
-        
-        let countQuery = `
-            SELECT COUNT(*) as total 
-            FROM financing_requests fr
-            WHERE fr.financing_type = 'bank' AND fr.assigned_to = $1
-        `;
-        const countParams = [bankManagerId];
-        
-        if (status && status !== 'all') {
-            countQuery += ` AND fr.status = $2`;
-            countParams.push(status);
-        }
-        
-        const countResult = await db.query(countQuery, countParams);
-        const total = getFirstRow(countResult)?.total || 0;
-        
-        res.json({
-            requests: requests || [],
-            total: total,
-            page: parseInt(page),
-            totalPages: Math.ceil(total / limit)
-        });
-        
-    } catch (error) {
-        console.error('❌ Error getting financing requests:', error);
-        res.status(500).json({ message: 'حدث خطأ في جلب طلبات التمويل', error: error.message });
-    }
-};
-
-// =============================================
 // تحديث حالة طلب تمويل
 // =============================================
 exports.updateFinancingStatus = async (req, res) => {
@@ -82,67 +18,81 @@ exports.updateFinancingStatus = async (req, res) => {
         const { status, approved_amount, interest_rate, duration_years, notes } = req.body;
         const bankManagerId = req.user.id;
         
+        console.log('📝 Updating financing request:', { requestId, status, approved_amount, interest_rate, duration_years, bankManagerId });
+        
         const validStatuses = ['pending', 'under_review', 'approved', 'rejected', 'completed'];
         
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'حالة غير صالحة' });
         }
         
+        // التحقق من وجود الطلب
         const existingResult = await db.query(
-            `SELECT id, lead_id FROM financing_requests 
+            `SELECT id, lead_id, status FROM financing_requests 
              WHERE id = $1 AND financing_type = 'bank' AND assigned_to = $2`,
             [requestId, bankManagerId]
         );
-        const existing = getRows(existingResult);
+        const existing = getFirstRow(existingResult);
         
-        if (!existing || existing.length === 0) {
+        if (!existing) {
             return res.status(404).json({ message: 'طلب التمويل غير موجود' });
         }
         
-        let updateQuery = `
-            UPDATE financing_requests 
-            SET status = $1, 
-                updated_at = CURRENT_TIMESTAMP
-        `;
-        const params = [status];
-        let paramIndex = 2;
+        // بناء استعلام التحديث
+        const updates = [];
+        const params = [];
+        let paramIndex = 1;
         
-        if (approved_amount) {
-            updateQuery += `, approved_amount = $${paramIndex}`;
-            params.push(approved_amount);
+        updates.push(`status = $${paramIndex}`);
+        params.push(status);
+        paramIndex++;
+        
+        if (approved_amount !== undefined && approved_amount !== '') {
+            updates.push(`approved_amount = $${paramIndex}`);
+            params.push(parseFloat(approved_amount));
             paramIndex++;
         }
         
-        if (interest_rate) {
-            updateQuery += `, interest_rate = $${paramIndex}`;
-            params.push(interest_rate);
+        if (interest_rate !== undefined && interest_rate !== '') {
+            updates.push(`interest_rate = $${paramIndex}`);
+            params.push(parseFloat(interest_rate));
             paramIndex++;
         }
         
-        if (duration_years) {
-            updateQuery += `, duration_years = $${paramIndex}`;
-            params.push(duration_years);
+        if (duration_years !== undefined && duration_years !== '') {
+            updates.push(`duration_years = $${paramIndex}`);
+            params.push(parseInt(duration_years));
             paramIndex++;
         }
         
-        if (notes) {
-            updateQuery += `, notes = $${paramIndex}`;
+        if (notes !== undefined) {
+            updates.push(`notes = $${paramIndex}`);
             params.push(notes);
             paramIndex++;
         }
         
-        updateQuery += ` WHERE id = $${paramIndex}`;
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        
+        const query = `
+            UPDATE financing_requests 
+            SET ${updates.join(', ')}
+            WHERE id = $${paramIndex}
+        `;
         params.push(requestId);
         
-        await db.query(updateQuery, params);
+        console.log('🔍 Update query:', query);
+        console.log('🔍 Params:', params);
         
+        await db.query(query, params);
+        
+        // تحديث lead إذا تمت الموافقة
         if (status === 'approved') {
             await db.query(
                 `UPDATE leads 
                  SET financing_status = 'approved', 
                      updated_at = CURRENT_TIMESTAMP 
                  WHERE id = $1`,
-                [existing[0].lead_id]
+                [existing.lead_id]
             );
         } else if (status === 'rejected') {
             await db.query(
@@ -150,7 +100,7 @@ exports.updateFinancingStatus = async (req, res) => {
                  SET financing_status = 'rejected', 
                      updated_at = CURRENT_TIMESTAMP 
                  WHERE id = $1`,
-                [existing[0].lead_id]
+                [existing.lead_id]
             );
         }
         

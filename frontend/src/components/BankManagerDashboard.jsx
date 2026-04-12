@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 import { 
     FaUniversity, FaFileAlt, FaCheckCircle, FaTimesCircle, 
     FaHourglassHalf, FaMoneyBillWave, FaUser, FaPhone, 
-    FaMapMarkerAlt, FaCalendarAlt, FaEye, FaSync, FaBuilding
+    FaMapMarkerAlt, FaCalendarAlt, FaEye, FaSync, FaBuilding,
+    FaCheck, FaTimes, FaSpinner
 } from 'react-icons/fa';
 
 const BankManagerDashboard = () => {
@@ -14,6 +15,7 @@ const BankManagerDashboard = () => {
     const [filter, setFilter] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [updating, setUpdating] = useState(false);
     const [modalData, setModalData] = useState({
         status: '',
         approved_amount: '',
@@ -28,59 +30,29 @@ const BankManagerDashboard = () => {
     }, [filter]);
 
     const fetchRequests = async () => {
-    setLoading(true);
-    try {
-        const params = filter !== 'all' ? { status: filter } : {};
-        const response = await bankAPI.getRequests(params);
-        console.log('📊 Bank API Response:', response.data);
-        
-        // ✅ تنسيق البيانات لتتناسب مع الواجهة
-        let requestsData = [];
-        
-        if (response.data.requests && Array.isArray(response.data.requests)) {
-            requestsData = response.data.requests.map(req => ({
-                id: req.id,
-                lead_id: req.lead_id,
-                client_name: req.client_name || req.name || 'غير محدد',
-                client_phone: req.client_phone || req.phone || 'غير محدد',
-                client_city: req.client_city || req.city || 'غير محدد',
-                bill_amount: req.bill_amount || 0,
-                required_kw: req.required_kw || 0,
-                requested_amount: req.requested_amount || req.amount || 0,
-                status: req.status || 'pending',
-                approved_amount: req.approved_amount,
-                interest_rate: req.interest_rate,
-                duration_years: req.duration_years,
-                notes: req.notes,
-                created_at: req.created_at
-            }));
-        } else if (Array.isArray(response.data)) {
-            requestsData = response.data.map(req => ({
-                id: req.id,
-                lead_id: req.lead_id,
-                client_name: req.client_name || req.name || 'غير محدد',
-                client_phone: req.client_phone || req.phone || 'غير محدد',
-                client_city: req.client_city || req.city || 'غير محدد',
-                bill_amount: req.bill_amount || 0,
-                required_kw: req.required_kw || 0,
-                requested_amount: req.requested_amount || req.amount || 0,
-                status: req.status || 'pending',
-                approved_amount: req.approved_amount,
-                interest_rate: req.interest_rate,
-                duration_years: req.duration_years,
-                notes: req.notes,
-                created_at: req.created_at
-            }));
+        setLoading(true);
+        try {
+            const params = filter !== 'all' ? { status: filter } : {};
+            const response = await bankAPI.getRequests(params);
+            console.log('📊 Bank API Response:', response.data);
+            
+            // تنسيق البيانات
+            let requestsData = [];
+            if (response.data.requests && Array.isArray(response.data.requests)) {
+                requestsData = response.data.requests;
+            } else if (Array.isArray(response.data)) {
+                requestsData = response.data;
+            }
+            
+            setRequests(requestsData);
+        } catch (error) {
+            console.error('Error fetching requests:', error);
+            toast.error('حدث خطأ في جلب الطلبات');
+        } finally {
+            setLoading(false);
         }
-        
-        setRequests(requestsData);
-    } catch (error) {
-        console.error('Error fetching requests:', error);
-        toast.error('حدث خطأ في جلب الطلبات');
-    } finally {
-        setLoading(false);
-    }
-};
+    };
+
     const fetchStats = async () => {
         try {
             const response = await bankAPI.getStats();
@@ -92,9 +64,24 @@ const BankManagerDashboard = () => {
 
     const handleUpdateStatus = async () => {
         if (!selectedRequest) return;
-
+        
+        setUpdating(true);
+        
         try {
-            await bankAPI.updateStatus(selectedRequest.id, modalData);
+            const updateData = {
+                status: modalData.status,
+                approved_amount: modalData.approved_amount,
+                interest_rate: modalData.interest_rate,
+                duration_years: modalData.duration_years,
+                notes: modalData.notes
+            };
+            
+            console.log('📤 Sending update:', {
+                requestId: selectedRequest.id,
+                data: updateData
+            });
+            
+            await bankAPI.updateStatus(selectedRequest.id, updateData);
             toast.success('✅ تم تحديث حالة طلب التمويل بنجاح');
             setShowModal(false);
             setSelectedRequest(null);
@@ -104,6 +91,8 @@ const BankManagerDashboard = () => {
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('❌ حدث خطأ في تحديث الحالة');
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -145,7 +134,7 @@ const BankManagerDashboard = () => {
 
     const formatCurrency = (amount) => {
         if (!amount) return '0';
-        return amount.toLocaleString();
+        return parseFloat(amount).toLocaleString();
     };
 
     if (loading) {
@@ -241,13 +230,13 @@ const BankManagerDashboard = () => {
                                     requests.map((req) => (
                                         <tr key={req.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900">{req.client_name}</div>
-                                                <div className="text-sm text-gray-500">{req.client_phone}</div>
+                                                <div className="font-medium text-gray-900">{req.client_name || req.name || 'غير محدد'}</div>
+                                                <div className="text-sm text-gray-500">{req.client_phone || req.phone || 'غير محدد'}</div>
                                             </td>
-                                            <td className="px-4 py-3">{req.client_city}</td>
-                                            <td className="px-4 py-3">{req.bill_amount} دينار</td>
-                                            <td className="px-4 py-3">{req.required_kw} kWp</td>
-                                            <td className="px-4 py-3">{formatCurrency(req.requested_amount || req.amount || 0)} دينار</td>
+                                            <td className="px-4 py-3">{req.client_city || req.city || 'غير محدد'}</td>
+                                            <td className="px-4 py-3">{req.bill_amount || 0} دينار</td>
+                                            <td className="px-4 py-3">{req.required_kw || 0} kWp</td>
+                                            <td className="px-4 py-3">{formatCurrency(req.requested_amount || req.bill_amount || 0)} دينار</td>
                                             <td className="px-4 py-3">{getStatusBadge(req.status)}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex gap-2">
@@ -258,7 +247,7 @@ const BankManagerDashboard = () => {
                                                     >
                                                         <FaEye size={18} />
                                                     </button>
-                                                    {req.status === 'under_review' && (
+                                                    {(req.status === 'pending' || req.status === 'under_review') && (
                                                         <>
                                                             <button
                                                                 onClick={() => openModal(req, 'approved')}
@@ -296,8 +285,8 @@ const BankManagerDashboard = () => {
                              modalData.status === 'rejected' ? '❌ رفض التمويل' : 
                              '📝 تحديث طلب التمويل'}
                         </h3>
-                        <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedRequest.client_name}</span></p>
-                        <p className="text-gray-500 text-sm mb-4">قدرة النظام: {selectedRequest.required_kw} kWp</p>
+                        <p className="text-gray-600 mb-2">العميل: <span className="font-semibold">{selectedRequest.client_name || selectedRequest.name}</span></p>
+                        <p className="text-gray-500 text-sm mb-4">قدرة النظام: {selectedRequest.required_kw || 0} kWp</p>
 
                         {(modalData.status === 'approved' || modalData.status === 'under_review') && (
                             <>
@@ -307,7 +296,7 @@ const BankManagerDashboard = () => {
                                         type="number"
                                         value={modalData.approved_amount}
                                         onChange={(e) => setModalData({...modalData, approved_amount: e.target.value})}
-                                        className="w-full px-4 py-2 border rounded-lg"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                                         placeholder="المبلغ المعتمد"
                                     />
                                 </div>
@@ -315,9 +304,10 @@ const BankManagerDashboard = () => {
                                     <label className="block text-gray-700 mb-1">نسبة الفائدة (%)</label>
                                     <input
                                         type="number"
+                                        step="0.1"
                                         value={modalData.interest_rate}
                                         onChange={(e) => setModalData({...modalData, interest_rate: e.target.value})}
-                                        className="w-full px-4 py-2 border rounded-lg"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                                         placeholder="مثال: 5"
                                     />
                                 </div>
@@ -327,7 +317,7 @@ const BankManagerDashboard = () => {
                                         type="number"
                                         value={modalData.duration_years}
                                         onChange={(e) => setModalData({...modalData, duration_years: e.target.value})}
-                                        className="w-full px-4 py-2 border rounded-lg"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                                         placeholder="مثال: 7"
                                     />
                                 </div>
@@ -339,18 +329,25 @@ const BankManagerDashboard = () => {
                             <textarea
                                 value={modalData.notes}
                                 onChange={(e) => setModalData({...modalData, notes: e.target.value})}
-                                className="w-full px-4 py-2 border rounded-lg"
+                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                                 rows="3"
                                 placeholder="أضف ملاحظات..."
                             />
                         </div>
 
                         <div className="flex gap-3">
-                            <button onClick={handleUpdateStatus} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-                                تأكيد
+                            <button 
+                                onClick={handleUpdateStatus} 
+                                disabled={updating}
+                                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {updating ? <><FaSpinner className="animate-spin" /> جاري...</> : <><FaCheck /> تأكيد</>}
                             </button>
-                            <button onClick={() => { setShowModal(false); setSelectedRequest(null); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
-                                إلغاء
+                            <button 
+                                onClick={() => { setShowModal(false); setSelectedRequest(null); }} 
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                            >
+                                <FaTimes /> إلغاء
                             </button>
                         </div>
                     </div>
