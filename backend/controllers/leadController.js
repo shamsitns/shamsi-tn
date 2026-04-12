@@ -14,6 +14,24 @@ const getFirstRow = (result) => {
 };
 
 // =============================================
+// حساب السعر التقديري حسب القدرة (دينار تونسي) - للاستخدام الداخلي فقط
+// =============================================
+const getPricePerKw = (systemKw) => {
+    if (systemKw <= 2) return 3500;
+    if (systemKw <= 3) return 3067;
+    if (systemKw <= 4) return 2750;
+    if (systemKw <= 6) return 2300;
+    if (systemKw <= 7) return 2357;
+    if (systemKw <= 8) return 2250;
+    return 2200;
+};
+
+const getEstimatedPrice = (systemKw) => {
+    const pricePerKw = getPricePerKw(systemKw);
+    return Math.round(systemKw * pricePerKw);
+};
+
+// =============================================
 // حساب lead score تلقائياً
 // =============================================
 const calculateLeadScore = (leadData) => {
@@ -168,6 +186,8 @@ exports.createLead = async (req, res) => {
         const finalCoveragePercent = coverage_percent !== undefined ? coverage_percent : null;
         
         const commissionAmount = calculateCommission(finalRequiredKw);
+        // ✅ حساب السعر التقديري الداخلي
+        const estimatedPrice = getEstimatedPrice(finalRequiredKw);
         
         const leadScore = calculateLeadScore({
             bill_amount: parseFloat(bill_amount),
@@ -231,8 +251,9 @@ exports.createLead = async (req, res) => {
                 annual_production, annual_savings, monthly_savings,
                 co2_saved, solar_score, coverage_percent,
                 invoice_image_url, invoice_image_file_id,
+                estimated_price,
                 status, created_by, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, CURRENT_TIMESTAMP)
             RETURNING id
         `;
         
@@ -266,6 +287,7 @@ exports.createLead = async (req, res) => {
             finalCoveragePercent,
             invoiceImageUrl,
             invoiceImageFileId,
+            estimatedPrice,
             'pending',
             userId
         ];
@@ -282,6 +304,7 @@ exports.createLead = async (req, res) => {
         console.log(`✅ Lead created successfully with ID: ${leadId}`);
         console.log(`   📊 Required KW: ${finalRequiredKw} kWp`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
+        console.log(`   💵 Estimated Price: ${estimatedPrice} DT`);
         console.log(`   ⭐ Lead Score: ${leadScore}`);
         console.log(`   📍 Source: ${leadSource}`);
         console.log(`   👤 Created by: ${userId}`);
@@ -339,6 +362,7 @@ exports.createLead = async (req, res) => {
             leadId: leadId,
             leadScore: leadScore,
             invoiceImageUrl: invoiceImageUrl,
+            estimatedPrice: estimatedPrice, // ✅ للاستخدام الداخلي فقط
             solarData: {
                 required_kw: finalRequiredKw,
                 panels_count: finalPanelsCount,
