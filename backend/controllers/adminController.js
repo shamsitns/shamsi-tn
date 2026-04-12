@@ -532,12 +532,13 @@ exports.assignToLeasingManager = async (req, res) => {
             [leasingManagerId, leadId]
         );
         
-        // إدراج في leasing_requests
-        await db.query(
-            `INSERT INTO leasing_requests (lead_id, leasing_manager_id, notes, status, financing_type, created_at)
-             VALUES ($1, $2, $3, 'pending', 'leasing', CURRENT_TIMESTAMP)`,
-            [leadId, leasingManagerId, notes || null]
-        );
+        // إدراج في financing_requests (يجب أن يتم دائماً)
+await db.query(
+    `INSERT INTO financing_requests (lead_id, manager_id, assigned_to, financing_type, status, notes, created_at)
+     VALUES ($1, $2, $3, $4, 'pending', $5, CURRENT_TIMESTAMP)
+     ON CONFLICT (lead_id, financing_type) DO NOTHING`,
+    [leadId, leasingManagerId, leasingManagerId, 'leasing', notes || null]
+);
         
         console.log(`✅ Lead ${leadId} assigned to leasing manager ${leasingManager.name}`);
         res.json({ 
