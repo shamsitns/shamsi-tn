@@ -530,7 +530,14 @@ exports.deleteLead = async (req, res) => {
     try {
         const { leadId } = req.params;
         
+        // ✅ حذف الإشعارات المرتبطة أولاً
+        await db.query('DELETE FROM notifications WHERE lead_id = $1', [leadId]);
+        
+        // ثم حذف العلاقات الأخرى
         await db.query('DELETE FROM lead_companies WHERE lead_id = $1', [leadId]);
+        await db.query('DELETE FROM lead_assignments WHERE lead_id = $1', [leadId]);
+        
+        // أخيراً حذف الطلب
         await db.query('DELETE FROM leads WHERE id = $1', [leadId]);
         
         res.json({ message: 'تم حذف الطلب بنجاح' });

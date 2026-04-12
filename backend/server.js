@@ -225,32 +225,32 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         
         // ✅ إرسال إشعارات للمدير العام والمدير التنفيذي
-        try {
-            const { sendNotification, sendNotificationToRole } = require('./utils/notifications');
-            
-            // إرسال إشعار مباشر للمدير العام (ID: 19)
-            await sendNotification(
-                19,
-                leadId,
-                '📋 طلب جديد',
-                `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
-                'info'
-            );
-            console.log(`✅ Direct notification sent to GM (ID: 19)`);
-            
-            // إرسال إشعار لجميع المديرين التنفيذيين
-            await sendNotificationToRole(
-                'executive_manager',
-                leadId,
-                '📋 طلب جديد',
-                `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
-                'info'
-            );
-            
-            console.log(`✅ Notifications sent for lead ${leadId}`);
-        } catch (notifError) {
-            console.error('❌ Error sending notifications:', notifError);
-        }
+try {
+    const { sendNotification, sendNotificationToRole } = require('./utils/notifications');
+    
+    // إرسال إشعار مباشر للمدير العام (ID: 19)
+    const result1 = await sendNotification(
+        19,
+        leadId,
+        '📋 طلب جديد',
+        `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
+        'info'
+    );
+    console.log(`✅ Direct notification sent to GM (ID: 19), result: ${result1}`);
+    
+    // إرسال إشعار للمدير التنفيذي (ID: 26)
+    const result2 = await sendNotification(
+        26,
+        leadId,
+        '📋 طلب جديد',
+        `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
+        'info'
+    );
+    console.log(`✅ Direct notification sent to Executive (ID: 26), result: ${result2}`);
+    
+} catch (notifError) {
+    console.error('❌ Error sending notifications:', notifError);
+}
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',

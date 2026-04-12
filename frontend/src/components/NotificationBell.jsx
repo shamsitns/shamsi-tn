@@ -9,18 +9,16 @@ const NotificationBell = () => {
     const previousUnreadCount = React.useRef(0);
 
     const playSound = () => {
-        // استخدام رابط صوت مضمون 100%
-        const audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        audio.volume = 1.0;
-        audio.play().then(() => {
-            console.log('🔊 Sound played successfully');
-        }).catch(err => {
-            console.log('Audio play failed:', err);
-            // محاولة بديلة
-            const audio2 = new Audio('https://actions.google.com/sound/bar.mp3');
-            audio2.play().catch(e => console.log('Fallback failed:', e));
-        });
-    };
+    // استخدام رابط صوت مضمون 100% من W3Schools
+    const audio = new Audio('https://www.w3schools.com/html/horse.ogg');
+    audio.volume = 0.5;
+    audio.play().catch(err => {
+        console.log('Audio play failed:', err);
+        // محاولة بديلة
+        const audio2 = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        audio2.play().catch(e => console.log('Fallback failed:', e));
+    });
+};
 
     const fetchNotifications = async () => {
         try {
