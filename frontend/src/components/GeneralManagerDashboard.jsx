@@ -39,6 +39,9 @@ const GeneralManagerDashboard = () => {
     const [showCompanyModal, setShowCompanyModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [showRequestModal, setShowRequestModal] = useState(false);
+    // ✅ جديد: نافذة تتبع الطلب
+    const [showFollowModal, setShowFollowModal] = useState(false);
+    const [followLead, setFollowLead] = useState(null);
     const [selectedLead, setSelectedLead] = useState(null);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [selectedUserId, setSelectedUserId] = useState('');
@@ -49,7 +52,6 @@ const GeneralManagerDashboard = () => {
     const [cities, setCities] = useState([]);
     const [selectedCompanyForUser, setSelectedCompanyForUser] = useState(null);
     
-    // ✅ إضافة حالتين لاختيار الشركة عند إضافة مستخدم من نوع company
     const [companiesList, setCompaniesList] = useState([]);
     const [selectedCompanyId, setSelectedCompanyId] = useState('');
     
@@ -114,12 +116,10 @@ const GeneralManagerDashboard = () => {
         }
     }, [showAssignModal]);
 
-    // ✅ جلب قائمة الشركات عند فتح مودال إضافة مستخدم
     useEffect(() => {
         if (showUserModal) {
             fetchCompaniesList();
         } else {
-            // إعادة تعيين الاختيار عند إغلاق المودال
             setSelectedCompanyId('');
         }
     }, [showUserModal]);
@@ -144,36 +144,43 @@ const GeneralManagerDashboard = () => {
     };
 
     const fetchLeads = async () => {
-    setLoading(true);
-    try {
-        const params = filter !== 'all' ? { status: filter } : {};
-        
-        const token = localStorage.getItem('token');
-        const queryString = new URLSearchParams(params).toString();
-        const url = `https://shamsi-tn.onrender.com/api/admin/leads${queryString ? `?${queryString}` : ''}`;
-        
-        console.log('📊 Fetching from:', url);
-        
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const data = await response.json();
-        console.log('📊 fetchLeads response:', data);
-        
-        const leadsData = data.leads || [];
-        console.log('📊 Leads data:', leadsData);
-        setLeads(leadsData);
-        
-        const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
-        setCities(uniqueCities);
-    } catch (error) {
-        console.error('Error fetching leads:', error);
-        toast.error('حدث خطأ في جلب البيانات');
-    } finally {
-        setLoading(false);
-    }
-};
+        setLoading(true);
+        try {
+            const params = filter !== 'all' ? { status: filter } : {};
+            const token = localStorage.getItem('token');
+            const queryString = new URLSearchParams(params).toString();
+            const url = `https://shamsi-tn.onrender.com/api/admin/leads${queryString ? `?${queryString}` : ''}`;
+            
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await response.json();
+            const leadsData = data.leads || [];
+            
+            // ✅ جلب assigned_sections من كل طلب
+            const leadsWithSections = await Promise.all(leadsData.map(async (lead) => {
+                try {
+                    const followRes = await fetch(`https://shamsi-tn.onrender.com/api/admin/leads/${lead.id}/follow`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const followData = await followRes.json();
+                    return { ...lead, assigned_sections: followData.sections || [] };
+                } catch {
+                    return { ...lead, assigned_sections: [] };
+                }
+            }));
+            
+            setLeads(leadsWithSections);
+            const uniqueCities = [...new Set(leadsWithSections.map(lead => lead.city).filter(Boolean))];
+            setCities(uniqueCities);
+        } catch (error) {
+            console.error('Error fetching leads:', error);
+            toast.error('حدث خطأ في جلب البيانات');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const fetchUsers = async () => {
         try {
@@ -207,7 +214,6 @@ const GeneralManagerDashboard = () => {
                 requestsData = [];
             }
             
-            console.log('📋 Company requests loaded:', requestsData.length);
             setCompanyRequests(requestsData);
             setFilteredRequests(requestsData);
         } catch (error) {
@@ -225,6 +231,29 @@ const GeneralManagerDashboard = () => {
         } catch (error) {
             console.error('Error fetching stats:', error);
         }
+    };
+
+    // ✅ جديد: دالة لتحديث الأقسام المرسل إليها
+    const updateLeadSections = async (leadId, sections) => {
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`https://shamsi-tn.onrender.com/api/admin/leads/${leadId}/update-sections`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ assigned_sections: sections })
+            });
+        } catch (error) {
+            console.error('Error updating sections:', error);
+        }
+    };
+
+    // ✅ جديد: دالة لفتح نافذة التتبع
+    const openFollowModal = (lead) => {
+        setFollowLead(lead);
+        setShowFollowModal(true);
     };
 
     // =============================================
@@ -337,15 +366,38 @@ const GeneralManagerDashboard = () => {
     // =============================================
     // Lead Management
     // =============================================
+    
+    // ✅ التعديل 1: الموافقة فقط - تغير حالة الطلب ولا تفتح نافذة
     const handleApprove = async (leadId) => {
-    // ✅ البحث عن الطلب وفتح نافذة التعيين
-    const lead = leads.find(l => l.id === leadId);
-    if (lead) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`https://shamsi-tn.onrender.com/api/admin/leads/${leadId}/approve`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) throw new Error('Approval failed');
+            
+            toast.success('✅ تم قبول الطلب');
+            showNotificationMessage('تم قبول الطلب بنجاح');
+            fetchLeads();
+            fetchStats();
+        } catch (error) {
+            console.error('Error approving lead:', error);
+            toast.error('حدث خطأ في قبول الطلب');
+        }
+    };
+    
+    // ✅ جديد: فتح نافذة الإرسال (لإرسال الطلب لقسم معين)
+    const openSendModal = (lead, type) => {
         setSelectedLead(lead);
-        setShowAssignModal(true);    // فتح نافذة الاختيار
-    }
-};
-        
+        setAssignType(type);
+        setSelectedUserId('');
+        setShowAssignModal(true);
+    };
 
     const handleReject = async () => {
         if (!selectedLead || !rejectReason) {
@@ -368,6 +420,7 @@ const GeneralManagerDashboard = () => {
         }
     };
 
+    // ✅ التعديل 2: إرسال الطلب مع تسجيل القسم
     const handleAssign = async () => {
         if (!selectedLead || !selectedUserId) {
             toast.error('يرجى اختيار الطلب والمستخدم');
@@ -375,20 +428,40 @@ const GeneralManagerDashboard = () => {
         }
 
         try {
+            let assignedSection = '';
+            let apiCall = null;
+            
             if (assignType === 'executive') {
-                await adminAPI.assignToExecutive(selectedLead.id, selectedUserId, '');
-                toast.success('📨 تم إرسال الطلب للمدير التنفيذي');
+                apiCall = adminAPI.assignToExecutive(selectedLead.id, selectedUserId, '');
+                assignedSection = 'executive_manager';
             } else if (assignType === 'callcenter') {
-                await adminAPI.assignToCallCenter(selectedLead.id, selectedUserId, '');
-                toast.success('📞 تم إرسال الطلب لمركز الاتصال');
+                apiCall = adminAPI.assignToCallCenter(selectedLead.id, selectedUserId, '');
+                assignedSection = 'call_center';
             } else if (assignType === 'bank') {
-                await adminAPI.assignToBankManager(selectedLead.id, selectedUserId, null, '');
-                toast.success('🏦 تم إرسال الطلب لمدير البنك');
+                apiCall = adminAPI.assignToBankManager(selectedLead.id, selectedUserId, null, '');
+                assignedSection = 'bank_manager';
             } else if (assignType === 'leasing') {
-                await adminAPI.assignToLeasingManager(selectedLead.id, selectedUserId, null, '');
-                toast.success('🚗 تم إرسال الطلب لمدير التأجير');
+                apiCall = adminAPI.assignToLeasingManager(selectedLead.id, selectedUserId, null, '');
+                assignedSection = 'leasing_manager';
             }
             
+            await apiCall;
+            
+            // ✅ تحديث الأقسام المرسل إليها
+            const currentSections = selectedLead.assigned_sections || [];
+            if (!currentSections.includes(assignedSection)) {
+                currentSections.push(assignedSection);
+                await updateLeadSections(selectedLead.id, currentSections);
+                
+                // تحديث الـ lead في الـ state المحلي
+                setLeads(prevLeads => prevLeads.map(lead => 
+                    lead.id === selectedLead.id 
+                        ? { ...lead, assigned_sections: currentSections }
+                        : lead
+                ));
+            }
+            
+            toast.success(`📨 تم إرسال الطلب إلى ${getSectionName(assignType)}`);
             showNotificationMessage('تم إرسال الطلب بنجاح');
             setShowAssignModal(false);
             setSelectedLead(null);
@@ -399,6 +472,26 @@ const GeneralManagerDashboard = () => {
             console.error('Error assigning:', error);
             toast.error('حدث خطأ');
         }
+    };
+
+    const getSectionName = (type) => {
+        const names = {
+            executive: 'المدير التنفيذي',
+            callcenter: 'مركز الاتصال',
+            bank: 'مدير البنك',
+            leasing: 'مدير التأجير'
+        };
+        return names[type] || type;
+    };
+
+    const getSectionNameByRole = (role) => {
+        const names = {
+            executive_manager: 'المدير التنفيذي',
+            call_center: 'مركز الاتصال',
+            bank_manager: 'مدير البنك',
+            leasing_manager: 'مدير التأجير'
+        };
+        return names[role] || role;
     };
 
     const handleDeleteLead = async (leadId) => {
@@ -419,101 +512,92 @@ const GeneralManagerDashboard = () => {
     // User Management
     // =============================================
     const handleAddUser = async () => {
-    // 1. التحقق من الحقول الأساسية
-    if (!newUser.name || !newUser.email || !newUser.password) {
-        toast.error('❌ الاسم، البريد الإلكتروني، وكلمة المرور مطلوبة');
-        return;
-    }
-
-    // 2. التحقق من طول كلمة المرور (6 أحرف على الأقل)
-    if (newUser.password.length < 6) {
-        toast.error('❌ كلمة المرور يجب أن تكون 6 أحرف أو أكثر');
-        return;
-    }
-
-    // 3. التحقق من صيغة البريد الإلكتروني
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(newUser.email)) {
-        toast.error('❌ البريد الإلكتروني غير صحيح');
-        return;
-    }
-
-    let companyId = null;
-
-    // 4. إذا كان الدور "شركة"، نتحقق من اختيار الشركة من القائمة
-    if (newUser.role === 'company') {
-        if (!selectedCompanyId) {
-            toast.error('⚠️ يرجى اختيار الشركة من القائمة');
+        if (!newUser.name || !newUser.email || !newUser.password) {
+            toast.error('❌ الاسم، البريد الإلكتروني، وكلمة المرور مطلوبة');
             return;
         }
-        companyId = selectedCompanyId;
-    }
 
-    // 5. تجهيز البيانات للإرسال
-    const userData = {
-        name: newUser.name.trim(),
-        email: newUser.email.trim().toLowerCase(),
-        password: newUser.password,
-        role: newUser.role,
-        phone: newUser.phone?.trim() || '',
-        company_id: companyId
-    };
+        if (newUser.password.length < 6) {
+            toast.error('❌ كلمة المرور يجب أن تكون 6 أحرف أو أكثر');
+            return;
+        }
 
-    console.log('📤 Sending user data:', userData);
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(newUser.email)) {
+            toast.error('❌ البريد الإلكتروني غير صحيح');
+            return;
+        }
 
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('https://shamsi-tn.onrender.com/api/admin/users', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(userData)
-        });
+        let companyId = null;
 
-        const responseData = await response.json();
-        console.log('📥 Response status:', response.status);
-        console.log('📥 Response data:', responseData);
-
-        if (!response.ok) {
-            let errorMsg = 'حدث خطأ غير معروف';
-            if (responseData.message) errorMsg = responseData.message;
-            else if (responseData.error) errorMsg = responseData.error;
-            else if (typeof responseData === 'string') errorMsg = responseData;
-            
-            if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
-                toast.error('❌ هذا البريد الإلكتروني مستخدم بالفعل');
-            } else if (errorMsg.includes('password')) {
-                toast.error('❌ كلمة المرور غير مقبولة (يجب أن تكون 6 أحرف على الأقل)');
-            } else {
-                toast.error(`❌ فشل الإضافة: ${errorMsg}`);
+        if (newUser.role === 'company') {
+            if (!selectedCompanyId) {
+                toast.error('⚠️ يرجى اختيار الشركة من القائمة');
+                return;
             }
-            return;
+            companyId = selectedCompanyId;
         }
 
-        toast.success('✅ تم إضافة المستخدم بنجاح');
-        toast.success('📝 يمكن للمستخدم تسجيل الدخول الآن باستخدام البريد وكلمة المرور', { duration: 5000 });
-        
-        setShowUserModal(false);
-        setSelectedCompanyForUser(null);
-        setSelectedCompanyId('');
-        setNewUser({ 
-            name: '', 
-            email: '', 
-            password: '', 
-            role: 'executive_manager', 
-            phone: '', 
-            company_name: '' 
-        });
-        
-        fetchUsers();
-        
-    } catch (error) {
-        console.error('❌ Network error:', error);
-        toast.error('❌ خطأ في الاتصال بالخادم. تأكد من اتصالك بالإنترنت');
-    }
-};
+        const userData = {
+            name: newUser.name.trim(),
+            email: newUser.email.trim().toLowerCase(),
+            password: newUser.password,
+            role: newUser.role,
+            phone: newUser.phone?.trim() || '',
+            company_id: companyId
+        };
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('https://shamsi-tn.onrender.com/api/admin/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(userData)
+            });
+
+            const responseData = await response.json();
+
+            if (!response.ok) {
+                let errorMsg = 'حدث خطأ غير معروف';
+                if (responseData.message) errorMsg = responseData.message;
+                else if (responseData.error) errorMsg = responseData.error;
+                else if (typeof responseData === 'string') errorMsg = responseData;
+                
+                if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
+                    toast.error('❌ هذا البريد الإلكتروني مستخدم بالفعل');
+                } else if (errorMsg.includes('password')) {
+                    toast.error('❌ كلمة المرور غير مقبولة (يجب أن تكون 6 أحرف على الأقل)');
+                } else {
+                    toast.error(`❌ فشل الإضافة: ${errorMsg}`);
+                }
+                return;
+            }
+
+            toast.success('✅ تم إضافة المستخدم بنجاح');
+            toast.success('📝 يمكن للمستخدم تسجيل الدخول الآن', { duration: 5000 });
+            
+            setShowUserModal(false);
+            setSelectedCompanyForUser(null);
+            setSelectedCompanyId('');
+            setNewUser({ 
+                name: '', 
+                email: '', 
+                password: '', 
+                role: 'executive_manager', 
+                phone: '', 
+                company_name: '' 
+            });
+            
+            fetchUsers();
+            
+        } catch (error) {
+            console.error('❌ Network error:', error);
+            toast.error('❌ خطأ في الاتصال بالخادم');
+        }
+    };
 
     const handleDeleteUser = async (userId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟')) {
@@ -532,44 +616,43 @@ const GeneralManagerDashboard = () => {
     // Company Management
     // =============================================
     const handleAddCompany = async () => {
-    if (!newCompany.name || !newCompany.email) {
-        toast.error('يرجى إكمال الاسم والبريد الإلكتروني');
-        return;
-    }
-    
-    try {
-        const response = await adminAPI.addCompany({
-            name: newCompany.name,
-            email: newCompany.email,
-            phone: newCompany.phone || '',
-            address: newCompany.address || '',
-            contact_person: newCompany.contact_person || '',
-            description: newCompany.description || '',
-            rating: newCompany.rating || 0,
-            projects_count: newCompany.projects_count || 0,
-            established_year: newCompany.established_year || '',
-            license_number: newCompany.license_number || '',
-            website: newCompany.website || '',
-            logo: newCompany.logo || ''
-        });
+        if (!newCompany.name || !newCompany.email) {
+            toast.error('يرجى إكمال الاسم والبريد الإلكتروني');
+            return;
+        }
         
-        console.log('Company added:', response.data);
-        toast.success('✅ تم إضافة الشركة بنجاح');
-        
-        setShowCompanyModal(false);
-        setNewCompany({
-            name: '', email: '', phone: '', address: '', contact_person: '',
-            description: '', rating: 0, projects_count: 0, established_year: '',
-            license_number: '', website: '', logo: ''
-        });
-        fetchCompanies();
-        
-    } catch (error) {
-        console.error('Error adding company:', error);
-        const errorMsg = error.response?.data?.message || error.message;
-        toast.error(`❌ حدث خطأ: ${errorMsg}`);
-    }
-};
+        try {
+            const response = await adminAPI.addCompany({
+                name: newCompany.name,
+                email: newCompany.email,
+                phone: newCompany.phone || '',
+                address: newCompany.address || '',
+                contact_person: newCompany.contact_person || '',
+                description: newCompany.description || '',
+                rating: newCompany.rating || 0,
+                projects_count: newCompany.projects_count || 0,
+                established_year: newCompany.established_year || '',
+                license_number: newCompany.license_number || '',
+                website: newCompany.website || '',
+                logo: newCompany.logo || ''
+            });
+            
+            toast.success('✅ تم إضافة الشركة بنجاح');
+            
+            setShowCompanyModal(false);
+            setNewCompany({
+                name: '', email: '', phone: '', address: '', contact_person: '',
+                description: '', rating: 0, projects_count: 0, established_year: '',
+                license_number: '', website: '', logo: ''
+            });
+            fetchCompanies();
+            
+        } catch (error) {
+            console.error('Error adding company:', error);
+            const errorMsg = error.response?.data?.message || error.message;
+            toast.error(`❌ حدث خطأ: ${errorMsg}`);
+        }
+    };
 
     const handleDeleteCompany = async (companyId) => {
         if (window.confirm('⚠️ هل أنت متأكد من حذف هذه الشركة؟')) {
@@ -585,7 +668,6 @@ const GeneralManagerDashboard = () => {
         }
     };
 
-    // ✅ أيقونة 👤 تفتح نموذج إضافة مستخدم مع بيانات مملوءة
     const handleAddCompanyUserManually = (company) => {
         setNewUser({
             name: company.contact_person || company.name,
@@ -600,21 +682,15 @@ const GeneralManagerDashboard = () => {
         setShowUserModal(true);
     };
 
-    // قبول طلب شركة - فقط تغيير الحالة (بدون إنشاء)
     const handleApproveRequest = async (request) => {
         try {
             await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'تم قبول الطلب');
-            
             toast.success(`✅ تم قبول طلب الشركة: ${request.company_name}`);
-            toast.info('📌 يمكنك الآن إضافة الشركة والمستخدم يدوياً من تبويب "الشركات" و "المستخدمين"', {
-                duration: 5000
-            });
-            
+            toast.info('📌 يمكنك الآن إضافة الشركة والمستخدم يدوياً من تبويب "الشركات" و "المستخدمين"', { duration: 5000 });
             showNotificationMessage(`تم قبول طلب الشركة: ${request.company_name}`);
             fetchCompanyRequests();
             setShowRequestModal(false);
             setSelectedRequest(null);
-            
         } catch (error) {
             console.error('Error approving request:', error);
             toast.error(`❌ حدث خطأ: ${error.message}`);
@@ -757,7 +833,6 @@ const GeneralManagerDashboard = () => {
         return stars;
     };
 
-    // ✅ إصلاح إحصائيات القدرة ونسبة التحويل
     const getAdvancedStats = () => {
         const totalLeads = filteredLeads.length;
         const hotLeads = filteredLeads.filter(l => isHotLead(l)).length;
@@ -845,7 +920,7 @@ const GeneralManagerDashboard = () => {
                 </div>
             </div>
 
-            {/* Advanced Stats Cards - تم إصلاحها */}
+            {/* Advanced Stats Cards */}
             {activeTab === 'leads' && (
                 <div className="max-w-7xl mx-auto px-4 py-6">
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -909,165 +984,190 @@ const GeneralManagerDashboard = () => {
             )}
 
             {/* ============================================= */}
-{/* TAB 1: LEADS */}
-{/* ============================================= */}
-{activeTab === 'leads' && (
-    <div className="max-w-7xl mx-auto px-4">
-        {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="relative">
-                    <FaSearch className="absolute right-3 top-3 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="🔍 بحث بالاسم / الهاتف / المدينة..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                </div>
-                <div className="relative">
-                    <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
-                    <select
-                        value={cityFilter}
-                        onChange={(e) => setCityFilter(e.target.value)}
-                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
-                    >
-                        <option value="all">جميع المدن</option>
-                        {cities.map(city => (
-                            <option key={city} value={city}>{city}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="relative">
-                    <FaFire className="absolute right-3 top-3 text-gray-400" />
-                    <select
-                        value={priorityFilter}
-                        onChange={(e) => setPriorityFilter(e.target.value)}
-                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
-                    >
-                        <option value="all">جميع الأولويات</option>
-                        <option value="high">🔴 أولوية عالية</option>
-                        <option value="medium">🟡 أولوية متوسطة</option>
-                        <option value="low">🟢 أولوية منخفضة</option>
-                    </select>
-                </div>
-                <div className="relative">
-                    <FaFilter className="absolute right-3 top-3 text-gray-400" />
-                    <select
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                        className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
-                    >
-                        <option value="all">جميع الحالات</option>
-                        <option value="pending">قيد المراجعة</option>
-                        <option value="approved">موافق عليها</option>
-                        <option value="contacted">تم التواصل</option>
-                        <option value="sent_to_operations">مرسل لعمليات</option>
-                        <option value="assigned_to_company">مرسل لشركة</option>
-                        <option value="completed">مكتملة</option>
-                        <option value="cancelled">ملغية</option>
-                    </select>
-                </div>
-            </div>
-        </div>
+            {/* TAB 1: LEADS - المعدل */}
+            {/* ============================================= */}
+            {activeTab === 'leads' && (
+                <div className="max-w-7xl mx-auto px-4">
+                    {/* Search and Filters */}
+                    <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="relative">
+                                <FaSearch className="absolute right-3 top-3 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="🔍 بحث بالاسم / الهاتف / المدينة..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                            </div>
+                            <div className="relative">
+                                <FaMapMarkerAlt className="absolute right-3 top-3 text-gray-400" />
+                                <select
+                                    value={cityFilter}
+                                    onChange={(e) => setCityFilter(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                                >
+                                    <option value="all">جميع المدن</option>
+                                    {cities.map(city => (
+                                        <option key={city} value={city}>{city}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="relative">
+                                <FaFire className="absolute right-3 top-3 text-gray-400" />
+                                <select
+                                    value={priorityFilter}
+                                    onChange={(e) => setPriorityFilter(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                                >
+                                    <option value="all">جميع الأولويات</option>
+                                    <option value="high">🔴 أولوية عالية</option>
+                                    <option value="medium">🟡 أولوية متوسطة</option>
+                                    <option value="low">🟢 أولوية منخفضة</option>
+                                </select>
+                            </div>
+                            <div className="relative">
+                                <FaFilter className="absolute right-3 top-3 text-gray-400" />
+                                <select
+                                    value={filter}
+                                    onChange={(e) => setFilter(e.target.value)}
+                                    className="w-full pr-10 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
+                                >
+                                    <option value="all">جميع الحالات</option>
+                                    <option value="pending">قيد المراجعة</option>
+                                    <option value="approved">موافق عليها</option>
+                                    <option value="contacted">تم التواصل</option>
+                                    <option value="sent_to_operations">مرسل لعمليات</option>
+                                    <option value="assigned_to_company">مرسل لشركة</option>
+                                    <option value="completed">مكتملة</option>
+                                    <option value="cancelled">ملغية</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
 
-        {/* Leads Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">العميل</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المدينة</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الفاتورة</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">القدرة</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأولوية</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">التقدم</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredLeads.length === 0 ? (
-                            <tr>
-                                <td colSpan="8" className="px-4 py-8 text-center text-gray-500">لا توجد طلبات</td>
-                            </tr>
-                        ) : (
-                            filteredLeads.map((lead) => {
-                                const priority = getLeadPriority(lead);
-                                const hot = isHotLead(lead);
-                                const progress = getProgressPercentage(lead.status);
-                                return (
-                                    <tr key={lead.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium text-gray-900 flex items-center gap-2">
-                                                {lead.name}
-                                                {hot && (
-                                                    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                                                        <FaFire className="text-xs" /> HOT
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-sm text-gray-500">{lead.phone}</div>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                                priority.level === 'high' ? 'bg-red-100 text-red-800' :
-                                                priority.level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-green-100 text-green-800'
-                                            }`}>
-                                                {priority.level === 'high' && '🔴 عالية'}
-                                                {priority.level === 'medium' && '🟡 متوسطة'}
-                                                {priority.level === 'low' && '🟢 منخفضة'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="w-24">
-                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                                    <span>{progress}%</span>
-                                                </div>
-                                                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                                    <div 
-                                                        className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
-                                                        style={{ width: `${progress}%` }}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="flex gap-2">
-                                                {lead.status === 'pending' && (
-                                                    <>
-                                                        <button onClick={() => handleApprove(lead.id)} className="text-green-600 hover:text-green-800 p-1" title="موافقة"><FaCheck size={18} /></button>
-                                                        <button onClick={() => { setSelectedLead(lead); setShowRejectModal(true); }} className="text-red-600 hover:text-red-800 p-1" title="رفض"><FaTimes size={18} /></button>
-                                                    </>
-                                                )}
-                                                {lead.status === 'approved' && (
-                                                    <>
-                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('executive'); setShowAssignModal(true); }} className="text-purple-600 hover:text-purple-800 p-1" title="إرسال لمدير تنفيذي"><FaUserTie size={18} /></button>
-                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('callcenter'); setShowAssignModal(true); }} className="text-indigo-600 hover:text-indigo-800 p-1" title="إرسال لمركز الاتصال"><FaHeadset size={18} /></button>
-                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('bank'); setShowAssignModal(true); }} className="text-pink-600 hover:text-pink-800 p-1" title="إرسال لمدير بنك"><FaUniversity size={18} /></button>
-                                                        <button onClick={() => { setSelectedLead(lead); setAssignType('leasing'); setShowAssignModal(true); }} className="text-teal-600 hover:text-teal-800 p-1" title="إرسال لمدير تأجير"><FaCar size={18} /></button>
-                                                    </>
-                                                )}
-                                                <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
-                                            </div>
-                                        </td>
+                    {/* Leads Table */}
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">العميل</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المدينة</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الفاتورة</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">القدرة</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأولوية</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">التقدم</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأقسام المرسل إليها</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجراءات</th>
                                     </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-)}
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {filteredLeads.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="9" className="px-4 py-8 text-center text-gray-500">لا توجد طلبات</td>
+                                        </tr>
+                                    ) : (
+                                        filteredLeads.map((lead) => {
+                                            const priority = getLeadPriority(lead);
+                                            const hot = isHotLead(lead);
+                                            const progress = getProgressPercentage(lead.status);
+                                            return (
+                                                <tr key={lead.id} className="hover:bg-gray-50">
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-medium text-gray-900 flex items-center gap-2">
+                                                            {lead.name}
+                                                            {hot && (
+                                                                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                                    <FaFire className="text-xs" /> HOT
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500">{lead.phone}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">{lead.city}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">{lead.bill_amount} دينار</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">{lead.required_kw} kW</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                            priority.level === 'high' ? 'bg-red-100 text-red-800' :
+                                                            priority.level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                            'bg-green-100 text-green-800'
+                                                        }`}>
+                                                            {priority.level === 'high' && '🔴 عالية'}
+                                                            {priority.level === 'medium' && '🟡 متوسطة'}
+                                                            {priority.level === 'low' && '🟢 منخفضة'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <div className="w-24">
+                                                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                                <span>{progress}%</span>
+                                                            </div>
+                                                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                                <div 
+                                                                    className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                                                                    style={{ width: `${progress}%` }}
+                                                                ></div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
+                                                    {/* ✅ عرض الأقسام المرسل إليها */}
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <div className="flex gap-1">
+                                                            {lead.assigned_sections?.includes('executive_manager') && (
+                                                                <span className="bg-purple-100 text-purple-800 text-xs px-1.5 py-0.5 rounded" title="مدير تنفيذي">👔</span>
+                                                            )}
+                                                            {lead.assigned_sections?.includes('call_center') && (
+                                                                <span className="bg-indigo-100 text-indigo-800 text-xs px-1.5 py-0.5 rounded" title="مركز اتصال">📞</span>
+                                                            )}
+                                                            {lead.assigned_sections?.includes('bank_manager') && (
+                                                                <span className="bg-pink-100 text-pink-800 text-xs px-1.5 py-0.5 rounded" title="مدير بنك">🏦</span>
+                                                            )}
+                                                            {lead.assigned_sections?.includes('leasing_manager') && (
+                                                                <span className="bg-teal-100 text-teal-800 text-xs px-1.5 py-0.5 rounded" title="مدير تأجير">🚗</span>
+                                                            )}
+                                                            {(!lead.assigned_sections || lead.assigned_sections.length === 0) && (
+                                                                <span className="text-gray-400 text-xs">لم يرسل</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <div className="flex gap-2">
+                                                            {/* ✅ زر الموافقة - فقط للطلبات pending */}
+                                                            {lead.status === 'pending' && (
+                                                                <>
+                                                                    <button onClick={() => handleApprove(lead.id)} className="text-green-600 hover:text-green-800 p-1" title="موافقة"><FaCheck size={18} /></button>
+                                                                    <button onClick={() => { setSelectedLead(lead); setShowRejectModal(true); }} className="text-red-600 hover:text-red-800 p-1" title="رفض"><FaTimes size={18} /></button>
+                                                                </>
+                                                            )}
+                                                            {/* ✅ أزرار الإرسال - تظهر بعد الموافقة */}
+                                                            {lead.status === 'approved' && (
+                                                                <>
+                                                                    <button onClick={() => openSendModal(lead, 'executive')} className="text-purple-600 hover:text-purple-800 p-1" title="إرسال لمدير تنفيذي"><FaUserTie size={18} /></button>
+                                                                    <button onClick={() => openSendModal(lead, 'callcenter')} className="text-indigo-600 hover:text-indigo-800 p-1" title="إرسال لمركز الاتصال"><FaHeadset size={18} /></button>
+                                                                    <button onClick={() => openSendModal(lead, 'bank')} className="text-pink-600 hover:text-pink-800 p-1" title="إرسال لمدير بنك"><FaUniversity size={18} /></button>
+                                                                    <button onClick={() => openSendModal(lead, 'leasing')} className="text-teal-600 hover:text-teal-800 p-1" title="إرسال لمدير تأجير"><FaCar size={18} /></button>
+                                                                </>
+                                                            )}
+                                                            {/* ✅ زر العين لعرض مسار الطلب */}
+                                                            <button onClick={() => openFollowModal(lead)} className="text-blue-500 hover:text-blue-700 p-1" title="تتبع الطلب"><FaEye size={18} /></button>
+                                                            <button onClick={() => handleDeleteLead(lead.id)} className="text-gray-500 hover:text-red-600 p-1" title="حذف"><FaTrash size={18} /></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ============================================= */}
             {/* TAB 2: USERS MANAGEMENT */}
@@ -1096,7 +1196,6 @@ const GeneralManagerDashboard = () => {
                         </div>
                     </div>
                     
-                    {/* فلتر الأدوار */}
                     <div className="flex gap-2 mb-4">
                         <button
                             onClick={() => setUserRoleFilter('all')}
@@ -1513,7 +1612,100 @@ const GeneralManagerDashboard = () => {
                 </div>
             )}
 
-            {/* باقي المودالات (Request Details, Reject, Assign, Add User, Add Company) - نفس الكود السابق */}
+            {/* ============================================= */}
+            {/* ✅ نافذة تتبع الطلب (Follow Modal) */}
+            {/* ============================================= */}
+            {showFollowModal && followLead && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white p-4 border-b flex justify-between items-center">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <FaEye className="text-blue-500" />
+                                تتبع الطلب
+                            </h3>
+                            <button onClick={() => setShowFollowModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <FaTimes size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6">
+                            {/* معلومات العميل */}
+                            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                                <h4 className="font-semibold text-gray-700 mb-2">معلومات العميل</h4>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <span className="text-gray-500">الاسم:</span>
+                                        <p className="font-medium">{followLead.name}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">الهاتف:</span>
+                                        <p className="font-medium" dir="ltr">{followLead.phone}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">المدينة:</span>
+                                        <p className="font-medium">{followLead.city}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">تاريخ الطلب:</span>
+                                        <p className="font-medium">{new Date(followLead.created_at).toLocaleDateString('ar-TN')}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* مسار الطلب */}
+                            <h4 className="font-semibold text-gray-700 mb-3">مسار الطلب</h4>
+                            <div className="space-y-3">
+                                {/* الخطوة 1: إنشاء الطلب */}
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                        <FaCheckCircle size={16} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-gray-800">تم إنشاء الطلب</p>
+                                        <p className="text-xs text-gray-500">{new Date(followLead.created_at).toLocaleString('ar-TN')}</p>
+                                    </div>
+                                </div>
+                                
+                                {/* ✅ عرض الأقسام المرسل إليها */}
+                                {followLead.assigned_sections && followLead.assigned_sections.length > 0 ? (
+                                    followLead.assigned_sections.map((section, index) => (
+                                        <div key={index} className="flex items-start gap-3">
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                                <FaPaperPlane size={16} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-medium text-gray-800">
+                                                    تم الإرسال إلى {getSectionNameByRole(section)}
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    {followLead.updated_at ? new Date(followLead.updated_at).toLocaleString('ar-TN') : 'تاريخ غير متوفر'}
+                                                </p>
+                                                <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                                                    في انتظار المعالجة
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center text-gray-500 py-4">
+                                        لم يتم إرسال الطلب لأي قسم بعد
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="sticky bottom-0 bg-gray-50 p-4 border-t">
+                            <button
+                                onClick={() => setShowFollowModal(false)}
+                                className="w-full bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                            >
+                                إغلاق
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ============================================= */}
             {/* Request Details Modal */}
             {/* ============================================= */}
@@ -1635,9 +1827,9 @@ const GeneralManagerDashboard = () => {
             )}
 
             {/* ============================================= */}
-            {/* Assign Modal */}
+            {/* Assign Modal - المعدلة */}
             {/* ============================================= */}
-            {showAssignModal && (
+            {showAssignModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                         <h3 className="text-xl font-bold mb-4">
@@ -1646,32 +1838,32 @@ const GeneralManagerDashboard = () => {
                             {assignType === 'bank' && '🏦 إرسال الطلب لمدير بنك'}
                             {assignType === 'leasing' && '🚗 إرسال الطلب لمدير تأجير'}
                         </h3>
-                        <p className="text-gray-600 mb-4">العميل: <span className="font-semibold">{selectedLead?.name}</span></p>
+                        <p className="text-gray-600 mb-4">العميل: <span className="font-semibold">{selectedLead.name}</span></p>
                         <label className="block text-gray-700 mb-2">اختر المستخدم:</label>
-<select
-    onChange={(e) => setSelectedUserId(e.target.value)}
-    className="w-full px-4 py-2 border rounded-lg mb-4"
-    value={selectedUserId}
->
-    <option value="">-- اختر --</option>
-    {users
-        .filter(u => {
-            if (assignType === 'executive') return u.role === 'executive_manager';
-            if (assignType === 'callcenter') return u.role === 'call_center';
-            if (assignType === 'bank') return u.role === 'bank_manager';
-            if (assignType === 'leasing') return u.role === 'leasing_manager';
-            return false;
-        })
-        .map((user) => (
-            <option key={user.id} value={user.id}>
-                {user.name} - {user.role === 'executive_manager' ? 'مدير تنفيذي' :
-                              user.role === 'call_center' ? 'مركز اتصال' :
-                              user.role === 'bank_manager' ? 'مدير بنك' :
-                              user.role === 'leasing_manager' ? 'مدير تأجير' : user.role}
-                {' '}({user.email})
-            </option>
-        ))}
-</select>
+                        <select
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg mb-4"
+                            value={selectedUserId}
+                        >
+                            <option value="">-- اختر --</option>
+                            {users
+                                .filter(u => {
+                                    if (assignType === 'executive') return u.role === 'executive_manager';
+                                    if (assignType === 'callcenter') return u.role === 'call_center';
+                                    if (assignType === 'bank') return u.role === 'bank_manager';
+                                    if (assignType === 'leasing') return u.role === 'leasing_manager';
+                                    return false;
+                                })
+                                .map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name} - {user.role === 'executive_manager' ? 'مدير تنفيذي' :
+                                                      user.role === 'call_center' ? 'مركز اتصال' :
+                                                      user.role === 'bank_manager' ? 'مدير بنك' :
+                                                      user.role === 'leasing_manager' ? 'مدير تأجير' : user.role}
+                                        {' '}({user.email})
+                                    </option>
+                                ))}
+                        </select>
                         <div className="flex gap-3">
                             <button onClick={handleAssign} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">إرسال</button>
                             <button onClick={() => { setShowAssignModal(false); setSelectedLead(null); setSelectedUserId(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">إلغاء</button>
@@ -1735,7 +1927,6 @@ const GeneralManagerDashboard = () => {
                                     <option value="company">شركة</option>
                                 </select>
                             </div>
-                            {/* ✅ إضافة قائمة منسدلة لاختيار الشركة عند اختيار دور company */}
                             {newUser.role === 'company' && (
                                 <div>
                                     <label className="block text-gray-700 mb-1">اختر الشركة *</label>
@@ -1863,7 +2054,7 @@ const GeneralManagerDashboard = () => {
                                 <input
                                     type="number"
                                     value={newCompany.projects_count}
-                                    onChange={(e) => setNewCompany({...newCompany, projects_count: e.target.value})}
+                                    onChange={(e) => setNewCompany({...newCompany, projects_count: parseInt(e.target.value) || 0})}
                                     className="w-full px-4 py-2 border rounded-lg"
                                     placeholder="مثال: 120"
                                 />
