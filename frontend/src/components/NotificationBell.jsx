@@ -8,29 +8,27 @@ const NotificationBell = () => {
     const [showDropdown, setShowDropdown] = useState(false);
     const previousUnreadCount = useRef(0);
     const audioRef = useRef(null);
+    const [audioInitialized, setAudioInitialized] = useState(false);
 
-    // تحميل الصوت - استخدام رابط مضمون
-    useEffect(() => {
-        // إنشاء عنصر صوت جديد
-        const audio = new Audio();
-        audio.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3';
-        audio.load();
-        audioRef.current = audio;
-        
-        console.log('🔊 Audio loaded successfully');
-    }, []);
+    // تهيئة الصوت عند أول تفاعل من المستخدم
+    const initAudio = () => {
+        if (!audioInitialized) {
+            const audio = new Audio();
+            audio.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3';
+            audio.load();
+            audioRef.current = audio;
+            setAudioInitialized(true);
+            console.log('🔊 Audio initialized');
+        }
+    };
 
     const playSound = () => {
-        if (audioRef.current) {
-            // إعادة تعيين الوقت إلى البداية
+        if (audioRef.current && audioInitialized) {
             audioRef.current.currentTime = 0;
             audioRef.current.play().then(() => {
                 console.log('🔊 Sound played successfully');
             }).catch(err => {
                 console.log('Audio play failed:', err);
-                // محاولة بديلة - استخدام عنصر صوت مؤقت
-                const tempAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-                tempAudio.play().catch(e => console.log('Temp audio also failed:', e));
             });
         }
     };
@@ -45,8 +43,7 @@ const NotificationBell = () => {
             
             console.log(`Previous: ${previousUnreadCount.current}, New: ${newUnreadCount}`);
             
-            // تشغيل الصوت عند وجود إشعارات جديدة غير مقروءة
-            if (newUnreadCount > previousUnreadCount.current) {
+            if (newUnreadCount > previousUnreadCount.current && audioInitialized) {
                 console.log('🔔 New notification! Playing sound...');
                 playSound();
             }
@@ -77,13 +74,14 @@ const NotificationBell = () => {
         }
     };
 
+    // جلب الإشعارات
     useEffect(() => {
         if (localStorage.getItem('token')) {
             fetchNotifications();
             const interval = setInterval(fetchNotifications, 15000);
             return () => clearInterval(interval);
         }
-    }, []);
+    }, [audioInitialized]);
 
     const getTypeColor = (type) => {
         switch(type) {
@@ -101,7 +99,10 @@ const NotificationBell = () => {
     return (
         <div className="relative">
             <button
-                onClick={() => setShowDropdown(!showDropdown)}
+                onClick={() => {
+                    initAudio(); // تهيئة الصوت عند أول نقرة
+                    setShowDropdown(!showDropdown);
+                }}
                 className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
             >
                 <FaBell size={20} />
