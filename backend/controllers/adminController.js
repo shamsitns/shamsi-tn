@@ -206,7 +206,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
     try {
-        const { name, email, password, role, phone, company_id } = req.body; // ✅ أضف company_id
+        const { name, email, password, role, phone, company_id } = req.body;
 
         const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
         if (getRows(existing).length > 0) {
@@ -318,7 +318,6 @@ exports.rejectLead = async (req, res) => {
 // تعيين الطلبات
 // =============================================
 
-// ✅ تعيين طلب للمدير التنفيذي (يستخدم ID المستلم من الواجهة)
 // تعيين طلب لمدير تنفيذي
 exports.assignToExecutive = async (req, res) => {
     try {
@@ -347,7 +346,7 @@ exports.assignToExecutive = async (req, res) => {
             return res.status(404).json({ message: 'المدير التنفيذي غير موجود' });
         }
         
-        // ✅ تحديث الطلب: فقط للمدير التنفيذي
+        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET assigned_to = $1,
@@ -357,14 +356,32 @@ exports.assignToExecutive = async (req, res) => {
             [executiveId, leadId]
         );
         
-        // ✅ تعليق أو حذف هذا الجزء (الإدراج في lead_assignments)
-        // await db.query(
-        //     `INSERT INTO lead_assignments (lead_id, assigned_to, assigned_by, notes, assigned_at)
-        //      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-        //     [leadId, executiveId, adminId, notes || null]
-        // );
-        
         console.log(`✅ Lead ${leadId} assigned to executive ${executive.name} (ID: ${executiveId})`);
+        
+        // ✅ إرسال إشعار للمدير التنفيذي
+        try {
+            const { sendNotification, sendNotificationToRole } = require('../utils/notifications');
+            
+            await sendNotification(
+                executiveId,
+                leadId,
+                '📨 طلب معين لك',
+                `تم تعيين طلب جديد من ${lead.name} إليك للمراجعة`,
+                'info'
+            );
+            
+            await sendNotificationToRole(
+                'general_manager',
+                leadId,
+                '✅ تم تعيين طلب',
+                `تم تعيين الطلب رقم ${leadId} للمدير التنفيذي ${executive.name}`,
+                'success'
+            );
+            
+            console.log(`✅ Notifications sent for assignment`);
+        } catch (notifError) {
+            console.error('❌ Error sending assignment notifications:', notifError);
+        }
         
         res.json({
             message: `تم تعيين الطلب للمدير التنفيذي: ${executive.name}`,
@@ -544,7 +561,6 @@ exports.getAllCompanies = async (req, res) => {
     }
 };
 
-// ✅ دالة addCompany (لا تنشئ مستخدم - المدير العام يضيف المستخدم يدوياً)
 exports.addCompany = async (req, res) => {
     try {
         const { name, email, phone, address, contact_person, projects_count, description, website, logo } = req.body;
@@ -553,18 +569,16 @@ exports.addCompany = async (req, res) => {
             return res.status(400).json({ message: 'الاسم والبريد الإلكتروني مطلوبان' });
         }
         
-        // التحقق من عدم وجود الشركة مسبقاً
         const existing = await db.query('SELECT id FROM companies WHERE email = $1', [email]);
         if (getRows(existing).length > 0) {
             return res.status(400).json({ message: 'البريد الإلكتروني موجود مسبقاً' });
         }
         
-        // ✅ إضافة الشركة فقط (بدون إنشاء مستخدم)
         const result = await db.query(`
-    INSERT INTO companies (name, email, phone, address, contact_person, projects_count, description, website, logo, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
-    RETURNING id
-`, [name, email, phone || null, address || null, contact_person || null, projects_count || 0, description || null, website || null, logo || null]);
+            INSERT INTO companies (name, email, phone, address, contact_person, projects_count, description, website, logo, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+            RETURNING id
+        `, [name, email, phone || null, address || null, contact_person || null, projects_count || 0, description || null, website || null, logo || null]);
         
         const companyId = result.rows[0].id;
         
@@ -644,7 +658,7 @@ exports.getCommissionStats = async (req, res) => {
 };
 
 // =============================================
-// جلب تفاصيل طلب محددp
+// جلب تفاصيل طلب محدد
 // =============================================
 exports.getLeadById = async (req, res) => {
     try {

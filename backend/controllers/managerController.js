@@ -38,23 +38,24 @@ exports.getMyLeads = async (req, res) => {
         }
         
         // ✅ لمركز الاتصال: فقط الطلبات التي حالتها pending أو contacted
-if (role === 'call_center') {
-    if (!status || status === 'all') {
-        query += ` AND l.status IN ('pending', 'contacted')`;
-    }
-} 
-// ✅ للمدير التنفيذي: الطلبات المعينة له
-else if (role === 'executive_manager') {
-    query += ` AND l.assigned_to = $${paramIndex}`;
-    queryParams.push(managerId);
-    paramIndex++;
-}
-// ✅ لمدير العمليات
-else if (role === 'operations_manager') {
-    query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
-    queryParams.push(managerId);
-   paramIndex++;
-}
+        if (role === 'call_center') {
+            if (!status || status === 'all') {
+                query += ` AND l.status IN ('pending', 'contacted')`;
+            }
+        } 
+        // ✅ للمدير التنفيذي: الطلبات المعينة له
+        else if (role === 'executive_manager') {
+            query += ` AND l.assigned_to = $${paramIndex}`;
+            queryParams.push(managerId);
+            paramIndex++;
+        }
+        // ✅ لمدير العمليات
+        else if (role === 'operations_manager') {
+            query += ` AND (l.assigned_to = $${paramIndex} OR l.created_by = $${paramIndex})`;
+            queryParams.push(managerId);
+            paramIndex++;
+        }
+        
         query += ` ORDER BY l.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
         queryParams.push(parseInt(limit), parseInt(offset));
         
@@ -366,6 +367,31 @@ exports.sendToOperationsManager = async (req, res) => {
         }
         
         console.log(`✅ Lead ${leadId} sent to operations manager (ID: ${opsManagerId})`);
+        
+        // ✅ إرسال إشعار لمدير العمليات
+        try {
+            const { sendNotification, sendNotificationToRole } = require('../utils/notifications');
+            
+            await sendNotification(
+                opsManagerId,
+                leadId,
+                '⚙️ طلب وارد',
+                `تم إرسال طلب جديد من ${lead.name} إليك للمعالجة`,
+                'info'
+            );
+            
+            await sendNotificationToRole(
+                'executive_manager',
+                leadId,
+                '📤 تم إرسال طلب',
+                `تم إرسال الطلب رقم ${leadId} إلى مدير العمليات`,
+                'success'
+            );
+            
+            console.log(`✅ Notifications sent for sending to operations`);
+        } catch (notifError) {
+            console.error('❌ Error sending notifications:', notifError);
+        }
         
         // حساب العمولة
         const commission = lead.commission_amount || (lead.required_kw * 150);
