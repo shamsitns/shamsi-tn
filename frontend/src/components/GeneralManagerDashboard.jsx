@@ -144,43 +144,49 @@ const GeneralManagerDashboard = () => {
     };
 
     const fetchLeads = async () => {
-        setLoading(true);
-        try {
-            const params = filter !== 'all' ? { status: filter } : {};
-            const token = localStorage.getItem('token');
-            const queryString = new URLSearchParams(params).toString();
-            const url = `https://shamsi-tn.onrender.com/api/admin/leads${queryString ? `?${queryString}` : ''}`;
-            
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            const data = await response.json();
-            const leadsData = data.leads || [];
-            
-            // ✅ جلب assigned_sections من كل طلب
-            const leadsWithSections = await Promise.all(leadsData.map(async (lead) => {
-                try {
-                    const followRes = await fetch(`https://shamsi-tn.onrender.com/api/admin/leads/${lead.id}/follow`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const followData = await followRes.json();
-                    return { ...lead, assigned_sections: followData.sections || [] };
-                } catch {
-                    return { ...lead, assigned_sections: [] };
-                }
-            }));
-            
-            setLeads(leadsWithSections);
-            const uniqueCities = [...new Set(leadsWithSections.map(lead => lead.city).filter(Boolean))];
-            setCities(uniqueCities);
-        } catch (error) {
-            console.error('Error fetching leads:', error);
-            toast.error('حدث خطأ في جلب البيانات');
-        } finally {
-            setLoading(false);
+    setLoading(true);
+    try {
+        const token = localStorage.getItem('token');
+        
+        // ✅ استخدم المسار الجديد leads-with-sections
+        let url = `https://shamsi-tn.onrender.com/api/admin/leads-with-sections`;
+        
+        // أضف فلتر الحالة إذا كان موجود
+        if (filter !== 'all') {
+            url += `?status=${filter}`;
         }
-    };
+        
+        console.log('📊 Fetching leads from:', url);
+        
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await response.json();
+        console.log('📊 Response:', data);
+        
+        // ✅ البيانات تأتي مع assigned_sections جاهزة
+        const leadsData = data.leads || [];
+        
+        console.log('✅ Leads with sections:', leadsData.map(l => ({
+            id: l.id,
+            name: l.name,
+            sections: l.assigned_sections
+        })));
+        
+        setLeads(leadsData);
+        
+        // استخراج المدن الفريدة للفلتر
+        const uniqueCities = [...new Set(leadsData.map(lead => lead.city).filter(Boolean))];
+        setCities(uniqueCities);
+        
+    } catch (error) {
+        console.error('❌ Error fetching leads:', error);
+        toast.error('حدث خطأ في جلب البيانات');
+    } finally {
+        setLoading(false);
+    }
+};
 
     const fetchUsers = async () => {
         try {
