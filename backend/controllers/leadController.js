@@ -128,10 +128,9 @@ exports.createLead = async (req, res) => {
             preferred_bank,
             panel_type,
             additional_info,
-            // ✅ الحقول الجديدة من الحاسبة
             roof_type,
             installation_timeline,
-            required_kw,          // من الحاسبة (قد يختلف عن solarData.required_kw)
+            required_kw,
             panels_count,
             annual_production,
             annual_savings,
@@ -139,7 +138,6 @@ exports.createLead = async (req, res) => {
             co2_saved,
             solar_score,
             coverage_percent,
-            // ✅ صورة الفاتورة
             invoiceImage
         } = req.body;
         
@@ -153,7 +151,6 @@ exports.createLead = async (req, res) => {
             });
         }
         
-        // حساب النظام باستخدام الخادم (كاحتياطي، لكننا سنستخدم القيم المرسلة إذا وجدت)
         const solarData = calculateSolarSystem(
             parseFloat(bill_amount),
             parseInt(bill_period_months) || 60,
@@ -161,7 +158,6 @@ exports.createLead = async (req, res) => {
             property_type || 'house'
         );
         
-        // استخدام القيم المرسلة من الحاسبة إذا كانت موجودة، وإلا استخدم القيم المحسوبة من الخادم
         const finalRequiredKw = required_kw !== undefined ? required_kw : solarData.required_kw;
         const finalPanelsCount = panels_count !== undefined ? panels_count : solarData.panels_count;
         const finalAnnualProduction = annual_production !== undefined ? annual_production : solarData.annual_production;
@@ -182,7 +178,6 @@ exports.createLead = async (req, res) => {
             meter_number: meter_number
         });
         
-        // ✅ رفع صورة الفاتورة إلى ImageKit إذا وجدت
         let invoiceImageUrl = null;
         let invoiceImageFileId = null;
         
@@ -205,7 +200,6 @@ exports.createLead = async (req, res) => {
                 console.log(`✅ Invoice image uploaded: ${invoiceImageUrl}`);
             } else {
                 console.error('❌ Failed to upload invoice image:', uploadResult.error);
-                // لا نمنع إنشاء الطلب إذا فشل رفع الصورة، فقط نسجل الخطأ
             }
         }
         
@@ -225,7 +219,6 @@ exports.createLead = async (req, res) => {
         
         console.log(`📊 Lead data: ${name}, ${phone}, KW: ${finalRequiredKw}, Score: ${leadScore}`);
         
-        // ✅ INSERT مع جميع الأعمدة (بما فيها أعمدة الصور)
         const query = `
             INSERT INTO leads (
                 name, phone, city, property_type, 
@@ -296,6 +289,30 @@ exports.createLead = async (req, res) => {
         console.log(`   ⏱️ Installation timeline: ${installation_timeline || 'غير محدد'}`);
         console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         
+        // ✅ ✅ ✅ إضافة إشعارات عند إنشاء طلب جديد ✅ ✅ ✅
+        try {
+            const dbNotif = require('../config/database').getDb();
+            
+            // إشعار للمدير العام (ID: 19)
+            await dbNotif.query(
+                `INSERT INTO notifications (user_id, lead_id, title, message, type, created_at)
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                [19, leadId, '📋 طلب جديد', `طلب جديد من ${name} (${phone}) في انتظار المراجعة`, 'info']
+            );
+            console.log(`✅ GM notification inserted for lead ${leadId}`);
+            
+            // إشعار للمدير التنفيذي (ID: 26)
+            await dbNotif.query(
+                `INSERT INTO notifications (user_id, lead_id, title, message, type, created_at)
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                [26, leadId, '📋 طلب جديد', `طلب جديد من ${name} (${phone}) في انتظار المراجعة`, 'info']
+            );
+            console.log(`✅ Executive notification inserted for lead ${leadId}`);
+            
+        } catch (notifError) {
+            console.error('❌ Error sending notifications:', notifError);
+        }
+        
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
             leadId: leadId,
@@ -327,7 +344,6 @@ exports.deleteLead = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // جلب معلومات الصورة قبل حذف الطلب
         const leadResult = await db.query(
             'SELECT invoice_image_file_id FROM leads WHERE id = $1',
             [id]
@@ -338,7 +354,6 @@ exports.deleteLead = async (req, res) => {
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        // حذف الصورة من ImageKit إذا وجدت
         if (lead.invoice_image_file_id) {
             const deleteResult = await deleteImage(lead.invoice_image_file_id);
             if (deleteResult.success) {
@@ -348,7 +363,6 @@ exports.deleteLead = async (req, res) => {
             }
         }
         
-        // حذف الطلب من قاعدة البيانات
         await db.query('DELETE FROM leads WHERE id = $1', [id]);
         
         console.log(`✅ Lead ${id} deleted successfully`);
