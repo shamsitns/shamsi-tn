@@ -224,33 +224,29 @@ app.post(`${API_PREFIX}/leads`, async (req, res) => {
         console.log(`   🖼️ Invoice image: ${invoiceImageUrl ? 'تم الرفع' : 'لا توجد صورة'}`);
         console.log(`   💰 Commission: ${commissionAmount} DT`);
         
-        // ✅ إرسال إشعارات للمدير العام والمدير التنفيذي
-try {
-    const { sendNotification, sendNotificationToRole } = require('./utils/notifications');
-    
-    // إرسال إشعار مباشر للمدير العام (ID: 19)
-    const result1 = await sendNotification(
-        19,
-        leadId,
-        '📋 طلب جديد',
-        `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
-        'info'
-    );
-    console.log(`✅ Direct notification sent to GM (ID: 19), result: ${result1}`);
-    
-    // إرسال إشعار للمدير التنفيذي (ID: 26)
-    const result2 = await sendNotification(
-        26,
-        leadId,
-        '📋 طلب جديد',
-        `طلب جديد من ${name} (${phone}) في انتظار المراجعة`,
-        'info'
-    );
-    console.log(`✅ Direct notification sent to Executive (ID: 26), result: ${result2}`);
-    
-} catch (notifError) {
-    console.error('❌ Error sending notifications:', notifError);
-}
+        // ✅ إضافة إشعارات مباشرة باستخدام SQL
+        try {
+            const dbInsert = getDb();
+            
+            // إشعار للمدير العام (ID: 19)
+            await dbInsert.query(
+                `INSERT INTO notifications (user_id, lead_id, title, message, type, created_at)
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                [19, leadId, '📋 طلب جديد', `طلب جديد من ${name} (${phone}) في انتظار المراجعة`, 'info']
+            );
+            console.log(`✅ SQL notification sent to GM (ID:19)`);
+            
+            // إشعار للمدير التنفيذي (ID: 26)
+            await dbInsert.query(
+                `INSERT INTO notifications (user_id, lead_id, title, message, type, created_at)
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+                [26, leadId, '📋 طلب جديد', `طلب جديد من ${name} (${phone}) في انتظار المراجعة`, 'info']
+            );
+            console.log(`✅ SQL notification sent to Executive (ID:26)`);
+            
+        } catch (notifError) {
+            console.error('❌ Error sending SQL notifications:', notifError);
+        }
         
         res.status(201).json({
             message: 'تم إرسال الطلب بنجاح',
@@ -625,7 +621,7 @@ const startServer = async () => {
     📝 Request ID: Enabled
     ✅ Company Requests API: Enabled (/api/company-requests)
     ✅ POST /api/leads: Enabled (for lead creation with images)
-    ✅ Notification System: Enabled (with direct GM notifications)
+    ✅ Notification System: Enabled with direct SQL inserts
     ════════════════════════════════════════════════════════
             `);
         });
