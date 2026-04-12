@@ -10,7 +10,6 @@ const NotificationBell = () => {
     const audioRef = useRef(null);
     const [audioInitialized, setAudioInitialized] = useState(false);
 
-    // تهيئة الصوت عند أول تفاعل من المستخدم
     const initAudio = () => {
         if (!audioInitialized) {
             const audio = new Audio();
@@ -25,16 +24,13 @@ const NotificationBell = () => {
     const playSound = () => {
         if (audioRef.current && audioInitialized) {
             audioRef.current.currentTime = 0;
-            audioRef.current.play().then(() => {
-                console.log('🔊 Sound played successfully');
-            }).catch(err => {
-                console.log('Audio play failed:', err);
-            });
+            audioRef.current.play().catch(err => console.log('Audio play failed:', err));
         }
     };
 
     const fetchNotifications = async () => {
         try {
+            console.log('🔍 Fetching notifications...');
             const response = await api.get('/notifications');
             console.log('📬 Notifications response:', response.data);
             
@@ -74,11 +70,11 @@ const NotificationBell = () => {
         }
     };
 
-    // جلب الإشعارات
+    // جلب الإشعارات كل 5 ثوانٍ (للاختبار)
     useEffect(() => {
         if (localStorage.getItem('token')) {
             fetchNotifications();
-            const interval = setInterval(fetchNotifications, 15000);
+            const interval = setInterval(fetchNotifications, 5000);
             return () => clearInterval(interval);
         }
     }, [audioInitialized]);
@@ -100,7 +96,7 @@ const NotificationBell = () => {
         <div className="relative">
             <button
                 onClick={() => {
-                    initAudio(); // تهيئة الصوت عند أول نقرة
+                    initAudio();
                     setShowDropdown(!showDropdown);
                 }}
                 className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
@@ -108,25 +104,19 @@ const NotificationBell = () => {
                 <FaBell size={20} />
                 {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
-                        {unreadCount > 9 ? '9+' : unreadCount}
+                        {unreadCount}
                     </span>
                 )}
             </button>
 
             {showDropdown && (
                 <>
-                    <div 
-                        className="fixed inset-0 z-40" 
-                        onClick={() => setShowDropdown(false)}
-                    />
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
                     <div className="absolute left-0 mt-2 w-80 bg-white rounded-lg shadow-xl z-50">
                         <div className="p-3 border-b flex justify-between items-center">
                             <h3 className="font-semibold text-gray-800">الإشعارات</h3>
                             {unreadCount > 0 && (
-                                <button
-                                    onClick={markAllAsRead}
-                                    className="text-xs text-blue-500 hover:text-blue-700"
-                                >
+                                <button onClick={markAllAsRead} className="text-xs text-blue-500 hover:text-blue-700">
                                     تحديد الكل كمقروء
                                 </button>
                             )}
@@ -134,9 +124,7 @@ const NotificationBell = () => {
                         
                         <div className="max-h-96 overflow-y-auto">
                             {notifications.length === 0 ? (
-                                <div className="p-4 text-center text-gray-500">
-                                    لا توجد إشعارات
-                                </div>
+                                <div className="p-4 text-center text-gray-500">لا توجد إشعارات</div>
                             ) : (
                                 notifications.map(notif => (
                                     <div
