@@ -277,41 +277,49 @@ exports.getAvailableCompanies = async (req, res) => {
 };
 
 // =============================================
-// إرسال الطلب لمدير العمليات (للمدير التنفيذي)
+// إرسال الطلب لمدير العمليات (للمدير التنفيذي أو مركز الاتصال)
 // =============================================
 exports.sendToOperationsManager = async (req, res) => {
-    console.log('🚀🔴🔴 sendToOperationsManager FUNCTION IS CALLED! 🔴🔴🚀');
+    console.log('🚀 sendToOperationsManager FUNCTION IS CALLED!');
     console.log('📝 req.params:', req.params);
     console.log('📝 req.body:', req.body);
     console.log('👤 req.user:', req.user);
     
     try {
-        const leadId = req.params.id;
-        const { notes } = req.body;
-        const executiveId = req.user.id;
+        const leadId = req.params.id || req.params.leadId;
+        const { notes, operations_manager_id } = req.body;
+        const userId = req.user.id;
+        const userRole = req.user.role;
         
-        console.log(`📤 Executive ${executiveId} sending lead ${leadId} to operations manager`);
+        console.log(`📤 User ${userId} (${userRole}) sending lead ${leadId} to operations manager`);
         
+        // التحقق من وجود الطلب
         const resultLead = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
         const lead = getFirstRow(resultLead);
+        
         if (!lead) {
             console.log('❌ Lead not found:', leadId);
             return res.status(404).json({ message: 'الطلب غير موجود' });
         }
         
-        const opsResult = await db.query(
-            'SELECT id, name FROM users WHERE role = $1 AND is_active = true LIMIT 1',
-            ['operations_manager']
-        );
-        const operationsManager = getFirstRow(opsResult);
+        // تحديد مدير العمليات
+        let opsManagerId = operations_manager_id;
         
-        if (!operationsManager) {
+        if (!opsManagerId) {
+            const opsResult = await db.query(
+                'SELECT id FROM users WHERE role = $1 AND is_active = true LIMIT 1',
+                ['operations_manager']
+            );
+            const opsManager = getFirstRow(opsResult);
+            opsManagerId = opsManager?.id;
+        }
+        
+        if (!opsManagerId) {
             console.log('❌ No operations manager available');
             return res.status(404).json({ message: 'لا يوجد مدير عمليات متاح' });
         }
         
-        const commission = lead.commission_amount || (lead.required_kw * 150);
-        
+        // تحديث الطلب
         await db.query(
             `UPDATE leads 
              SET status = 'sent_to_operations', 
@@ -320,22 +328,37 @@ exports.sendToOperationsManager = async (req, res) => {
                  sent_to_operations_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP 
              WHERE id = $3`,
-            [operationsManager.id, executiveId, leadId]
+            [opsManagerId, userId, leadId]
         );
         
-        console.log(`✅ Lead ${leadId} sent to operations manager ${operationsManager.name} with commission ${commission}`);
+        // إضافة ملاحظات إذا وجدت
+        if (notes) {
+            await db.query(
+                `UPDATE leads 
+                 SET notes = COALESCE(notes, '') || '\n' || $1
+                 WHERE id = $2`,
+                [`[${new Date().toISOString()}] ${userRole === 'call_center' ? 'مركز الاتصال' : 'المدير التنفيذي'}: ${notes}`, leadId]
+            );
+        }
+        
+        console.log(`✅ Lead ${leadId} sent to operations manager (ID: ${opsManagerId})`);
+        
+        // حساب العمولة
+        const commission = lead.commission_amount || (lead.required_kw * 150);
         
         return res.status(200).json({ 
-            message: `تم إرسال الطلب لمدير العمليات (العمولة: ${commission} دينار)`,
+            message: 'تم إرسال الطلب لمدير العمليات بنجاح',
             leadId: parseInt(leadId),
             commission: commission,
-            operationsManagerId: operationsManager.id,
-            operationsManagerName: operationsManager.name
+            operationsManagerId: opsManagerId
         });
         
     } catch (error) {
         console.error('❌ Error sending to operations:', error);
-        return res.status(500).json({ message: 'حدث خطأ في إرسال الطلب لمدير العمليات', error: error.message });
+        return res.status(500).json({ 
+            message: 'حدث خطأ في إرسال الطلب لمدير العمليات', 
+            error: error.message 
+        });
     }
 };
 
