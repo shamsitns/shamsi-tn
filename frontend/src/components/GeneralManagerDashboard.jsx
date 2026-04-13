@@ -11,7 +11,8 @@ import {
     FaSearch, FaFilter, FaFire, FaTrophy, FaClock, FaCheckCircle,
     FaHourglassHalf, FaTimesCircle, FaBell, FaChartPie, FaArrowUp,
     FaHandshake, FaFileAlt, FaCheckDouble, FaUserCheck,
-    FaCopy, FaEyeSlash, FaBan, FaInfoCircle
+    FaCopy, FaEyeSlash, FaBan, FaInfoCircle,
+    FaEdit
 } from 'react-icons/fa';
 
 const GeneralManagerDashboard = () => {
@@ -887,42 +888,50 @@ const handleApprove = async (leadId) => {
                             <p className="text-green-100 mt-1">إدارة الطلبات والمستخدمين والشركات والإحصائيات</p>
                         </div>
                         <div className="flex gap-2 mt-3 sm:mt-0 flex-wrap">
-                            <button
-                                onClick={() => { setActiveTab('leads'); setFilter('all'); setSearchTerm(''); setCityFilter('all'); setPriorityFilter('all'); }}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'leads' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
-                            >
-                                الطلبات
-                            </button>
-                            <button
-                                onClick={() => { setActiveTab('users'); setSearchTerm(''); }}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'users' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
-                            >
-                                المستخدمين
-                            </button>
-                            <button
-                                onClick={() => { setActiveTab('companies'); setSearchTerm(''); }}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'companies' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
-                            >
-                                الشركات
-                            </button>
-                            <button
-                                onClick={() => { setActiveTab('requests'); setSearchTerm(''); fetchCompanyRequests(); }}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === 'requests' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
-                            >
-                                <FaHandshake /> طلبات الشركات
-                                {companyRequests.filter(r => r.status === 'pending').length > 0 && (
-                                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                                        {companyRequests.filter(r => r.status === 'pending').length}
-                                    </span>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('stats')}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'stats' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
-                            >
-                                الإحصائيات
-                            </button>
-                        </div>
+    <button
+        onClick={() => { setActiveTab('leads'); setFilter('all'); setSearchTerm(''); setCityFilter('all'); setPriorityFilter('all'); }}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'leads' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+    >
+        الطلبات
+    </button>
+    <button
+        onClick={() => { setActiveTab('users'); setSearchTerm(''); }}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'users' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+    >
+        المستخدمين
+    </button>
+    <button
+        onClick={() => { setActiveTab('companies'); setSearchTerm(''); }}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'companies' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+    >
+        الشركات
+    </button>
+    <button
+        onClick={() => { setActiveTab('requests'); setSearchTerm(''); fetchCompanyRequests(); }}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === 'requests' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+    >
+        <FaHandshake /> طلبات الشركات
+        {companyRequests.filter(r => r.status === 'pending').length > 0 && (
+            <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {companyRequests.filter(r => r.status === 'pending').length}
+            </span>
+        )}
+    </button>
+    <button
+        onClick={() => setActiveTab('stats')}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'stats' ? 'bg-white text-green-700' : 'bg-green-700 text-white hover:bg-green-800'}`}
+    >
+        الإحصائيات
+    </button>
+    
+    {/* ✅ زر إدارة المدونة - أضفه هنا */}
+    <button
+        onClick={() => window.location.href = '/admin/blog'}
+        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+    >
+        <FaEdit /> إدارة المدونة
+    </button>
+</div>
                     </div>
                 </div>
             </div>
@@ -1398,38 +1407,38 @@ const handleApprove = async (leadId) => {
                                             )}
                                         </div>
                                         <div className="flex justify-between items-center mt-3 pt-3 border-t">
-    <div className="flex gap-3">
-        <span className="text-sm text-gray-500">
-            <strong>{company.projects_count || 0}</strong> مشروع
-        </span>
-        <span className="text-sm text-gray-500">
-            📅 <strong>{company.established_year || '—'}</strong>
-        </span>
-    </div>
-    <div className="flex gap-2">
-        {!hasUser && (
-            <button
-                onClick={() => handleAddCompanyUserManually(company)}
-                className="text-purple-500 hover:text-purple-700 p-1"
-                title="إضافة مستخدم للشركة"
-            >
-                <FaUserPlus size={18} />
-            </button>
-        )}
-        <button
-            onClick={() => handleDeleteCompany(company.id)}
-            className="text-red-500 hover:text-red-700 p-1"
-            title="حذف"
-        >
-            <FaTrash size={18} />
-        </button>
-    </div>
-</div>
-{hasUser && (
-    <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
-        <FaUserCheck /> يوجد حساب مستخدم
-    </div>
-)}
+                                            <div className="flex gap-3">
+                                                <span className="text-sm text-gray-500">
+                                                    <strong>{company.projects_count || 0}</strong> مشروع
+                                                </span>
+                                                <span className="text-sm text-gray-500">
+                                                    📅 <strong>{company.established_year || '—'}</strong>
+                                                </span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!hasUser && (
+                                                    <button
+                                                        onClick={() => handleAddCompanyUserManually(company)}
+                                                        className="text-purple-500 hover:text-purple-700 p-1"
+                                                        title="إضافة مستخدم للشركة"
+                                                    >
+                                                        <FaUserPlus size={18} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDeleteCompany(company.id)}
+                                                    className="text-red-500 hover:text-red-700 p-1"
+                                                    title="حذف"
+                                                >
+                                                    <FaTrash size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {hasUser && (
+                                            <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                                                <FaUserCheck /> يوجد حساب مستخدم
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 );
