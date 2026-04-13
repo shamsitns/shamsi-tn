@@ -296,15 +296,41 @@ app.use((err, req, res, next) => {
 });
 
 // =============================================
-// معالجة المسارات غير الموجودة
+// خدمة الملفات الثابتة لـ React (في الإنتاج)
 // =============================================
-app.use('*', (req, res) => {
-    res.status(404).json({ 
-        message: 'المسار غير موجود',
-        path: req.originalUrl,
-        requestId: req.id
+const buildPath = path.join(__dirname, 'frontend', 'build');
+
+// التحقق من وجود مجلد build
+if (process.env.NODE_ENV === 'production' && fs.existsSync(buildPath)) {
+    console.log(`📁 Serving React build from: ${buildPath}`);
+    
+    // خدمة الملفات الثابتة
+    app.use(express.static(buildPath));
+    
+    // ✅ إعادة توجيه جميع المسارات غير المعروفة إلى index.html
+    // هذا مهم جداً لـ React Router
+    app.get('*', (req, res) => {
+        // استثناء مسارات API
+        if (req.path.startsWith(API_PREFIX)) {
+            return res.status(404).json({ 
+                message: 'API endpoint not found',
+                path: req.originalUrl,
+                requestId: req.id
+            });
+        }
+        res.sendFile(path.join(buildPath, 'index.html'));
     });
-});
+} else {
+    console.log('📁 Development mode or build folder not found - API only mode');
+    // معالجة المسارات غير الموجودة (للتطوير)
+    app.use('*', (req, res) => {
+        res.status(404).json({ 
+            message: 'المسار غير موجود',
+            path: req.originalUrl,
+            requestId: req.id
+        });
+    });
+}
 
 // =============================================
 // بدء الخادم
