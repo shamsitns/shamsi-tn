@@ -691,19 +691,20 @@ const handleApprove = async (leadId) => {
     };
 
     const handleApproveRequest = async (request) => {
-        try {
-            await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'تم قبول الطلب');
-            toast.success(`✅ تم قبول طلب الشركة: ${request.company_name}`);
-            toast.info('📌 يمكنك الآن إضافة الشركة والمستخدم يدوياً من تبويب "الشركات" و "المستخدمين"', { duration: 5000 });
-            showNotificationMessage(`تم قبول طلب الشركة: ${request.company_name}`);
-            fetchCompanyRequests();
-            setShowRequestModal(false);
-            setSelectedRequest(null);
-        } catch (error) {
-            console.error('Error approving request:', error);
-            toast.error(`❌ حدث خطأ: ${error.message}`);
-        }
-    };
+    try {
+        await adminAPI.updateCompanyRequestStatus(request.id, 'approved', 'تم قبول الطلب');
+        toast.success(`✅ تم قبول طلب الشركة: ${request.company_name}`);
+        // ✅ استبدل toast.info بـ toast.success أو استخدم showNotificationMessage
+        showNotificationMessage(`📌 يمكنك الآن إضافة الشركة والمستخدم يدوياً من تبويب "الشركات" و "المستخدمين"`);
+        showNotificationMessage(`تم قبول طلب الشركة: ${request.company_name}`);
+        fetchCompanyRequests();
+        setShowRequestModal(false);
+        setSelectedRequest(null);
+    } catch (error) {
+        console.error('Error approving request:', error);
+        toast.error(`❌ حدث خطأ: ${error.message}`);
+    }
+};
 
     const handleRejectRequest = async (request, reason) => {
         if (!reason) {
