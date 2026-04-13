@@ -11,6 +11,7 @@ const CalculatorPage = lazy(() => import('./pages/CalculatorPage'));
 const CompaniesPage = lazy(() => import('./pages/CompaniesPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
+const BlogAdmin = lazy(() => import('./pages/BlogAdmin')); // ✅ إضافة صفحة إدارة المدونة
 const Login = lazy(() => import('./components/Login'));
 
 // ✅ صفحة تسجيل الشركات الجديدة (عامة - لا تحتاج تسجيل دخول)
@@ -24,7 +25,7 @@ const OperationsManagerDashboard = lazy(() => import('./components/OperationsDas
 const CallCenterDashboard = lazy(() => import('./components/CallCenterDashboard'));
 const BankManagerDashboard = lazy(() => import('./components/BankManagerDashboard'));
 const LeasingManagerDashboard = lazy(() => import('./components/LeasingManagerDashboard'));
-const CompanyDashboard = lazy(() => import('./components/CompanyDashboard')); // ✅ إضافة لوحة الشركة
+const CompanyDashboard = lazy(() => import('./components/CompanyDashboard'));
 
 // مكون تحميل مؤقت
 const LoadingSpinner = () => (
@@ -50,7 +51,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
             'call_center': '/callcenter',
             'bank_manager': '/bank',
             'leasing_manager': '/leasing',
-            'company': '/company'  // ✅ إضافة توجيه الشركة
+            'company': '/company'
         };
         
         const redirectPath = roleRedirects[user.role] || '/';
@@ -95,6 +96,16 @@ function App() {
                                 element={
                                     <ProtectedRoute allowedRoles={['general_manager']}>
                                         <GeneralManagerDashboard />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
+                            {/* ✅ إدارة المدونة (للمدير العام والمالك فقط) */}
+                            <Route 
+                                path="/admin/blog" 
+                                element={
+                                    <ProtectedRoute allowedRoles={['general_manager', 'owner']}>
+                                        <BlogAdmin />
                                     </ProtectedRoute>
                                 } 
                             />
