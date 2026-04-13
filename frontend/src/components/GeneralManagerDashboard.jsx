@@ -1398,33 +1398,38 @@ const handleApprove = async (leadId) => {
                                             )}
                                         </div>
                                         <div className="flex justify-between items-center mt-3 pt-3 border-t">
-                                            <span className="text-sm text-gray-500">
-                                                <strong>{company.projects_count || 0}</strong> مشروع
-                                            </span>
-                                            <div className="flex gap-2">
-                                                {!hasUser && (
-                                                    <button
-                                                        onClick={() => handleAddCompanyUserManually(company)}
-                                                        className="text-purple-500 hover:text-purple-700 p-1"
-                                                        title="إضافة مستخدم للشركة"
-                                                    >
-                                                        <FaUserPlus size={18} />
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => handleDeleteCompany(company.id)}
-                                                    className="text-red-500 hover:text-red-700 p-1"
-                                                    title="حذف"
-                                                >
-                                                    <FaTrash size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {hasUser && (
-                                            <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
-                                                <FaUserCheck /> يوجد حساب مستخدم
-                                            </div>
-                                        )}
+    <div className="flex gap-3">
+        <span className="text-sm text-gray-500">
+            <strong>{company.projects_count || 0}</strong> مشروع
+        </span>
+        <span className="text-sm text-gray-500">
+            📅 <strong>{company.established_year || '—'}</strong>
+        </span>
+    </div>
+    <div className="flex gap-2">
+        {!hasUser && (
+            <button
+                onClick={() => handleAddCompanyUserManually(company)}
+                className="text-purple-500 hover:text-purple-700 p-1"
+                title="إضافة مستخدم للشركة"
+            >
+                <FaUserPlus size={18} />
+            </button>
+        )}
+        <button
+            onClick={() => handleDeleteCompany(company.id)}
+            className="text-red-500 hover:text-red-700 p-1"
+            title="حذف"
+        >
+            <FaTrash size={18} />
+        </button>
+    </div>
+</div>
+{hasUser && (
+    <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+        <FaUserCheck /> يوجد حساب مستخدم
+    </div>
+)}
                                     </div>
                                 </div>
                                 );
