@@ -28,6 +28,7 @@ const leasingRoutes = require('./routes/leasing');
 const companyDashboardRoutes = require('./routes/companyDashboard');
 const notificationRoutes = require('./routes/notifications');
 const companyRequestsRoutes = require('./routes/companyRequests');
+const blogRoutes = require('./routes/blog');
 
 // =============================================
 // التأكد من وجود مجلد data (لـ SQLite على Render)
@@ -122,6 +123,7 @@ app.use(`${API_PREFIX}/leasing`, leasingRoutes);
 app.use(`${API_PREFIX}/company`, companyDashboardRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/company-requests`, companyRequestsRoutes);
+app.use('/api/blog', blogRoutes);
 
 // =============================================
 // Create New Lead (POST /api/leads)

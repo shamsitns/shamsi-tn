@@ -1,166 +1,212 @@
-import React from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { FaCalendarAlt, FaUser, FaArrowRight } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
+import { 
+    FaCalendarAlt, FaUser, FaArrowRight, FaClock, 
+    FaTag, FaSpinner, FaEye, FaShare, FaFacebook, 
+    FaTwitter, FaLinkedin
+} from 'react-icons/fa';
 
 const BlogPost = () => {
     const { slug } = useParams();
-    
-    const posts = {
-        'cout-energie-solaire-tunisie-2026': {
-            title: 'تكلفة الطاقة الشمسية في تونس 2026',
-            date: '31 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            content: `
-                <p>تتراوح تكلفة تركيب الطاقة الشمسية في تونس بين <strong>2000 و 3000 دينار لكل كيلوواط</strong> حسب جودة المعدات والشركة المنفذة.</p>
-                
-                <h2>عوامل تؤثر على التكلفة:</h2>
-                <ul>
-                    <li>قدرة النظام المطلوبة (kW)</li>
-                    <li>نوع الألواح (مونوكريستالين / بولي كريستالين)</li>
-                    <li>جودة العاكس (Inverter)</li>
-                    <li>تكلفة التركيب والنقل</li>
-                </ul>
-                
-                <h2>مثال على التكلفة:</h2>
-                <ul>
-                    <li><strong>نظام 3kW:</strong> 8,000 - 10,000 دينار</li>
-                    <li><strong>نظام 5kW:</strong> 14,000 - 17,000 دينار</li>
-                    <li><strong>نظام 10kW:</strong> 26,000 - 32,000 دينار</li>
-                </ul>
-                
-                <p>يمكنك الحصول على <strong>دراسة مجانية</strong> لمنزلك من خلال <a href="/calculator">حاسبة الطاقة الشمسية</a>.</p>
-            `
-        },
-        'choisir-entreprise-solaire-tunisie': {
-            title: 'كيف تختار أفضل شركة لتركيب الطاقة الشمسية في تونس؟',
-            date: '28 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            content: `
-                <p>اختيار الشركة المناسبة هو أهم خطوة لضمان جودة التركيب وكفاءة النظام. إليك 5 معايير حاسمة:</p>
-                
-                <h2>1. التحقق من الترخيص والشهادات</h2>
-                <p>تأكد أن الشركة مسجلة في قائمة المعتمدين من الوكالة الوطنية للتحكم في الطاقة (ANME).</p>
-                
-                <h2>2. جودة المكونات</h2>
-                <p>اسأل عن العلامات التجارية للألواح والعاكس. الألواح من LONGi، Jinko، Canadian Solar هي الأفضل.</p>
-                
-                <h2>3. زيارة تقنية ميدانية</h2>
-                <p>أي شركة تقدم عرض سعر دون زيارة منزلك غير جادة. يجب أن يقوم مهندس بفحص السطح والتظليل.</p>
-                
-                <h2>4. الضمانات</h2>
-                <p>اطلب ضمان المنتج (10-12 سنة) وضمان الأداء (25 سنة).</p>
-                
-                <h2>5. المراجع والمشاريع السابقة</h2>
-                <p>اطلب الاطلاع على مشاريع سابقة في منطقتك.</p>
-            `
-        },
-        'aides-energie-solaire-tunisie-2026': {
-            title: 'دعم الدولة للطاقة الشمسية في تونس 2026',
-            date: '25 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            content: `
-                <p>تقدم الدولة التونسية عدة برامج لدعم الطاقة الشمسية:</p>
-                
-                <h2>1. برنامج PROSOL</h2>
-                <p>قرض مدعوم من الدولة عبر البنوك المشاركة. يغطي 80% من قيمة النظام مع فائدة مخفضة.</p>
-                
-                <h2>2. إعفاءات ضريبية</h2>
-                <p>إعفاء من الأداء على القيمة المضافة (TVA) بنسبة 100% على معدات الطاقة الشمسية.</p>
-                
-                <h2>3. تعريفة شراء الكهرباء الفائض</h2>
-                <p>يمكن بيع الكهرباء الفائضة إلى STEG بعقود طويلة الأجل.</p>
-                
-                <h2>4. قروض بنكية ميسرة</h2>
-                <p>البنوك التونسية تقدم قروضاً خاصة للطاقة الشمسية بفائدة مدعومة.</p>
-            `
-        },
-        'prosol-financement-solaire-tunisie': {
-            title: 'PROSOL: كل ما تحتاج معرفته عن تمويل الطاقة الشمسية',
-            date: '20 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            content: `
-                <p>PROSOL هو برنامج وطني تونسي يهدف إلى تشجيع تركيب أنظمة الطاقة الشمسية للمنازل والشركات.</p>
-                
-                <h2>كيف يعمل PROSOL؟</h2>
-                <ul>
-                    <li>العميل يدفع 20% من قيمة النظام كمساهمة شخصية</li>
-                    <li>البنك يمول 80% المتبقية عبر قرض بفائدة مدعومة</li>
-                    <li>يتم سداد القرض على أقساط شهرية لمدة تصل إلى 7 سنوات</li>
-                    <li>المنحة تُصرف للشركة المعتمدة وليس للعميل مباشرة</li>
-                </ul>
-                
-                <h2>البنوك المشاركة:</h2>
-                <ul>
-                    <li>BNA (البنك الوطني الفلاحي)</li>
-                    <li>BH (بنك الإسكان)</li>
-                    <li>ATB (العرب لتونس للبنك)</li>
-                    <li>STB (البنك التونسي للتضامن)</li>
-                    <li>BIAT (البنك الدولي العربي لتونس)</li>
-                </ul>
-                
-                <h2>الشروط:</h2>
-                <ul>
-                    <li>ملكية العقار أو عقد إيجار طويل الأجل</li>
-                    <li>موافقة STEG على ربط النظام بالشبكة</li>
-                    <li>التركيب بواسطة شركة معتمدة من ANME</li>
-                </ul>
-            `
-        },
-        'solaire-agricole-tunisie': {
-            title: 'الطاقة الشمسية للمزارع: حل اقتصادي وبيئي',
-            date: '15 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            content: `
-                <p>المزارع في تونس تستهلك كميات كبيرة من الكهرباء لتشغيل المضخات والتبريد. الطاقة الشمسية توفر حلاً مثالياً.</p>
-                
-                <h2>فوائد الطاقة الشمسية للمزارع:</h2>
-                <ul>
-                    <li>توفير يصل إلى 70% من فاتورة الكهرباء</li>
-                    <li>استقلالية في توفير الطاقة</li>
-                    <li>تشغيل المضخات خلال النهار مجاناً</li>
-                    <li>زيادة قيمة العقار</li>
-                </ul>
-                
-                <h2>دراسة جدوى لمزرعة نموذجية:</h2>
-                <ul>
-                    <li>نظام 6 كيلوواط لتشغيل مضخة ماء</li>
-                    <li>سعر النظام: 18,000 دينار</li>
-                    <li>التوفير السنوي: 3,600 دينار</li>
-                    <li>مدة استرجاع المال: 5 سنوات</li>
-                </ul>
-                
-                <p>يمكن للمزارع الاستفادة من برنامج PROSOL وبرامج دعم خاصة بالقطاع الفلاحي.</p>
-            `
+    const navigate = useNavigate();
+    const [post, setPost] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        fetchPost();
+        window.scrollTo(0, 0);
+    }, [slug]);
+
+    const fetchPost = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`https://shamsi-tn.onrender.com/api/blog/posts/${slug}`);
+            
+            if (response.status === 404) {
+                navigate('/blog');
+                return;
+            }
+            
+            const data = await response.json();
+            setPost(data);
+        } catch (error) {
+            console.error('Error fetching post:', error);
+            setError('حدث خطأ في جلب المقال');
+        } finally {
+            setLoading(false);
         }
     };
-    
-    const post = posts[slug] || posts['cout-energie-solaire-tunisie-2026'];
-    
+
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ar-TN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    const getReadTime = (content) => {
+        if (!content) return '3 دقائق';
+        const wordCount = content.split(/\s+/).length;
+        const minutes = Math.ceil(wordCount / 200);
+        return `${minutes} دقائق`;
+    };
+
+    const shareOnFacebook = () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${window.location.href}`, '_blank');
+    };
+
+    const shareOnTwitter = () => {
+        window.open(`https://twitter.com/intent/tweet?text=${post?.title}&url=${window.location.href}`, '_blank');
+    };
+
+    const shareOnLinkedin = () => {
+        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${window.location.href}`, '_blank');
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <FaSpinner className="animate-spin text-5xl text-green-600 mx-auto mb-4" />
+                    <p className="text-gray-600">جاري تحميل المقال...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !post) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-red-600 mb-4">{error || 'المقال غير موجود'}</p>
+                    <Link to="/blog" className="bg-green-600 text-white px-6 py-2 rounded-lg">
+                        العودة للمدونة
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4">
-            <div className="max-w-3xl mx-auto">
-                <Link to="/blog" className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 mb-6">
-                    <FaArrowRight /> العودة إلى المدونة
-                </Link>
-                
-                <div className="bg-white rounded-2xl shadow-xl p-8">
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">{post.title}</h1>
+        <>
+            <Helmet>
+                <title>{post.title} | Shamsi.tn</title>
+                <meta name="description" content={post.excerpt || post.content?.substring(0, 160)} />
+                <meta property="og:title" content={post.title} />
+                <meta property="og:description" content={post.excerpt || post.content?.substring(0, 160)} />
+                <meta property="og:type" content="article" />
+                {post.featured_image && <meta property="og:image" content={post.featured_image} />}
+            </Helmet>
+
+            <div className="min-h-screen bg-gray-50 py-12 px-4">
+                <div className="max-w-3xl mx-auto">
+                    {/* زر العودة */}
+                    <Link 
+                        to="/blog" 
+                        className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 mb-6 group"
+                    >
+                        <FaArrowRight /> 
+                        <span className="group-hover:mr-1 transition">العودة إلى المدونة</span>
+                    </Link>
                     
-                    <div className="flex items-center gap-4 text-gray-500 mb-8 pb-4 border-b">
-                        <span className="flex items-center gap-1"><FaCalendarAlt /> {post.date}</span>
-                        <span className="flex items-center gap-1"><FaUser /> {post.author}</span>
-                    </div>
-                    
-                    <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
-                    
-                    <div className="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <p className="text-center text-yellow-800">
-                            💡 هل تريد دراسة مجانية لمنزلك؟ <Link to="/calculator" className="font-bold underline">احسب تكلفة الطاقة الشمسية الآن</Link>
-                        </p>
+                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+                        {/* Tag */}
+                        {post.category && (
+                            <div className="flex items-center gap-2 mb-4">
+                                <FaTag className="text-green-500 text-sm" />
+                                <span className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                                    {post.category}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* العنوان */}
+                        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
+                            {post.title}
+                        </h1>
+                        
+                        {/* معلومات المقال */}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-8 pb-4 border-b">
+                            <span className="flex items-center gap-1">
+                                <FaCalendarAlt className="text-green-600" /> 
+                                {formatDate(post.published_at || post.created_at)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <FaUser className="text-green-600" /> 
+                                {post.author_name || 'Shamsi.tn'}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <FaClock className="text-green-600" /> 
+                                {getReadTime(post.content)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <FaEye className="text-green-600" /> 
+                                {post.views || 0} مشاهدة
+                            </span>
+                        </div>
+                        
+                        {/* صورة المقال */}
+                        {post.featured_image && (
+                            <div className="rounded-xl overflow-hidden mb-8">
+                                <img 
+                                    src={post.featured_image} 
+                                    alt={post.title}
+                                    className="w-full h-64 md:h-80 object-cover"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = 'https://via.placeholder.com/800x400?text=Shamsi.tn';
+                                    }}
+                                />
+                            </div>
+                        )}
+                        
+                        {/* محتوى المقال */}
+                        <div 
+                            className="prose prose-lg max-w-none prose-headings:text-gray-800 prose-p:text-gray-600 prose-a:text-green-600 prose-img:rounded-lg"
+                            dangerouslySetInnerHTML={{ __html: post.content }} 
+                        />
+                        
+                        {/* أزرار المشاركة */}
+                        <div className="mt-8 pt-4 border-t">
+                            <p className="text-gray-600 mb-3">شارك المقال:</p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={shareOnFacebook}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition"
+                                >
+                                    <FaFacebook size={20} />
+                                </button>
+                                <button
+                                    onClick={shareOnTwitter}
+                                    className="bg-sky-500 hover:bg-sky-600 text-white p-2 rounded-full transition"
+                                >
+                                    <FaTwitter size={20} />
+                                </button>
+                                <button
+                                    onClick={shareOnLinkedin}
+                                    className="bg-blue-700 hover:bg-blue-800 text-white p-2 rounded-full transition"
+                                >
+                                    <FaLinkedin size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* CTA */}
+                        <div className="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <p className="text-center text-yellow-800">
+                                💡 هل تريد دراسة مجانية لمنزلك؟ 
+                                <Link to="/calculator" className="font-bold underline mr-1">احسب تكلفة الطاقة الشمسية الآن</Link>
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 

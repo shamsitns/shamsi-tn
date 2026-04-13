@@ -1,102 +1,104 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { 
     FaCalendarAlt, FaUser, FaArrowLeft, FaClock, 
-    FaTag, FaChartLine, FaCalculator, FaArrowLeft as FaArrowRight
+    FaTag, FaChartLine, FaCalculator, FaArrowLeft as FaArrowRight,
+    FaSpinner
 } from 'react-icons/fa';
 
 const BlogPage = () => {
-    const posts = [
-        {
-            id: 1,
-            title: 'تكلفة الطاقة الشمسية في تونس 2026',
-            slug: 'cout-energie-solaire-tunisie-2026',
-            excerpt: 'تعرف على أسعار تركيب الألواح الشمسية في تونس، والعوامل المؤثرة في التكلفة، وكيفية حساب العائد على الاستثمار.',
-            date: '31 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '5 دقائق',
-            tag: 'أسعار',
-            image: '/images/blog/solar-cost.png'
-        },
-        {
-            id: 2,
-            title: 'كيف تختار أفضل شركة لتركيب الطاقة الشمسية في تونس؟',
-            slug: 'choisir-entreprise-solaire-tunisie',
-            excerpt: 'دليل شامل لاختيار الشركة المناسبة لتركيب الألواح الشمسية في تونس، مع نصائح مهمة لتجنب الاحتيال.',
-            date: '28 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '4 دقائق',
-            tag: 'نصائح',
-            image: '/images/blog/choose-company.png'
-        },
-        {
-            id: 3,
-            title: 'دعم الدولة للطاقة الشمسية في تونس 2026',
-            slug: 'aides-energie-solaire-tunisie-2026',
-            excerpt: 'تعرف على برامج الدعم والقروض المتاحة من الدولة والبنوك لتركيب الألواح الشمسية في تونس.',
-            date: '25 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '6 دقائق',
-            tag: 'دعم حكومي',
-            image: '/images/blog/government-support.png'
-        },
-        {
-            id: 4,
-            title: 'PROSOL: كل ما تحتاج معرفته عن تمويل الطاقة الشمسية',
-            slug: 'prosol-financement-solaire-tunisie',
-            excerpt: 'شرح مفصل لبرنامج PROSOL، كيفية الاستفادة منه، والشروط المطلوبة للحصول على القرض المدعوم.',
-            date: '20 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '7 دقائق',
-            tag: 'تمويل',
-            image: '/images/blog/prosol.png'
-        },
-        {
-            id: 5,
-            title: 'الطاقة الشمسية للمزارع: حل اقتصادي وبيئي',
-            slug: 'solaire-agricole-tunisie',
-            excerpt: 'كيف يمكن للمزارع الاستفادة من الطاقة الشمسية لتشغيل المضخات وتوفير الكهرباء، مع دراسة جدوى حقيقية.',
-            date: '15 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '5 دقائق',
-            tag: 'زراعة',
-            image: '/images/blog/agriculture.png'
-        },
-        {
-            id: 6,
-            title: 'كم تكلفة تركيب الطاقة الشمسية لمنزل في تونس؟',
-            slug: 'prix-panneau-solaire-maison-tunisie',
-            excerpt: 'تفصيل كامل لتكاليف تركيب النظام الشمسي لمنزل متوسط، مع مقارنة الأسعار بين الشركات المختلفة.',
-            date: '10 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '6 دقائق',
-            tag: 'أسعار',
-            image: '/images/blog/house-price.png'
-        },
-        {
-            id: 7,
-            title: 'هل الطاقة الشمسية مربحة في تونس؟',
-            slug: 'rentabilite-energie-solaire-tunisie',
-            excerpt: 'تحليل العائد على الاستثمار للطاقة الشمسية، ومتى تسترد تكلفة النظام في تونس.',
-            date: '5 مارس 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '5 دقائق',
-            tag: 'دراسة جدوى',
-            image: '/images/blog/profitability.png'
-        },
-        {
-            id: 8,
-            title: 'كم عدد الألواح الشمسية لتشغيل منزل كامل؟',
-            slug: 'nombre-panneaux-solaire-maison',
-            excerpt: 'حساب عدد الألواح المطلوبة حسب استهلاك الكهرباء وحسب نوع الأجهزة الكهربائية.',
-            date: '28 فبراير 2026',
-            author: 'فريق Shamsi.tn',
-            readTime: '4 دقائق',
-            tag: 'حسابات',
-            image: '/images/blog/panels-count.png'
+    const [posts, setPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [categories, setCategories] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState('');
+
+    // جلب التصنيفات
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch('https://shamsi-tn.onrender.com/api/blog/categories');
+            const data = await response.json();
+            setCategories(data);
+        } catch (error) {
+            console.error('Error fetching categories:', error);
         }
-    ];
+    };
+
+    // جلب المقالات
+    const fetchPosts = async () => {
+        setLoading(true);
+        try {
+            let url = `https://shamsi-tn.onrender.com/api/blog/posts?page=${page}&limit=9`;
+            if (selectedCategory) {
+                url += `&category=${selectedCategory}`;
+            }
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            setPosts(data.posts || []);
+            setTotalPages(data.totalPages || 1);
+        } catch (error) {
+            console.error('Error fetching posts:', error);
+            setError('حدث خطأ في جلب المقالات');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    useEffect(() => {
+        fetchPosts();
+    }, [page, selectedCategory]);
+
+    // تنسيق التاريخ
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ar-TN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    // حساب وقت القراءة التقريبي (الكلمات / 200)
+    const getReadTime = (content) => {
+        if (!content) return '3 دقائق';
+        const wordCount = content.split(/\s+/).length;
+        const minutes = Math.ceil(wordCount / 200);
+        return `${minutes} دقائق`;
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <FaSpinner className="animate-spin text-5xl text-green-600 mx-auto mb-4" />
+                    <p className="text-gray-600">جاري تحميل المقالات...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-red-600 mb-4">{error}</p>
+                    <button onClick={fetchPosts} className="bg-green-600 text-white px-6 py-2 rounded-lg">
+                        إعادة المحاولة
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -131,71 +133,136 @@ const BlogPage = () => {
                         </p>
                     </div>
 
-                    {/* Grid المقالات */}
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {posts.map(post => (
-                            <Link
-                                key={post.id}
-                                to={`/blog/${post.slug}`}
-                                className="group bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden block"
+                    {/* فلتر التصنيفات */}
+                    {categories.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-2 mb-8">
+                            <button
+                                onClick={() => setSelectedCategory('')}
+                                className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                                    selectedCategory === '' 
+                                        ? 'bg-green-600 text-white' 
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
                             >
-                                {/* صورة المقال */}
-                                <div className="h-48 bg-gray-200 overflow-hidden">
-                                    <img 
-                                        src={post.image} 
-                                        alt={post.title}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                                        onError={(e) => {
-                                            e.target.onerror = null;
-                                            // ✅ استخدام صورة افتراضية محلية بدلاً من placeholder.com
-                                            e.target.src = '/images/blog/placeholder.png';
-                                        }}
-                                    />
-                                </div>
-                                
-                                <div className="p-6">
-                                    {/* Tag */}
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <FaTag className="text-green-500 text-xs" />
-                                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                                            {post.tag}
-                                        </span>
+                                الكل
+                            </button>
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setSelectedCategory(cat.slug)}
+                                    className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                                        selectedCategory === cat.slug 
+                                            ? 'bg-green-600 text-white' 
+                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                >
+                                    {cat.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Grid المقالات */}
+                    {posts.length === 0 ? (
+                        <div className="text-center py-12">
+                            <p className="text-gray-500">لا توجد مقالات في هذا التصنيف حالياً</p>
+                        </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {posts.map(post => (
+                                <Link
+                                    key={post.id}
+                                    to={`/blog/${post.slug}`}
+                                    className="group bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden block"
+                                >
+                                    {/* صورة المقال */}
+                                    <div className="h-48 bg-gray-200 overflow-hidden">
+                                        {post.featured_image ? (
+                                            <img 
+                                                src={post.featured_image} 
+                                                alt={post.title}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'https://via.placeholder.com/400x250?text=Shamsi.tn';
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center">
+                                                <FaChartLine className="text-white text-5xl" />
+                                            </div>
+                                        )}
                                     </div>
                                     
-                                    {/* العنوان */}
-                                    <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition line-clamp-2">
-                                        {post.title}
-                                    </h2>
-                                    
-                                    {/* الملخص */}
-                                    <p className="text-gray-600 mb-4 line-clamp-3 text-sm">
-                                        {post.excerpt}
-                                    </p>
-                                    
-                                    {/* معلومات المقال */}
-                                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-4">
-                                        <span className="flex items-center gap-1">
-                                            <FaCalendarAlt /> {post.date}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <FaUser /> {post.author}
-                                        </span>
-                                        <span className="flex items-center gap-1 text-green-600">
-                                            <FaClock /> {post.readTime}
-                                        </span>
+                                    <div className="p-6">
+                                        {/* Tag */}
+                                        {post.category && (
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <FaTag className="text-green-500 text-xs" />
+                                                <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                                                    {post.category}
+                                                </span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* العنوان */}
+                                        <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition line-clamp-2">
+                                            {post.title}
+                                        </h2>
+                                        
+                                        {/* الملخص */}
+                                        <p className="text-gray-600 mb-4 line-clamp-3 text-sm">
+                                            {post.excerpt || post.content?.substring(0, 150) + '...'}
+                                        </p>
+                                        
+                                        {/* معلومات المقال */}
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-4">
+                                            <span className="flex items-center gap-1">
+                                                <FaCalendarAlt /> {formatDate(post.published_at || post.created_at)}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <FaUser /> {post.author_name || 'Shamsi.tn'}
+                                            </span>
+                                            <span className="flex items-center gap-1 text-green-600">
+                                                <FaClock /> {getReadTime(post.content)}
+                                            </span>
+                                        </div>
+                                        
+                                        {/* زر القراءة */}
+                                        <div className="flex items-center justify-between pt-3 border-t">
+                                            <span className="text-green-600 font-semibold text-sm group-hover:text-green-700 transition">
+                                                اقرأ المقال
+                                            </span>
+                                            <FaArrowRight className="text-green-600 text-sm group-hover:translate-x-1 transition" />
+                                        </div>
                                     </div>
-                                    
-                                    {/* زر القراءة */}
-                                    <div className="flex items-center justify-between pt-3 border-t">
-                                        <span className="text-green-600 font-semibold text-sm group-hover:text-green-700 transition">
-                                            اقرأ المقال
-                                        </span>
-                                        <FaArrowRight className="text-green-600 text-sm group-hover:translate-x-1 transition" />
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex justify-center gap-2 mt-8">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page === 1}
+                                className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-300 transition"
+                            >
+                                السابق
+                            </button>
+                            <span className="px-4 py-2 bg-green-600 text-white rounded-lg">
+                                {page} / {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page === totalPages}
+                                className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-300 transition"
+                            >
+                                التالي
+                            </button>
+                        </div>
+                    )}
 
                     {/* CTA Section */}
                     <div className="mt-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-8 text-center text-white">
