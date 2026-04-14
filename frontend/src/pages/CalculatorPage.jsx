@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';  // ✅ أضف هذا السطر
 import { 
     FaBolt, FaMoneyBillWave, FaChartLine, FaCheckCircle, 
-    FaCalculator, FaBuilding, FaHome, FaStore, FaIndustry,
-    FaUniversity, FaCar, FaShieldAlt, FaUsers, FaStar,
-    FaWhatsapp, FaPhone, FaEnvelope, FaArrowLeft, FaSpinner,
-    FaHandshake, FaClock, FaLeaf, FaSolarPanel
+    // ... باقي الأيقونات
 } from 'react-icons/fa';
 
 const CalculatorPage = () => {
