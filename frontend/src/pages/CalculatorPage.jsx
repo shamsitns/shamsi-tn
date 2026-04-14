@@ -22,18 +22,6 @@ const tunisianCities = [
 ];
 
 // ============================================
-// قائمة البنوك المتعاقدة مع PROSOL
-// ============================================
-const prosolBanks = [
-    { id: 1, name: 'بنك الزيتونة', logo: '🏦' },
-    { id: 2, name: 'التجاري بنك', logo: '🏦' },
-    { id: 3, name: 'البنك الوطني الفلاحي', logo: '🌾' },
-    { id: 4, name: 'البنك التونسي للتضامن', logo: '🤝' },
-    { id: 5, name: 'البنك التونسي', logo: '🏦' },
-    { id: 6, name: 'البنك العربي الدولي لتونس', logo: '🌍' }
-];
-
-// ============================================
 // أنواع الألواح (للاستخدام الداخلي فقط)
 // ============================================
 const panelTypes = {
@@ -101,7 +89,6 @@ const electricityTiers = [
 // حساب الاستهلاك من الفاتورة حسب شرائح STEG
 // ============================================
 const calculateConsumption = (billAmount, billPeriod) => {
-    // تعديل قيمة الفاتورة لتكون شهرية
     const monthlyBill = billPeriod === 60 ? billAmount / 2 : billAmount;
     
     let remaining = monthlyBill;
@@ -124,6 +111,14 @@ const calculateConsumption = (billAmount, billPeriod) => {
         }
     }
     return { totalKwh: Math.round(totalKwh), usedTiers, monthlyBill };
+};
+
+// ============================================
+// حساب الاستهلاك السنوي
+// ============================================
+const calculateAnnualConsumption = (monthlyBill) => {
+    const monthlyKwh = monthlyBill / 0.25;
+    return Math.round(monthlyKwh * 12);
 };
 
 // ============================================
@@ -150,6 +145,9 @@ const calculateSolarSystemAccurate = (billAmount, billPeriod, season, city, roof
     const solarScore = Math.min(100, Math.round((radiation / 5.8) * 80 + (roofAreaValid ? 20 : 0)));
     const coveragePercent = Math.min(100, Math.round((annualProduction / annualKwh) * 100));
     
+    // حساب الاستهلاك السنوي
+    const annualConsumption = calculateAnnualConsumption(consumption.monthlyBill);
+    
     return {
         required_kw: roundedKw,
         panels_count: panelsCount,
@@ -165,7 +163,8 @@ const calculateSolarSystemAccurate = (billAmount, billPeriod, season, city, roof
         roof_area_valid: roofAreaValid,
         roof_area_available: roofAreaAvailable,
         solar_score: solarScore,
-        coverage_percent: coveragePercent
+        coverage_percent: coveragePercent,
+        annual_consumption: annualConsumption
     };
 };
 
@@ -195,29 +194,70 @@ const getBestPanel = (requiredKw, propertyType, isAgricultural) => {
 // ============================================
 // خيارات الدفع حسب نوع العقار
 // ============================================
-const getPaymentOptions = (propertyType) => {
+const getPaymentOptions = (propertyType, annualConsumption = null) => {
     const isResidential = ['house', 'apartment'].includes(propertyType);
     const isAgricultural = propertyType === 'farm';
     
+    const options = [];
+    
+    // دفع نقدي (متاح للجميع)
+    options.push({ 
+        value: 'cash', 
+        label: 'دفع نقدي', 
+        icon: FaMoneyBillWave, 
+        description: 'الدفع الكامل للمبلغ عند التركيب', 
+        pros: ['خصم 5-10%', 'تركيب سريع'] 
+    });
+    
+    // تمويل STEG (للمنازل فقط)
     if (isResidential) {
-        return [
-            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'الدفع الكامل للمبلغ عند التركيب', pros: ['خصم 5-10%', 'تركيب سريع'] },
-            { value: 'steg', label: 'تمويل STEG', icon: FaBolt, description: 'تقسيط عبر فاتورة الكهرباء حتى 7 سنوات', pros: ['بدون فوائد', 'تقسيط شهري'] },
-            { value: 'prosol', label: 'قرض PROSOL', icon: FaHandHoldingHeart, description: 'قرض مدعوم من الدولة', pros: ['فائدة 3% فقط', 'ضمان الدولة', 'حتى 7 سنوات'], needsBank: true }
-        ];
-    } else if (isAgricultural) {
-        return [
-            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'الدفع الكامل للمبلغ عند التركيب', pros: ['خصم 5-10%', 'تركيب سريع'] },
-            { value: 'bank', label: 'قرض بنكي', icon: FaUniversity, description: 'تمويل للأنظمة الزراعية', pros: ['فائدة مخفضة', 'حتى 10 سنوات'], needsBank: true },
-            { value: 'leasing', label: 'إيجار تمويلي', icon: FaBuilding, description: 'تأجير النظام مع أحقية التمليك', pros: ['لا يشترط ملكية العقار', 'دفعة أولى 10-20%'] }
-        ];
-    } else {
-        return [
-            { value: 'cash', label: 'دفع نقدي', icon: FaMoneyBillWave, description: 'الدفع الكامل للمبلغ عند التركيب', pros: ['خصم 5-10%', 'تركيب سريع'] },
-            { value: 'bank', label: 'قرض بنكي', icon: FaUniversity, description: 'تمويل بنكي بفائدة مخفضة', pros: ['حتى 10 سنوات', 'مرونة في السداد'], needsBank: true },
-            { value: 'leasing', label: 'إيجار تمويلي', icon: FaBuilding, description: 'تأجير النظام مع أحقية التمليك', pros: ['لا يشترط ملكية العقار', 'دفعة أولى 10-20%'] }
-        ];
+        options.push({ 
+            value: 'steg', 
+            label: 'تمويل STEG', 
+            icon: FaBolt, 
+            description: 'تقسيط عبر فاتورة الكهرباء حتى 7 سنوات', 
+            pros: ['بدون فوائد', 'تقسيط شهري', 'بدون دفعة أولى'] 
+        });
     }
+    
+    // PROSOL (للمنازل فقط والاستهلاك بين 1200-1800 kWh)
+    if (isResidential && annualConsumption && annualConsumption >= 1200 && annualConsumption <= 1800) {
+        const isCategory1 = annualConsumption <= 1600;
+        const loanAmount = isCategory1 ? 2000 : 3000;
+        options.push({ 
+            value: 'prosol', 
+            label: 'PROSOL ELEC Économique', 
+            icon: FaHandHoldingHeart, 
+            description: `قرض مدعوم بقيمة ${loanAmount} دينار + منحة 1500 دينار`, 
+            pros: ['فائدة 3% فقط', 'ضمان الدولة', 'سداد 10 سنوات', 'قسط بيدومستري'],
+            loanAmount: loanAmount,
+            grantAmount: 1500
+        });
+    }
+    
+    // قرض بنكي (للمحلات والمصانع والمزارع)
+    if (!isResidential) {
+        options.push({ 
+            value: 'bank', 
+            label: 'قرض بنكي', 
+            icon: FaUniversity, 
+            description: 'تمويل بنكي بفائدة مخفضة', 
+            pros: ['حتى 10 سنوات', 'مرونة في السداد'] 
+        });
+    }
+    
+    // إيجار تمويلي (للمزارع والمحلات)
+    if (isAgricultural || propertyType === 'commercial' || propertyType === 'factory') {
+        options.push({ 
+            value: 'leasing', 
+            label: 'إيجار تمويلي', 
+            icon: FaBuilding, 
+            description: 'تأجير النظام مع أحقية التمليك', 
+            pros: ['لا يشترط ملكية العقار', 'دفعة أولى 10-20%'] 
+        });
+    }
+    
+    return options;
 };
 
 // ============================================
@@ -229,10 +269,6 @@ const CalculatorPage = () => {
     const [sending, setSending] = useState(false);
     const [result, setResult] = useState(null);
     const [selectedPanel, setSelectedPanel] = useState(null);
-    const [showLegalModal, setShowLegalModal] = useState(false);
-    const [showBankModal, setShowBankModal] = useState(false);
-    const [selectedPayment, setSelectedPayment] = useState(null);
-    const [selectedBank, setSelectedBank] = useState(null);
     const [invoiceImage, setInvoiceImage] = useState(null);
     const [invoiceImagePreview, setInvoiceImagePreview] = useState(null);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -241,14 +277,14 @@ const CalculatorPage = () => {
         phone: '',
         city: '',
         property_type: 'house',
-        bill_period: 60,  // ✅ جديد: فترة الفاتورة (30 أو 60 يوم)
+        bill_period: 60,
         bill_season: 'spring',
         meter_number: '',
         bill_value: '',
         roof_area: '',
         roof_type: 'terrace',
         installation_timeline: '3-6',
-        payment_method: ''  // ✅ جديد: طريقة الدفع المختارة
+        payment_method: ''
     });
 
     useEffect(() => {
@@ -259,7 +295,6 @@ const CalculatorPage = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // ✅ دالة معالجة رفع الصورة
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -297,28 +332,6 @@ const CalculatorPage = () => {
         toast.success('تم حذف الصورة');
     };
 
-    // ✅ دالة اختيار طريقة الدفع (تحدث في الخطوة 2)
-    const handlePaymentSelection = (paymentMethod) => {
-        const isResidential = ['house', 'apartment'].includes(formData.property_type);
-        const isAgricultural = formData.property_type === 'farm';
-        
-        setFormData({ ...formData, payment_method: paymentMethod });
-        
-        if ((paymentMethod === 'prosol' && isResidential) || (paymentMethod === 'bank' && (isAgricultural || !isResidential))) {
-            setSelectedPayment(paymentMethod);
-            setShowBankModal(true);
-        } else {
-            setSelectedPayment(paymentMethod);
-            setShowLegalModal(true);
-        }
-    };
-    
-    const handleBankSelect = (bank) => {
-        setSelectedBank(bank);
-        setShowBankModal(false);
-        setShowLegalModal(true);
-    };
-    
     // ✅ دالة الحساب (بعد اختيار طريقة الدفع)
     const handleCalculate = async (e) => {
         e.preventDefault();
@@ -342,7 +355,7 @@ const CalculatorPage = () => {
         
         const solarData = calculateSolarSystemAccurate(
             parseFloat(formData.bill_value),
-            formData.bill_period,  // ✅ استخدام فترة الفاتورة المختارة
+            formData.bill_period,
             formData.bill_season,
             formData.city,
             parseFloat(formData.roof_area),
@@ -350,7 +363,7 @@ const CalculatorPage = () => {
         );
         
         setResult(solarData);
-        setStep(3);  // ✅ النتيجة في الخطوة 3
+        setStep(3);
         
         if (!solarData.roof_area_valid) {
             toast.warning(`⚠️ المساحة المتوفرة (${formData.roof_area} م²) أقل من المساحة المطلوبة (${solarData.required_roof_area} م²)`);
@@ -363,7 +376,6 @@ const CalculatorPage = () => {
     
     const handleConfirmAndSend = async () => {
         setSending(true);
-        setShowLegalModal(false);
         
         const sendData = {
             name: formData.name,
@@ -371,7 +383,7 @@ const CalculatorPage = () => {
             city: formData.city,
             property_type: formData.property_type,
             bill_amount: parseFloat(formData.bill_value),
-            bill_period_months: formData.bill_period,  // ✅ إرسال فترة الفاتورة
+            bill_period_months: formData.bill_period,
             bill_season: formData.bill_season,
             roof_availability: true,
             roof_area: formData.roof_area,
@@ -379,7 +391,6 @@ const CalculatorPage = () => {
             installation_timeline: formData.installation_timeline,
             meter_number: formData.meter_number,
             payment_method: formData.payment_method,
-            preferred_bank: selectedBank?.name || null,
             additional_info: `مساحة السطح: ${formData.roof_area} م²، نوع السطح: ${formData.roof_type}`,
             required_kw: result.required_kw,
             panels_count: result.panels_count,
@@ -403,8 +414,6 @@ const CalculatorPage = () => {
                 roof_area: '', roof_type: 'terrace', installation_timeline: '3-6',
                 payment_method: ''
             });
-            setSelectedBank(null);
-            setSelectedPayment(null);
             setSelectedPanel(null);
             setInvoiceImage(null);
             setInvoiceImagePreview(null);
@@ -450,9 +459,16 @@ const CalculatorPage = () => {
         </div>
     );
 
-    // ==================== STEP 2: معلومات العقار + فترة الفاتورة + طريقة الدفع ====================
+    // ==================== STEP 2: معلومات العقار + طريقة الدفع ====================
     const renderStep2 = () => {
-        const paymentOptions = getPaymentOptions(formData.property_type);
+        // حساب الاستهلاك السنوي التقريبي لعرض خيارات الدفع المناسبة
+        let estimatedAnnualConsumption = null;
+        if (formData.bill_value && formData.bill_period) {
+            const monthlyBill = formData.bill_period === 60 ? parseFloat(formData.bill_value) / 2 : parseFloat(formData.bill_value);
+            estimatedAnnualConsumption = calculateAnnualConsumption(monthlyBill);
+        }
+        
+        const paymentOptions = getPaymentOptions(formData.property_type, estimatedAnnualConsumption);
         
         return (
             <div className="space-y-4">
@@ -508,7 +524,7 @@ const CalculatorPage = () => {
                     </div>
                 </div>
                 
-                {/* ✅ فترة الفاتورة (جديد - يختارها العميل) */}
+                {/* فترة الفاتورة */}
                 <div>
                     <label className="block text-gray-700 mb-2 font-semibold">فترة فاتورة الكهرباء *</label>
                     <div className="grid grid-cols-2 gap-3">
@@ -612,7 +628,7 @@ const CalculatorPage = () => {
                     </div>
                 </div>
                 
-                {/* ✅ طريقة الدفع (جديد - تظهر قبل الحساب) */}
+                {/* طريقة الدفع - اختيار عادي بدون نوافذ منبثقة */}
                 <div className="border-t pt-4 mt-2">
                     <p className="text-gray-700 font-semibold mb-3">اختر طريقة الدفع *</p>
                     <div className="space-y-2">
@@ -623,7 +639,7 @@ const CalculatorPage = () => {
                                 <button
                                     key={option.value}
                                     type="button"
-                                    onClick={() => handlePaymentSelection(option.value)}
+                                    onClick={() => setFormData({ ...formData, payment_method: option.value })}
                                     className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition text-right ${
                                         isSelected 
                                             ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' 
@@ -637,6 +653,11 @@ const CalculatorPage = () => {
                                             {isSelected && <FaCheckCircle className="text-orange-500 text-sm" />}
                                         </div>
                                         <div className="text-xs text-gray-500">{option.description}</div>
+                                        {option.value === 'prosol' && option.loanAmount && (
+                                            <div className="text-xs text-green-600 mt-1">
+                                                💰 قرض {option.loanAmount} دينار + منحة {option.grantAmount} دينار
+                                            </div>
+                                        )}
                                     </div>
                                     <div className={`text-xl ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>✓</div>
                                 </button>
@@ -665,8 +686,27 @@ const CalculatorPage = () => {
     // ==================== STEP 3: النتائج ====================
     const renderResult = () => {
         const property = propertyTypes.find(p => p.value === formData.property_type);
-        const paymentOptions = getPaymentOptions(formData.property_type);
-        const selectedPaymentOption = paymentOptions.find(p => p.value === formData.payment_method);
+        const isResidential = ['house', 'apartment'].includes(formData.property_type);
+        
+        // تحديد تفاصيل PROSOL إذا كان العميل مؤهلاً
+        let prosolDetails = null;
+        if (formData.payment_method === 'prosol' && result.annual_consumption >= 1200 && result.annual_consumption <= 1800) {
+            const isCategory1 = result.annual_consumption <= 1600;
+            const loanAmount = isCategory1 ? 2000 : 3000;
+            const grantAmount = 1500;
+            const monthlyRate = 0.03 / 12;
+            const totalMonths = 10 * 12;
+            const monthlyPayment = (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1);
+            const biMonthlyPayment = monthlyPayment / 2;
+            
+            prosolDetails = {
+                loanAmount,
+                grantAmount,
+                monthlyPayment: Math.round(monthlyPayment),
+                biMonthlyPayment: Math.round(biMonthlyPayment),
+                totalFinancing: loanAmount + grantAmount
+            };
+        }
         
         return (
             <div className="space-y-4">
@@ -735,34 +775,72 @@ const CalculatorPage = () => {
                     <div className="flex justify-between font-semibold mt-2 pt-2 border-t"><span>الإجمالي</span><span>{result.monthly_consumption} kWh</span><span>{result.monthly_bill.toFixed(2)} دينار/شهر</span></div>
                 </div>
                 
-                {/* ✅ تذكير العميل بطريقة الدفع المختارة والفوائد */}
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <FaMoneyBillWave className="text-green-600 text-xl" />
-                        <span className="font-bold text-gray-800">طريقة الدفع المختارة: {selectedPaymentOption?.label}</span>
+                {/* تفاصيل التمويل حسب طريقة الدفع */}
+                {formData.payment_method === 'cash' && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><FaMoneyBillWave className="text-green-600" /> دفع نقدي</h3>
+                        <p className="text-sm text-gray-700">الدفع الكامل للمبلغ عند التركيب</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ خصم 5-10%</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ تركيب سريع</span>
+                        </div>
                     </div>
-                    <p className="text-sm text-gray-700">{selectedPaymentOption?.description}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedPaymentOption?.pros.map((pro, idx) => (
-                            <span key={idx} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ {pro}</span>
-                        ))}
+                )}
+                
+                {formData.payment_method === 'steg' && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><FaBolt className="text-green-600" /> تمويل STEG</h3>
+                        <p className="text-sm text-gray-700">تقسيط عبر فاتورة الكهرباء حتى 7 سنوات</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ بدون فوائد</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ تقسيط شهري</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ بدون دفعة أولى</span>
+                        </div>
                     </div>
-                    {formData.payment_method === 'prosol' && (
-                        <div className="mt-3 text-xs text-blue-600">
-                            💡 تمويل PROSOL: فائدة 3% فقط، ضمان الدولة، مدة سداد تصل إلى 7 سنوات
+                )}
+                
+                {formData.payment_method === 'prosol' && prosolDetails && (
+                    <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-5 text-white">
+                        <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+                            <FaHandHoldingHeart /> PROSOL ELEC Économique
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span>الاستهلاك السنوي:</span>
+                                <span className="font-bold">{result.annual_consumption} kWh</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>منحة ANME:</span>
+                                <span className="font-bold">{prosolDetails.grantAmount.toLocaleString()} دينار</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>مبلغ القرض (فائدة 3%):</span>
+                                <span className="font-bold">{prosolDetails.loanAmount.toLocaleString()} دينار</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>القسط الشهري:</span>
+                                <span className="font-bold">{prosolDetails.monthlyPayment.toLocaleString()} دينار</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>القسط البيدومستري (مرتين في الشهر):</span>
+                                <span className="font-bold">{prosolDetails.biMonthlyPayment.toLocaleString()} دينار</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>مدة السداد:</span>
+                                <span>10 سنوات</span>
+                            </div>
+                            <div className="border-t border-white/30 pt-2 mt-2">
+                                <div className="flex justify-between">
+                                    <span>التوفير الشهري بعد القسط:</span>
+                                    <span className="font-bold text-yellow-200">{Math.max(0, result.monthly_savings - prosolDetails.monthlyPayment).toLocaleString()} دينار</span>
+                                </div>
+                            </div>
                         </div>
-                    )}
-                    {formData.payment_method === 'steg' && (
-                        <div className="mt-3 text-xs text-blue-600">
-                            💡 تمويل STEG: تقسيط عبر فاتورة الكهرباء بدون فوائد
-                        </div>
-                    )}
-                    {formData.payment_method === 'cash' && (
-                        <div className="mt-3 text-xs text-blue-600">
-                            💡 دفع نقدي: خصم 5-10% على التكلفة الإجمالية
-                        </div>
-                    )}
-                </div>
+                        <p className="text-xs mt-3 text-green-100">
+                            ✓ يتم خصم القسط تلقائياً من فاتورة STEG (بيدومستري)
+                        </p>
+                    </div>
+                )}
                 
                 <div className="mt-4 p-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg">
                     <button 
@@ -781,47 +859,6 @@ const CalculatorPage = () => {
                 <button onClick={() => { setStep(2); setResult(null); }} className="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300 transition">
                     تعديل البيانات
                 </button>
-            </div>
-        );
-    };
-
-    // ==================== النوافذ المنبثقة ====================
-    const renderLegalModal = () => {
-        if (!showLegalModal || !selectedPayment) return null;
-        const paymentOption = getPaymentOptions(formData.property_type).find(p => p.value === selectedPayment);
-        const isProsol = selectedPayment === 'prosol';
-        
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                    <div className="sticky top-0 bg-white p-4 border-b"><h3 className="text-xl font-bold text-gray-800">{paymentOption?.label}</h3></div>
-                    <div className="p-6">
-                        <p className="text-gray-700 mb-4">{paymentOption?.description}</p>
-                        {isProsol && (
-                            <>
-                                <div className="bg-green-50 p-3 rounded-lg mb-4"><h4 className="font-semibold text-green-800 mb-2">✓ مزايا PROSOL:</h4><ul className="list-disc list-inside space-y-1 text-sm text-green-700"><li>فائدة مخفضة 3% فقط</li><li>ضمان الدولة</li><li>مدة سداد تصل إلى 7 سنوات</li><li>مساهمة شخصية 20%</li></ul></div>
-                                <div className="bg-yellow-50 p-3 rounded-lg mb-4"><p className="text-xs text-yellow-800">⚠️ ملاحظة: المنحة تُصرف للشركة المعتمدة وليس للعميل مباشرة، ويتم خصمها من السعر النهائي.</p></div>
-                                {selectedBank && <div className="bg-blue-50 p-3 rounded-lg mb-4"><p className="text-sm text-blue-800">🏦 البنك المختار: <strong>{selectedBank.name}</strong></p></div>}
-                            </>
-                        )}
-                        <div className="flex gap-3"><button onClick={handleConfirmAndSend} disabled={sending} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50">{sending ? <FaSpinner className="animate-spin" /> : 'أوافق وأطلب الدراسة'}</button><button onClick={() => setShowLegalModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition">إلغاء</button></div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const renderBankModal = () => {
-        if (!showBankModal) return null;
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-                    <div className="sticky top-0 bg-white p-4 border-b"><h3 className="text-xl font-bold text-gray-800">اختر البنك</h3><p className="text-sm text-gray-500 mt-1">اختر البنك الذي ترغب في التعامل معه</p></div>
-                    <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
-                        {prosolBanks.map(bank => (<button key={bank.id} onClick={() => handleBankSelect(bank)} className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-orange-500 hover:bg-orange-50 transition text-right"><span className="text-2xl">{bank.logo}</span><div className="flex-1"><div className="font-semibold">{bank.name}</div><div className="text-xs text-gray-500">بنك معتمد</div></div><div className="text-gray-400">›</div></button>))}
-                    </div>
-                    <div className="p-4 border-t"><button onClick={() => setShowBankModal(false)} className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 transition">إلغاء</button></div>
-                </div>
             </div>
         );
     };
@@ -852,8 +889,6 @@ const CalculatorPage = () => {
                     <p>للتواصل: shamsi.tns@gmail.com | <span dir="ltr" className="inline-block">24 66 14 99</span></p>
                 </div>
             </div>
-            {renderLegalModal()}
-            {renderBankModal()}
         </div>
     );
 };
