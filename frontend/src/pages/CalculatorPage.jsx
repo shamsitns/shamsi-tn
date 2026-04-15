@@ -479,9 +479,10 @@ const CalculatorPage = () => {
     const renderStep2 = () => {
         // حساب الاستهلاك السنوي التقريبي لعرض خيارات الدفع المناسبة
         let estimatedAnnualConsumption = null;
-        if (formData.bill_value && formData.bill_period) {
+        if (formData.bill_value && formData.bill_value > 0 && formData.bill_period) {
             const monthlyBill = formData.bill_period === 60 ? parseFloat(formData.bill_value) / 2 : parseFloat(formData.bill_value);
             estimatedAnnualConsumption = calculateAnnualConsumption(monthlyBill);
+            console.log('📊 Estimated Annual Consumption:', estimatedAnnualConsumption);
         }
         
         const paymentOptions = getPaymentOptions(formData.property_type, estimatedAnnualConsumption);
