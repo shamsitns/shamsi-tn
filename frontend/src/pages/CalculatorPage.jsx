@@ -117,8 +117,24 @@ const calculateConsumption = (billAmount, billPeriod) => {
 // حساب الاستهلاك السنوي
 // ============================================
 const calculateAnnualConsumption = (monthlyBill) => {
-    const monthlyKwh = monthlyBill / 0.25;
-    return Math.round(monthlyKwh * 12);
+    // حساب أكثر دقة باستخدام شرائح STEG
+    let remaining = monthlyBill;
+    let totalKwh = 0;
+    
+    for (const tier of electricityTiers) {
+        const tierMaxKwh = tier.max;
+        const tierCost = tierMaxKwh * tier.rate;
+        
+        if (remaining <= tierCost) {
+            const kwh = remaining / tier.rate;
+            totalKwh += kwh;
+            break;
+        } else {
+            totalKwh += tierMaxKwh;
+            remaining -= tierCost;
+        }
+    }
+    return Math.round(totalKwh * 12);
 };
 
 // ============================================
